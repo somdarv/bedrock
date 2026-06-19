@@ -16,7 +16,7 @@ and demoable.
 
 ---
 
-## Phase 0 — Scaffold & foundations
+## Phase 0 — Scaffold & foundations ✅ done
 
 - Next.js App Router + TypeScript; Tailwind; ESLint/Prettier; env config.
 - Route-group skeleton: `(public)` and `(admin)`; base layouts.
@@ -29,7 +29,7 @@ and demoable.
 
 ---
 
-## Phase 1 — Admin auth & shell
+## Phase 1 — Admin auth & shell ✅ done
 
 - Login page → Sanctum token stored in an httpOnly cookie; logout.
 - Protected `(admin)` layout that guards every admin route server-side; redirect unauthenticated.
@@ -39,7 +39,7 @@ and demoable.
 
 ---
 
-## Phase 2 — Clients
+## Phase 2 — Clients ✅ done
 
 - Client list (search), create/edit form (name, WhatsApp, email, phone), client detail showing
   their packages.
@@ -48,7 +48,7 @@ and demoable.
 
 ---
 
-## Phase 3 — Work Packages core (the spine)
+## Phase 3 — Work Packages core (the spine) ✅ done
 
 - Create a package under a client; package list + detail view; status badge.
 - **Line items CRUD** with live subtotal.
