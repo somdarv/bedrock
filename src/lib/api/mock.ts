@@ -1,7 +1,7 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type Payment, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
-import { deliverableTypeFromName } from "@/lib/utils";
+import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
 /**
  * In-memory mock backend. Default in dev so the frontend is never blocked on the
@@ -372,6 +372,38 @@ export const mockApi: BedrockApi = {
       const [removed] = pkg.deliverables.splice(idx, 1);
       processingUntil.delete(deliverableId);
       logActivity(pkg, "deliverable_removed", `Removed "${removed.filename}".`);
+      return pkg;
+    },
+    async recordPayment(packageId, input) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const payment: Payment = {
+        id: `pm_${crypto.randomUUID().slice(0, 8)}`,
+        amount: input.amount,
+        kind: input.kind,
+        status: "success",
+        paystackReference: `ref_${crypto.randomUUID().slice(0, 10)}`,
+        method: input.method,
+        paidAt: new Date().toISOString(),
+      };
+      pkg.payments.push(payment);
+      logActivity(pkg, "payment_received", `Payment of ${formatCedis(input.amount)} received.`);
+
+      // Start gate: deposit (or full small-job payment) opens work.
+      if (pkg.status === "sent" || pkg.status === "awaiting_deposit") {
+        pkg.status = "in_progress";
+        logActivity(pkg, "work_started", "Deposit confirmed — work started.");
+      }
+
+      // Download gate: a zero balance unlocks the clean originals.
+      if (balance(pkg) <= 0) {
+        pkg.deliverables.forEach((d) => (d.locked = false));
+        logActivity(pkg, "payment_complete", "Balance cleared — downloads unlocked, receipt sent.");
+      }
+
       return pkg;
     },
   },

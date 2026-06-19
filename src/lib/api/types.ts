@@ -71,6 +71,12 @@ export interface Payment {
   paidAt: string | null;
 }
 
+export interface PaymentInput {
+  amount: number;
+  kind: PaymentKind;
+  method: string | null;
+}
+
 export interface Deliverable {
   id: string;
   type: DeliverableType;

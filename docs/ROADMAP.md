@@ -80,7 +80,7 @@ and demoable.
 
 ---
 
-## Phase 6 — Payments & gates visibility
+## Phase 6 — Payments & gates visibility ✅ done
 
 - Payments panel per package (deposit + final): amounts, references, status, paid-at; live
   **balance** and **gate state** (start/download) read from the API.

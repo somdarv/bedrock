@@ -115,5 +115,10 @@ export const httpApi: BedrockApi = {
       request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/${deliverableId}`, {
         method: "DELETE",
       }),
+    recordPayment: (packageId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/payments`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
   },
 };

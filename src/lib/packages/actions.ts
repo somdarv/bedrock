@@ -6,6 +6,7 @@ import {
   ApiError,
   effectiveTotal,
   type LineItemInput,
+  type PaymentKind,
   type PricingMode,
   type WorkPackageInput,
   type WorkPackageStatus,
@@ -186,6 +187,36 @@ export async function toggleLineItemDone(
     await api.packages.setLineItemDone(packageId, itemId, done);
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not update progress." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+// ----- Payments -----
+
+export interface PaymentFormState {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: { amount?: string };
+}
+
+export async function recordPayment(
+  packageId: string,
+  _prev: PaymentFormState,
+  formData: FormData,
+): Promise<PaymentFormState> {
+  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const kind = String(formData.get("kind") ?? "deposit") as PaymentKind;
+  const method = String(formData.get("method") ?? "").trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { fieldErrors: { amount: "Enter an amount greater than 0." } };
+  }
+
+  try {
+    await api.packages.recordPayment(packageId, { amount, kind, method: method || null });
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not record payment." };
   }
   revalidatePackage(packageId);
   return { ok: true };
