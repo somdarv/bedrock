@@ -60,7 +60,7 @@ and demoable.
 
 ---
 
-## Phase 4 — Lifecycle & activity
+## Phase 4 — Lifecycle & activity ✅ done
 
 - Status transition controls (Draft → Sent → … → Closed) with the allowed-transition rules.
 - "Send invoice / link" action (triggers backend Termii/email); toggle **line items done** to

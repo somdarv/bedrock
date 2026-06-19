@@ -1,5 +1,6 @@
 import { ApiError, type BedrockApi } from "./contract";
 import type { ActivityEntry, Client, LineItem, WorkPackage } from "./types";
+import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 
 /**
  * In-memory mock backend. Default in dev so the frontend is never blocked on the
@@ -69,6 +70,16 @@ const packages: WorkPackage[] = [
 function found<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new ApiError(404, `${what} not found`);
   return value;
+}
+
+function logActivity(pkg: WorkPackage, event: string, message: string) {
+  const entry: ActivityEntry = {
+    id: `ev_${crypto.randomUUID().slice(0, 8)}`,
+    event,
+    message,
+    createdAt: new Date().toISOString(),
+  };
+  pkg.activity.push(entry);
 }
 
 export const mockApi: BedrockApi = {
@@ -239,6 +250,53 @@ export const mockApi: BedrockApi = {
       const idx = pkg.lineItems.findIndex((li) => li.id === itemId);
       if (idx === -1) throw new ApiError(404, "Line item not found");
       pkg.lineItems.splice(idx, 1);
+      return pkg;
+    },
+    async setStatus(id, status) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === id),
+        "Work package",
+      );
+      if (!ALLOWED_TRANSITIONS[pkg.status].includes(status)) {
+        throw new ApiError(
+          409,
+          `Cannot move from ${statusMeta(pkg.status).label} to ${statusMeta(status).label}.`,
+        );
+      }
+      pkg.status = status;
+      logActivity(pkg, "status_changed", `Status changed to ${statusMeta(status).label}.`);
+      return pkg;
+    },
+    async send(id) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === id),
+        "Work package",
+      );
+      if (pkg.status !== "draft") {
+        throw new ApiError(409, "Only a draft package can be sent.");
+      }
+      pkg.status = "sent";
+      logActivity(pkg, "invoice_sent", "Invoice and tracking link sent via WhatsApp + email.");
+      return pkg;
+    },
+    async setLineItemDone(packageId, itemId, done) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const item = found(
+        pkg.lineItems.find((li) => li.id === itemId),
+        "Line item",
+      );
+      item.done = done;
+      logActivity(
+        pkg,
+        "line_item_progress",
+        `"${item.description}" marked ${done ? "done" : "not done"}.`,
+      );
       return pkg;
     },
   },

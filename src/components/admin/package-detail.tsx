@@ -12,14 +12,24 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { LineItemModal } from "@/components/admin/line-item-modal";
 import { PackageFormModal } from "@/components/admin/package-form-modal";
-import { balance, effectiveTotal, type LineItem, type PricingMode, type WorkPackage } from "@/lib/api";
 import {
+  balance,
+  effectiveTotal,
+  type LineItem,
+  type PricingMode,
+  type WorkPackage,
+  type WorkPackageStatus,
+} from "@/lib/api";
+import {
+  changeStatus,
   deletePackage,
   deleteLineItem,
+  sendPackage,
   setPricingMode,
   setTotalOverride,
+  toggleLineItemDone,
 } from "@/lib/packages/actions";
-import { statusMeta } from "@/lib/status";
+import { nextTransitions, statusMeta } from "@/lib/status";
 import { cn, formatCedis } from "@/lib/utils";
 
 export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientName: string }) {
@@ -35,9 +45,16 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   const [pendingMode, startMode] = React.useTransition();
   const [pendingItemDelete, startItemDelete] = React.useTransition();
   const [pendingDelete, startDelete] = React.useTransition();
+  const [pendingLifecycle, startLifecycle] = React.useTransition();
+  const [pendingProgress, startProgress] = React.useTransition();
 
   const meta = statusMeta(pkg.status);
   const isFixed = pkg.pricingMode === "fixed";
+  const transitions = nextTransitions(pkg.status);
+  const doneCount = pkg.lineItems.filter((li) => li.done).length;
+  const progressPct = pkg.lineItems.length
+    ? Math.round((doneCount / pkg.lineItems.length) * 100)
+    : 0;
   const total = effectiveTotal(pkg);
   const paid = pkg.payments
     .filter((p) => p.status === "success")
@@ -94,6 +111,36 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
     });
   }
 
+  function doSend() {
+    startLifecycle(async () => {
+      const res = await sendPackage(pkg.id);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Invoice sent to the client.", "success");
+        router.refresh();
+      }
+    });
+  }
+
+  function doTransition(status: WorkPackageStatus) {
+    startLifecycle(async () => {
+      const res = await changeStatus(pkg.id, status);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast(`Moved to ${statusMeta(status).label}.`, "success");
+        router.refresh();
+      }
+    });
+  }
+
+  function doToggleDone(item: LineItem, done: boolean) {
+    startProgress(async () => {
+      const res = await toggleLineItemDone(pkg.id, item.id, done);
+      if (res.error) toast(res.error, "danger");
+      else router.refresh();
+    });
+  }
+
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(publicUrl);
@@ -147,6 +194,38 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
         </Button>
       </div>
 
+      {/* Lifecycle */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface p-4">
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Lifecycle</div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <span className="text-sm">Current:</span>
+            <Badge variant={meta.variant}>{meta.label}</Badge>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {pkg.status === "draft" && (
+            <Button onClick={doSend} disabled={pendingLifecycle}>
+              {pendingLifecycle ? <Spinner /> : null}
+              Send invoice &amp; link
+            </Button>
+          )}
+          {transitions.map((status) => (
+            <Button
+              key={status}
+              variant="outline"
+              onClick={() => doTransition(status)}
+              disabled={pendingLifecycle}
+            >
+              Move to {statusMeta(status).label}
+            </Button>
+          ))}
+          {pkg.status !== "draft" && transitions.length === 0 && (
+            <span className="text-sm text-muted-foreground">No further transitions.</span>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Pricing + line items */}
         <div className="space-y-4 lg:col-span-2">
@@ -182,6 +261,7 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           <Table>
             <THead>
               <TR>
+                <TH className="w-12">Done</TH>
                 <TH>Description</TH>
                 <TH className="text-right">Qty</TH>
                 <TH className="text-right">Unit</TH>
@@ -192,14 +272,26 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
             <TBody>
               {pkg.lineItems.length === 0 ? (
                 <TR>
-                  <TD colSpan={5} className="text-center text-muted-foreground">
+                  <TD colSpan={6} className="text-center text-muted-foreground">
                     No line items yet.
                   </TD>
                 </TR>
               ) : (
                 pkg.lineItems.map((li) => (
                   <TR key={li.id}>
-                    <TD className="font-medium">{li.description}</TD>
+                    <TD>
+                      <input
+                        type="checkbox"
+                        checked={li.done}
+                        disabled={pendingProgress}
+                        onChange={(e) => doToggleDone(li, e.target.checked)}
+                        className="h-4 w-4 accent-primary"
+                        aria-label={`Mark ${li.description} done`}
+                      />
+                    </TD>
+                    <TD className={cn("font-medium", li.done && "text-muted-foreground line-through")}>
+                      {li.description}
+                    </TD>
                     <TD className={cn("text-right", isFixed && "text-subtle line-through")}>
                       {li.quantity}
                     </TD>
@@ -234,6 +326,21 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
 
         {/* Summary */}
         <aside className="space-y-4">
+          <div className="space-y-2 rounded-lg border bg-surface p-5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">Progress</span>
+              <span className="text-muted-foreground">
+                {doneCount}/{pkg.lineItems.length} done
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+
           <div className="space-y-3 rounded-lg border bg-surface p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total</span>
@@ -266,6 +373,29 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
             </div>
           </dl>
         </aside>
+      </div>
+
+      {/* Activity timeline */}
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Activity</h2>
+        <div className="rounded-lg border bg-surface">
+          {pkg.activity.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-muted-foreground">No activity yet.</p>
+          ) : (
+            <ul className="divide-y">
+              {[...pkg.activity]
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .map((entry) => (
+                  <li key={entry.id} className="flex items-start justify-between gap-4 px-5 py-3">
+                    <span className="text-sm">{entry.message}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Modals */}

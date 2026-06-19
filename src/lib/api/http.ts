@@ -88,5 +88,16 @@ export const httpApi: BedrockApi = {
       request<WorkPackage>(`/api/admin/packages/${packageId}/items/${itemId}`, {
         method: "DELETE",
       }),
+    setStatus: (id, status) =>
+      request<WorkPackage>(`/api/admin/packages/${id}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
+    send: (id) => request<WorkPackage>(`/api/admin/packages/${id}/send`, { method: "POST" }),
+    setLineItemDone: (packageId, itemId, done) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/items/${itemId}/done`, {
+        method: "POST",
+        body: JSON.stringify({ done }),
+      }),
   },
 };

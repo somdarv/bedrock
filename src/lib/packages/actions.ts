@@ -8,6 +8,7 @@ import {
   type LineItemInput,
   type PricingMode,
   type WorkPackageInput,
+  type WorkPackageStatus,
 } from "@/lib/api";
 
 function revalidatePackage(id: string) {
@@ -143,6 +144,50 @@ export async function setTotalOverride(
     return { error: e instanceof ApiError ? e.message : "Could not update total." };
   }
   revalidatePackage(id);
+  return { ok: true };
+}
+
+// ----- Lifecycle -----
+
+export interface ActionState {
+  ok?: boolean;
+  error?: string;
+}
+
+export async function sendPackage(id: string): Promise<ActionState> {
+  try {
+    await api.packages.send(id);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not send package." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
+export async function changeStatus(
+  id: string,
+  status: WorkPackageStatus,
+): Promise<ActionState> {
+  try {
+    await api.packages.setStatus(id, status);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not change status." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
+export async function toggleLineItemDone(
+  packageId: string,
+  itemId: string,
+  done: boolean,
+): Promise<ActionState> {
+  try {
+    await api.packages.setLineItemDone(packageId, itemId, done);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not update progress." };
+  }
+  revalidatePackage(packageId);
   return { ok: true };
 }
 

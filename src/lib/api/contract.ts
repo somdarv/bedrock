@@ -6,6 +6,7 @@ import type {
   SessionUser,
   WorkPackage,
   WorkPackageInput,
+  WorkPackageStatus,
 } from "./types";
 
 /**
@@ -38,6 +39,12 @@ export interface BedrockApi {
     addLineItem(packageId: string, input: LineItemInput): Promise<WorkPackage>;
     updateLineItem(packageId: string, itemId: string, input: LineItemInput): Promise<WorkPackage>;
     removeLineItem(packageId: string, itemId: string): Promise<WorkPackage>;
+    /** Apply a lifecycle transition (validated against allowed moves). */
+    setStatus(id: string, status: WorkPackageStatus): Promise<WorkPackage>;
+    /** Send the invoice + tracking link (Termii/email) and move draft → sent. */
+    send(id: string): Promise<WorkPackage>;
+    /** Toggle a line item's done flag to drive the client progress bar. */
+    setLineItemDone(packageId: string, itemId: string, done: boolean): Promise<WorkPackage>;
   };
 }
 

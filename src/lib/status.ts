@@ -21,3 +21,22 @@ export const STATUS_META: Record<WorkPackageStatus, StatusMeta> = {
 export function statusMeta(status: WorkPackageStatus): StatusMeta {
   return STATUS_META[status];
 }
+
+/**
+ * Allowed forward transitions. Leaving `draft` happens only via the "send invoice"
+ * action (which also fires notifications), so it is not listed as a manual move.
+ */
+export const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
+  draft: [],
+  sent: ["awaiting_deposit"],
+  awaiting_deposit: ["in_progress"],
+  in_progress: ["review"],
+  review: ["awaiting_final_payment"],
+  awaiting_final_payment: ["delivered"],
+  delivered: ["closed"],
+  closed: [],
+};
+
+export function nextTransitions(status: WorkPackageStatus): WorkPackageStatus[] {
+  return ALLOWED_TRANSITIONS[status];
+}
