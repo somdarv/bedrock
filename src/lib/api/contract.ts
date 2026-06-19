@@ -45,6 +45,9 @@ export interface BedrockApi {
     send(id: string): Promise<WorkPackage>;
     /** Toggle a line item's done flag to drive the client progress bar. */
     setLineItemDone(packageId: string, itemId: string, done: boolean): Promise<WorkPackage>;
+    /** Upload an original; the backend stores it in R2 and queues preview generation. */
+    addDeliverable(packageId: string, file: File): Promise<WorkPackage>;
+    removeDeliverable(packageId: string, deliverableId: string): Promise<WorkPackage>;
   };
 }
 

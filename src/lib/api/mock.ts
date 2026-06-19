@@ -1,6 +1,7 @@
 import { ApiError, type BedrockApi } from "./contract";
-import type { ActivityEntry, Client, LineItem, WorkPackage } from "./types";
+import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
+import { deliverableTypeFromName } from "@/lib/utils";
 
 /**
  * In-memory mock backend. Default in dev so the frontend is never blocked on the
@@ -82,6 +83,40 @@ function logActivity(pkg: WorkPackage, event: string, message: string) {
   pkg.activity.push(entry);
 }
 
+// Simulated media pipeline: deliverables finish "processing" a few seconds after upload.
+const PROCESSING_MS = 3000;
+const processingUntil = new Map<string, number>();
+
+/** Build a watermarked SVG preview as a self-contained data URI (no network). */
+function makePreview(type: DeliverableType, filename: string): string {
+  const label = type.toUpperCase();
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'>
+    <rect width='400' height='300' fill='#f4efe8'/>
+    <g fill='none' stroke='#b45309' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.5'>
+      <path d='M150 175 L185 110 L200 145 L215 110 L250 175'/>
+    </g>
+    <text x='200' y='215' font-family='sans-serif' font-size='15' fill='#78716c' text-anchor='middle'>${label} preview</text>
+    <text x='200' y='240' font-family='sans-serif' font-size='12' fill='#a8a29e' text-anchor='middle'>${filename}</text>
+    <text x='200' y='160' font-family='sans-serif' font-size='34' font-weight='bold' fill='#1c1917' fill-opacity='0.06' text-anchor='middle' transform='rotate(-20 200 150)'>SAHARABASE</text>
+  </svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/** Lazily advance any deliverable past its processing window to "ready". */
+function settleDeliverables(pkg: WorkPackage) {
+  const now = Date.now();
+  for (const d of pkg.deliverables) {
+    if (d.processingStatus === "processing") {
+      const until = processingUntil.get(d.id) ?? 0;
+      if (now >= until) {
+        d.processingStatus = "ready";
+        d.previewUrl = makePreview(d.type, d.filename);
+        processingUntil.delete(d.id);
+      }
+    }
+  }
+}
+
 export const mockApi: BedrockApi = {
   auth: {
     async login(email) {
@@ -144,22 +179,27 @@ export const mockApi: BedrockApi = {
   packages: {
     async list(params) {
       await delay();
+      packages.forEach(settleDeliverables);
       const all = [...packages].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return params?.clientId ? all.filter((p) => p.clientId === params.clientId) : all;
     },
     async get(id) {
       await delay();
-      return found(
+      const pkg = found(
         packages.find((p) => p.id === id),
         "Work package",
       );
+      settleDeliverables(pkg);
+      return pkg;
     },
     async getBySlug(slug) {
       await delay();
-      return found(
+      const pkg = found(
         packages.find((p) => p.publicSlug === slug),
         "Work package",
       );
+      settleDeliverables(pkg);
+      return pkg;
     },
     async create(clientId, input) {
       await delay();
@@ -297,6 +337,41 @@ export const mockApi: BedrockApi = {
         "line_item_progress",
         `"${item.description}" marked ${done ? "done" : "not done"}.`,
       );
+      return pkg;
+    },
+    async addDeliverable(packageId, file) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const type = deliverableTypeFromName(file.name);
+      if (!type) throw new ApiError(422, "Unsupported file type. Use an image, PDF, or video.");
+      const deliverable: Deliverable = {
+        id: `dl_${crypto.randomUUID().slice(0, 8)}`,
+        type,
+        filename: file.name,
+        previewUrl: null,
+        // Download gate: originals stay locked until the balance reaches zero.
+        locked: balance(pkg) > 0,
+        processingStatus: "processing",
+      };
+      pkg.deliverables.push(deliverable);
+      processingUntil.set(deliverable.id, Date.now() + PROCESSING_MS);
+      logActivity(pkg, "deliverable_uploaded", `Uploaded "${file.name}" — generating preview.`);
+      return pkg;
+    },
+    async removeDeliverable(packageId, deliverableId) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const idx = pkg.deliverables.findIndex((d) => d.id === deliverableId);
+      if (idx === -1) throw new ApiError(404, "Deliverable not found");
+      const [removed] = pkg.deliverables.splice(idx, 1);
+      processingUntil.delete(deliverableId);
+      logActivity(pkg, "deliverable_removed", `Removed "${removed.filename}".`);
       return pkg;
     },
   },

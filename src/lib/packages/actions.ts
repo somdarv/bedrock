@@ -191,6 +191,38 @@ export async function toggleLineItemDone(
   return { ok: true };
 }
 
+// ----- Deliverables -----
+
+export async function uploadDeliverable(
+  packageId: string,
+  formData: FormData,
+): Promise<ActionState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a file to upload." };
+  }
+  try {
+    await api.packages.addDeliverable(packageId, file);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Upload failed." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+export async function deleteDeliverable(
+  packageId: string,
+  deliverableId: string,
+): Promise<ActionState> {
+  try {
+    await api.packages.removeDeliverable(packageId, deliverableId);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not remove deliverable." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
 // ----- Line items -----
 
 export interface LineItemFormState {

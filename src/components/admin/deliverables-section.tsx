@@ -1,0 +1,137 @@
+"use client";
+
+import * as React from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState, Spinner } from "@/components/ui/states";
+import { useToast } from "@/components/ui/toast";
+import type { Deliverable, WorkPackage } from "@/lib/api";
+import { deleteDeliverable, uploadDeliverable } from "@/lib/packages/actions";
+
+const ACCEPT = "image/*,application/pdf,video/*";
+
+export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, startUpload] = React.useTransition();
+  const [removingId, setRemovingId] = React.useState<string | null>(null);
+  const [pendingRemove, startRemove] = React.useTransition();
+
+  const anyProcessing = pkg.deliverables.some((d) => d.processingStatus === "processing");
+
+  // Poll while the mock/backend pipeline finishes generating previews.
+  React.useEffect(() => {
+    if (!anyProcessing) return;
+    const t = setTimeout(() => router.refresh(), 3500);
+    return () => clearTimeout(t);
+  }, [anyProcessing, router]);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    startUpload(async () => {
+      const res = await uploadDeliverable(pkg.id, fd);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Upload received — generating preview…", "success");
+        router.refresh();
+      }
+      if (fileRef.current) fileRef.current.value = "";
+    });
+  }
+
+  function remove(d: Deliverable) {
+    setRemovingId(d.id);
+    startRemove(async () => {
+      const res = await deleteDeliverable(pkg.id, d.id);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Deliverable removed.", "success");
+        router.refresh();
+      }
+      setRemovingId(null);
+    });
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold tracking-tight">Deliverables</h2>
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={ACCEPT}
+            className="hidden"
+            onChange={onFile}
+            disabled={uploading}
+          />
+          <Button size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? <Spinner /> : null}
+            Upload original
+          </Button>
+        </div>
+      </div>
+
+      <p className="mb-3 text-sm text-muted-foreground">
+        Originals are watermarked into previews automatically. Clean files stay locked until the
+        balance reaches GHS&nbsp;0.
+      </p>
+
+      {pkg.deliverables.length === 0 ? (
+        <EmptyState
+          title="No deliverables yet"
+          description="Upload an image, PDF, or video. A watermarked preview is generated for the client."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {pkg.deliverables.map((d) => (
+            <div key={d.id} className="overflow-hidden rounded-lg border bg-surface">
+              <div className="relative flex h-40 items-center justify-center bg-muted">
+                {d.processingStatus === "ready" && d.previewUrl ? (
+                  <Image
+                    src={d.previewUrl}
+                    alt={`${d.filename} preview`}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : d.processingStatus === "failed" ? (
+                  <span className="text-sm text-danger">Processing failed</span>
+                ) : (
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner /> Processing…
+                  </span>
+                )}
+                <div className="absolute right-2 top-2">
+                  <Badge variant={d.locked ? "warning" : "success"}>
+                    {d.locked ? "Locked" : "Unlocked"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{d.filename}</div>
+                  <Badge className="mt-1">{d.type.toUpperCase()}</Badge>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => remove(d)}
+                  disabled={pendingRemove && removingId === d.id}
+                >
+                  {pendingRemove && removingId === d.id ? <Spinner /> : "Remove"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

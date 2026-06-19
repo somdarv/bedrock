@@ -99,5 +99,21 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify({ done }),
       }),
+    addDeliverable: async (packageId, file) => {
+      // Multipart upload — let the browser set the multipart boundary; no JSON header.
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${BASE_URL}/api/admin/packages/${packageId}/deliverables`, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      if (!res.ok) throw new ApiError(res.status, res.statusText);
+      return (await res.json()) as WorkPackage;
+    },
+    removeDeliverable: (packageId, deliverableId) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/${deliverableId}`, {
+        method: "DELETE",
+      }),
   },
 };

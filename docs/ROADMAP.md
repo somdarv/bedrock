@@ -71,7 +71,7 @@ and demoable.
 
 ---
 
-## Phase 5 — Deliverables (admin upload)
+## Phase 5 — Deliverables (admin upload) ✅ done
 
 - Upload originals (image / PDF / video) to the package; show per-file **processing status** and
   generated **preview** thumbnails; show **locked** state.
