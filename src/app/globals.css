@@ -185,9 +185,14 @@
     page-break-after: avoid;
     break-after: avoid;
   }
-  tr,
+  /* Keep small items intact, but let tall table rows flow — a single big row (e.g. a
+     bulleted scope cell) must be allowed to break, or it gets shoved to the next page. */
   li {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+  tr {
+    page-break-inside: auto;
+    break-inside: auto;
   }
 }
