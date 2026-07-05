@@ -1,0 +1,30 @@
+name: Deploy hub frontend
+
+# Auto-deploy the Next.js hub frontend to the VPS on every push to main.
+# The work (git pull, npm ci, build, pm2 reload) runs in a hardened
+# forced-command script on the server: /home/sahara/deploy-hub.sh
+# This job only opens the SSH connection that triggers it.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-hub
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy over SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger server deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          command_timeout: 15m
+          script: echo "Requesting hub (frontend) deploy on $(hostname)"
