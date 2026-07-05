@@ -103,7 +103,7 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
       </div>
 
       {/* Project Investment */}
-      <div className="avoid-break mb-8">
+      <div className="mb-8">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">Project Investment</p>
         <h3 className="mt-2 text-2xl font-semibold leading-tight text-gray-900">
           Commodity Sourcing &amp; Lead-Management Platform
@@ -180,7 +180,7 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
       </div>
 
       {/* Care Plan / Retainer */}
-      <div className="avoid-break mb-8 border border-t-2 border-gray-200 border-t-primary bg-white">
+      <div className="mb-8 border border-t-2 border-gray-200 border-t-primary bg-white">
         <div className="flex items-end justify-between gap-6 px-5 pt-5">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">Care Plan</p>
@@ -205,7 +205,7 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
             { t: "Backups & data integrity", d: "Seller, buyer, and deal records are backed up on a schedule and verified, so a failure or mistake never means lost data." },
             { t: "Priority support & changes", d: "Fixes and small improvements are handled first, so the platform keeps pace with how the business actually runs." },
           ].map((p, i) => (
-            <div key={p.t} className="bg-white px-4 py-3">
+            <div key={p.t} className="avoid-break bg-white px-4 py-3">
               <div className="flex gap-3">
                 <span className="text-[11px] font-semibold tabular-nums text-primary">0{i + 1}</span>
                 <div>
@@ -250,10 +250,10 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
       </div>
 
       {/* Payment Schedule */}
-      <div className="avoid-break mb-8">
+      <div className="mb-8">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">Payment Schedule</p>
         <div className="mt-4 divide-y divide-gray-200 border-y border-gray-300">
-          <div className="grid grid-cols-[140px_1fr_170px] gap-4 py-4">
+          <div className="avoid-break grid grid-cols-[140px_1fr_170px] gap-4 py-4">
             <div>
               <p className="text-xs font-semibold text-gray-900">Project Start</p>
               <p className="mt-1 text-[10px] uppercase tracking-wider text-gray-500">Due before commencement</p>
@@ -266,7 +266,7 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
               <p className="mt-1 text-sm font-semibold tabular-nums text-primary">+ USD 204.00</p>
             </div>
           </div>
-          <div className="grid grid-cols-[140px_1fr_170px] gap-4 py-4">
+          <div className="avoid-break grid grid-cols-[140px_1fr_170px] gap-4 py-4">
             <div>
               <p className="text-xs font-semibold text-gray-900">Completion</p>
               <p className="mt-1 text-[10px] uppercase tracking-wider text-gray-500">Due before final handoff</p>
@@ -277,7 +277,7 @@ export function DropynFeeSchedule({ record }: { record: DocumentRecord }) {
             </p>
             <p className="text-right text-sm font-semibold text-gray-900">GHS 4,000.00</p>
           </div>
-          <div className="grid grid-cols-[140px_1fr_170px] gap-4 py-4">
+          <div className="avoid-break grid grid-cols-[140px_1fr_170px] gap-4 py-4">
             <div>
               <p className="text-xs font-semibold text-gray-900">Care Plan</p>
               <p className="mt-1 text-[10px] uppercase tracking-wider text-gray-500">Recurring after handover</p>
