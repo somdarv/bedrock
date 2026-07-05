@@ -124,7 +124,11 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
                     aria-label={`Preview ${d.filename}`}
                   >
                     <Image
-                      src={d.previewUrl}
+                      src={
+                        d.type === "image" && !d.archived
+                          ? `/api/admin/deliverables/${pkg.id}/${d.id}`
+                          : d.previewUrl
+                      }
                       alt={`${d.filename} preview`}
                       fill
                       unoptimized
@@ -166,10 +170,18 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
         </div>
       )}
 
-      {/* Admin gets a clean, full-size look at the preview (no client-side deterrents). */}
+      {/* Admin gets a clean, full-size look at the real original (no client-side deterrents).
+          Archived files have no original left, so fall back to the stored preview. */}
       <PreviewLightbox
-        open={Boolean(previewing?.previewUrl)}
-        src={previewing?.previewUrl ?? ""}
+        open={Boolean(previewing)}
+        src={
+          previewing
+            ? previewing.archived
+              ? previewing.previewUrl ?? ""
+              : `/api/admin/deliverables/${pkg.id}/${previewing.id}`
+            : ""
+        }
+        kind={previewing && !previewing.archived ? previewing.type : "image"}
         alt={previewing?.filename ?? "Preview"}
         onClose={() => setPreviewing(null)}
       />
