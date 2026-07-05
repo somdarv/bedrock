@@ -1,36 +1,75 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * SaharaBase monochrome brand mark. Single-color by design so it doubles as the
- * deliverable watermark glyph. Inherits `currentColor`.
+ * SaharaBase brand icon. Uses the real logo asset (public/brand). Defaults to the
+ * black mark for light surfaces; pass variant="white" on dark backgrounds.
  */
-export function BrandMark({ className }: { className?: string }) {
+export function BrandMark({
+  className,
+  variant = "black",
+}: {
+  className?: string;
+  variant?: "black" | "white";
+}) {
   return (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-      className={cn("h-7 w-7", className)}
-    >
-      <rect x="2" y="2" width="28" height="28" rx="7" fill="currentColor" opacity="0.12" />
-      <path
-        d="M9 22l5-12 2 5 2-5 5 12"
-        stroke="currentColor"
-        strokeWidth="2.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <Image
+      src={`/brand/icon-${variant}.png`}
+      alt="SaharaBase"
+      width={110}
+      height={89}
+      priority
+      className={cn("h-7 w-auto", className)}
+    />
   );
 }
 
-export function BrandLockup({ className }: { className?: string }) {
+/**
+ * Full SaharaBase wordmark logo (public/brand). Use where the full brand should
+ * read, e.g. the sign-in screen.
+ */
+export function BrandLogo({
+  className,
+  variant = "black",
+}: {
+  className?: string;
+  variant?: "black" | "white";
+}) {
+  return (
+    <Image
+      src={`/brand/logo-${variant}.png`}
+      alt="SaharaBase"
+      width={497}
+      height={107}
+      priority
+      className={cn("h-7 w-auto", className)}
+    />
+  );
+}
+
+/** Icon + product name — the sidebar/header lockup. */
+export function BrandLockup({
+  className,
+  variant = "black",
+}: {
+  className?: string;
+  variant?: "black" | "white";
+}) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <BrandMark className="text-primary" />
+      <BrandMark variant={variant} />
       <div className="leading-tight">
-        <div className="text-sm font-semibold tracking-tight">Bedrock</div>
-        <div className="text-[11px] text-muted-foreground">SaharaBase</div>
+        <div
+          className={cn(
+            "font-display text-[15px] font-semibold tracking-tightest",
+            variant === "white" ? "text-white" : "text-foreground",
+          )}
+        >
+          Bedrock
+        </div>
+        <div className={cn("text-[11px] tracking-wide", variant === "white" ? "text-white/60" : "text-subtle")}>
+          by SaharaBase
+        </div>
       </div>
     </div>
   );

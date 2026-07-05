@@ -7,13 +7,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format an amount of Ghana cedis for display. */
+/** Format an amount of Ghana cedis for display, e.g. "GHS 1,234.56". */
 export function formatCedis(amount: number) {
-  return new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
+  const value = new Intl.NumberFormat("en-GH", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
+  return `GHS ${value}`;
+}
+
+/**
+ * Base origin for public, client-facing links (the portal). Uses the configured
+ * production URL when set, otherwise the current origin in the browser.
+ */
+export function publicBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "")
+  );
 }
 
 const IMAGE_EXT = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"];

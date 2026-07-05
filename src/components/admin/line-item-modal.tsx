@@ -45,7 +45,13 @@ export function LineItemModal({ open, onClose, packageId, item, onDone }: Props)
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit line item" : "Add line item"}>
       <form action={formAction} className="space-y-4">
         <Field label="Description" htmlFor="description" required error={state.fieldErrors?.description}>
-          <Input id="description" name="description" defaultValue={item?.description} required />
+          <Input
+            id="description"
+            name="description"
+            placeholder="e.g. Logo design"
+            defaultValue={item?.description}
+            required
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Quantity" htmlFor="quantity" required error={state.fieldErrors?.quantity}>

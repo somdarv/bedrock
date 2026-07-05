@@ -1,41 +1,49 @@
 @import "tailwindcss";
 
 /*
- * SaharaBase design tokens.
- * Warm sand + stone neutrals with an ochre primary. The monochrome brand mark is
- * used for deliverable watermarks; the UI leans warm-neutral and confident.
+ * SaharaBase — Bedrock design tokens (v2, "paper" editorial).
+ * Monochrome ink-on-paper, mirroring the SaharaBase marketing site's white
+ * "Why we exist" section: near-black ink on warm off-white, Sora for display
+ * and General Sans for body, hairline borders, and confident whitespace.
+ * Token *names* are unchanged from v1 so every primitive reskins at once;
+ * only their values moved to the monochrome scale.
  */
 @theme {
-  --color-background: #faf8f5;
+  --color-background: #f4f4f2; /* paper */
   --color-surface: #ffffff;
-  --color-foreground: #1c1917;
-  --color-muted: #f4efe8;
-  --color-muted-foreground: #78716c;
-  --color-subtle: #a8a29e;
-  --color-border: #e7e1d8;
-  --color-input: #e7e1d8;
+  --color-foreground: #0a0a0a; /* ink */
+  --color-muted: #f0efec;
+  --color-muted-foreground: #6b6a66;
+  --color-subtle: #9b9a95;
+  --color-border: #e6e5e1; /* hairline */
+  --color-input: #e0dfda;
 
-  --color-primary: #b45309;
-  --color-primary-hover: #9a4708;
+  /* Monochrome primary: ink. Buttons/emphasis are black-on-paper. */
+  --color-primary: #0a0a0a;
+  --color-primary-hover: #262624;
   --color-primary-foreground: #ffffff;
 
-  --color-accent: #1c1917;
+  --color-accent: #0a0a0a;
   --color-accent-foreground: #ffffff;
 
+  /* Status semantics kept, but muted to sit quietly on paper. */
   --color-success: #15803d;
-  --color-success-soft: #dcfce7;
-  --color-warning: #b45309;
-  --color-warning-soft: #fef3c7;
-  --color-danger: #b91c1c;
-  --color-danger-soft: #fee2e2;
-  --color-info: #1d4ed8;
-  --color-info-soft: #dbeafe;
+  --color-success-soft: #e7f2ea;
+  --color-warning: #a35a08;
+  --color-warning-soft: #f6ecdd;
+  --color-danger: #b3261e;
+  --color-danger-soft: #f7e7e5;
+  --color-info: #1c3f6e;
+  --color-info-soft: #e6ebf2;
 
-  --color-ring: #b45309;
+  --color-ring: #0a0a0a;
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-general), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-display: var(--font-sora), var(--font-general), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+
+  --tracking-tightest: -0.045em;
 
   --radius: 0.625rem;
 }
@@ -59,5 +67,111 @@
   :focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+  }
+
+  /* Tailwind v4 no longer sets pointer on buttons — restore it for all clickables. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  /*
+   * Eyebrow — the small uppercase tracked label from the marketing site's
+   * section headers ("Why we exist"). The editorial signature move.
+   */
+  .eyebrow {
+    font-size: 0.6875rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--color-subtle);
+    font-weight: 500;
+  }
+
+  /* Hairline rule matching the marketing site's border-*/10 dividers. */
+  .hairline {
+    border-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
+  }
+}
+
+/*
+ * ============================================================
+ * Document engine — print-to-PDF sheets (invoices, proposals, …)
+ * A4 sheet on a neutral canvas on screen; edge-to-edge on print.
+ * Authored bodies live inside `.doc-sheet`; `.no-print` is stripped on print.
+ * ============================================================
+ */
+.doc-page {
+  --doc-accent: var(--color-foreground);
+  background: #e9e8e5;
+  min-height: 100vh;
+  padding: 2rem 0;
+}
+/* The document body uses Sora — the original document font — everywhere, on screen
+   and in the printed PDF. Set explicitly so the sheet never inherits the app body face. */
+.doc-page,
+.doc-sheet {
+  font-family: var(--font-sora), "Sora", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.doc-sheet {
+  background: #fff;
+  color: #111827;
+  width: 100%;
+  max-width: 8.27in;
+  min-height: 11.69in;
+  margin: 0 auto;
+  padding: 0.6in;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 640px) {
+  .doc-page {
+    padding: 0;
+  }
+  .doc-sheet {
+    max-width: 100%;
+    min-height: 0;
+    padding: 1rem 0.85rem;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0.65in 0.4in;
+  }
+  html,
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Hide the whole app chrome (sidebar, header, buttons) when printing a sheet. */
+  .no-print {
+    display: none !important;
+  }
+  .doc-page {
+    background: #fff !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+  .doc-sheet {
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }

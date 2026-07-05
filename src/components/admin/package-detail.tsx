@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
@@ -32,7 +33,7 @@ import {
   toggleLineItemDone,
 } from "@/lib/packages/actions";
 import { nextTransitions, statusMeta } from "@/lib/status";
-import { cn, formatCedis } from "@/lib/utils";
+import { cn, formatCedis, publicBaseUrl } from "@/lib/utils";
 
 export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientName: string }) {
   const router = useRouter();
@@ -50,8 +51,13 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   const [pendingLifecycle, startLifecycle] = React.useTransition();
   const [pendingProgress, startProgress] = React.useTransition();
 
+  // Optimistic pricing mode so the toggle flips instantly; reconciled on refresh.
+  const [optimisticMode, setOptimisticMode] = React.useState<PricingMode>(pkg.pricingMode);
+  React.useEffect(() => setOptimisticMode(pkg.pricingMode), [pkg.pricingMode]);
+  const [copied, setCopied] = React.useState(false);
+
   const meta = statusMeta(pkg.status);
-  const isFixed = pkg.pricingMode === "fixed";
+  const isFixed = optimisticMode === "fixed";
   const transitions = nextTransitions(pkg.status);
   const doneCount = pkg.lineItems.filter((li) => li.done).length;
   const progressPct = pkg.lineItems.length
@@ -62,18 +68,17 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
     .filter((p) => p.status === "success")
     .reduce((s, p) => s + p.amount, 0);
   const bal = balance(pkg);
-  const publicUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/p/${pkg.publicSlug}`
-      : `/p/${pkg.publicSlug}`;
+  const publicUrl = `${publicBaseUrl()}/p/${pkg.publicSlug}`;
 
   function changeMode(mode: PricingMode) {
-    if (mode === pkg.pricingMode) return;
+    if (mode === optimisticMode) return;
+    setOptimisticMode(mode); // instant visual switch
     startMode(async () => {
       const res = await setPricingMode(pkg.id, mode);
-      if (res.error) toast(res.error, "danger");
-      else {
-        toast("Pricing mode updated.", "success");
+      if (res.error) {
+        setOptimisticMode(pkg.pricingMode); // revert on failure
+        toast(res.error, "danger");
+      } else {
         router.refresh();
       }
     });
@@ -146,7 +151,9 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
       toast("Public link copied.", "success");
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       toast("Copy failed — select and copy manually.", "danger");
     }
@@ -155,12 +162,7 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href="/admin/packages"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Work Packages
-        </Link>
+        <BackButton href="/admin/packages" label="Work Packages" />
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-3">
@@ -191,8 +193,22 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           <div className="text-xs font-medium text-muted-foreground">Client link</div>
           <div className="truncate font-mono text-sm">{publicUrl}</div>
         </div>
-        <Button variant="outline" size="sm" onClick={copyLink}>
-          Copy link
+        <Button
+          variant={copied ? "primary" : "outline"}
+          size="sm"
+          onClick={copyLink}
+          className="min-w-26"
+        >
+          {copied ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Copied
+            </>
+          ) : (
+            "Copy link"
+          )}
         </Button>
       </div>
 
@@ -242,7 +258,7 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
                   disabled={pendingMode}
                   className={cn(
                     "rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors",
-                    pkg.pricingMode === mode
+                    optimisticMode === mode
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground",
                   )}

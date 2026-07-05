@@ -110,7 +110,9 @@ export async function deletePackage(id: string): Promise<PackageFormState> {
 export async function setPricingMode(id: string, mode: PricingMode): Promise<PackageFormState> {
   try {
     const pkg = await api.packages.get(id);
-    const totalOverride = mode === "fixed" ? (pkg.totalOverride ?? effectiveTotal(pkg)) : null;
+    // Seed a fixed total on first switch; otherwise preserve whatever was set so
+    // toggling back and forth never loses the number.
+    const totalOverride = mode === "fixed" ? (pkg.totalOverride ?? effectiveTotal(pkg)) : pkg.totalOverride;
     await api.packages.update(id, {
       title: pkg.title,
       pricingMode: mode,
@@ -249,6 +251,16 @@ export async function deleteDeliverable(
     await api.packages.removeDeliverable(packageId, deliverableId);
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not remove deliverable." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+export async function purgeDeliverables(packageId: string): Promise<ActionState> {
+  try {
+    await api.packages.purgeDeliverables(packageId);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not free up storage." };
   }
   revalidatePackage(packageId);
   return { ok: true };

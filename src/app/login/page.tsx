@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { BrandLockup } from "@/components/brand-mark";
+import { BrandLogo } from "@/components/brand-mark";
 import { getSession } from "@/lib/auth/session";
 import { LoginForm } from "./login-form";
 
@@ -13,10 +13,10 @@ export default async function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
-          <BrandLockup />
+          <BrandLogo className="h-8" />
         </div>
-        <div className="rounded-xl border bg-surface p-6 shadow-sm">
-          <h1 className="text-xl font-semibold tracking-tight">Admin sign in</h1>
+        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <h1 className="font-display text-xl font-semibold tracking-tight">Admin sign in</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage clients, packages, and delivery.
           </p>

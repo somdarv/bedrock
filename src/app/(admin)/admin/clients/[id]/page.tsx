@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { BackButton } from "@/components/ui/back-button";
 import { EmptyState } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
@@ -19,30 +20,47 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/clients" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Clients
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{client.name}</h1>
+        <BackButton href="/admin/clients" label="Clients" />
+        <div className="mt-2 flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">{client.name}</h1>
+          <Badge>{client.type === "organisation" ? "Organisation" : "Individual"}</Badge>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Added {new Date(client.createdAt).toLocaleDateString()}
+        </p>
       </div>
 
-      <dl className="grid max-w-xl grid-cols-2 gap-4 rounded-lg border bg-surface p-5 text-sm">
-        <div>
-          <dt className="text-muted-foreground">WhatsApp</dt>
-          <dd className="mt-0.5 font-medium">{client.whatsapp}</dd>
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">
+          {client.type === "organisation" ? "Contacts" : "Contact"}
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {client.contacts.map((ct) => (
+            <div key={ct.id} className="rounded-lg border bg-surface p-5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{ct.name}</span>
+                {ct.isPrimary && client.type === "organisation" && (
+                  <Badge variant="info">Primary</Badge>
+                )}
+              </div>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">WhatsApp</dt>
+                  <dd className="font-medium">{ct.whatsapp}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Phone</dt>
+                  <dd className="font-medium">{ct.phone ?? "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Email</dt>
+                  <dd className="font-medium">{ct.email ?? "—"}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
         </div>
-        <div>
-          <dt className="text-muted-foreground">Email</dt>
-          <dd className="mt-0.5 font-medium">{client.email ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Phone</dt>
-          <dd className="mt-0.5 font-medium">{client.phone ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Added</dt>
-          <dd className="mt-0.5 font-medium">{new Date(client.createdAt).toLocaleDateString()}</dd>
-        </div>
-      </dl>
+      </div>
 
       <div>
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Work packages</h2>
@@ -65,8 +83,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               {packages.map((p) => {
                 const meta = statusMeta(p.status);
                 return (
-                  <TR key={p.id}>
-                    <TD className="font-medium">{p.title}</TD>
+                  <TR key={p.id} className="transition-colors hover:bg-muted/50">
+                    <TD className="font-medium">
+                      <Link
+                        href={`/admin/packages/${p.id}`}
+                        className="text-foreground hover:underline"
+                      >
+                        {p.title}
+                      </Link>
+                    </TD>
                     <TD>
                       <Badge variant={meta.variant}>{meta.label}</Badge>
                     </TD>

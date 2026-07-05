@@ -14,18 +14,34 @@ const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 const clients: Client[] = [
   {
     id: "cl_1",
+    type: "individual",
     name: "Ama Boateng",
-    whatsapp: "+233201234567",
-    email: "ama@example.com",
-    phone: "+233201234567",
+    contacts: [
+      {
+        id: "ct_1",
+        name: "Ama Boateng",
+        whatsapp: "+233201234567",
+        phone: "+233201234567",
+        email: "ama@example.com",
+        isPrimary: true,
+      },
+    ],
     createdAt: "2026-06-10T09:00:00Z",
   },
   {
     id: "cl_2",
+    type: "individual",
     name: "Kojo Mensah",
-    whatsapp: "+233557654321",
-    email: null,
-    phone: "+233557654321",
+    contacts: [
+      {
+        id: "ct_2",
+        name: "Kojo Mensah",
+        whatsapp: "+233557654321",
+        phone: "+233557654321",
+        email: null,
+        isPrimary: true,
+      },
+    ],
     createdAt: "2026-06-14T14:30:00Z",
   },
 ];
@@ -151,7 +167,9 @@ export const mockApi: BedrockApi = {
       await delay();
       const client: Client = {
         id: `cl_${crypto.randomUUID().slice(0, 8)}`,
-        ...input,
+        type: input.type,
+        name: input.name,
+        contacts: input.contacts.map((c) => ({ id: `ct_${crypto.randomUUID().slice(0, 8)}`, ...c })),
         createdAt: new Date().toISOString(),
       };
       clients.push(client);
@@ -163,7 +181,12 @@ export const mockApi: BedrockApi = {
         clients.find((c) => c.id === id),
         "Client",
       );
-      Object.assign(existing, input);
+      existing.type = input.type;
+      existing.name = input.name;
+      existing.contacts = input.contacts.map((c) => ({
+        id: `ct_${crypto.randomUUID().slice(0, 8)}`,
+        ...c,
+      }));
       return existing;
     },
     async remove(id) {
@@ -354,6 +377,7 @@ export const mockApi: BedrockApi = {
         previewUrl: null,
         // Download gate: originals stay locked until the balance reaches zero.
         locked: balance(pkg) > 0,
+        archived: false,
         processingStatus: "processing",
       };
       pkg.deliverables.push(deliverable);
@@ -372,6 +396,24 @@ export const mockApi: BedrockApi = {
       const [removed] = pkg.deliverables.splice(idx, 1);
       processingUntil.delete(deliverableId);
       logActivity(pkg, "deliverable_removed", `Removed "${removed.filename}".`);
+      return pkg;
+    },
+    async purgeDeliverables(packageId) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      let count = 0;
+      for (const d of pkg.deliverables) {
+        if (!d.archived) {
+          d.archived = true;
+          count++;
+        }
+      }
+      if (count > 0) {
+        logActivity(pkg, "originals_archived", `Removed ${count} original file(s) from storage to free space.`);
+      }
       return pkg;
     },
     async recordPayment(packageId, input) {

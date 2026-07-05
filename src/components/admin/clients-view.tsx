@@ -9,8 +9,9 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { Badge } from "@/components/ui/badge";
 import { ClientFormModal } from "@/components/admin/client-form-modal";
-import type { Client } from "@/lib/api";
+import { primaryContact, type Client } from "@/lib/api";
 import { deleteClient } from "@/lib/clients/actions";
 
 export function ClientsView({ clients }: { clients: Client[] }) {
@@ -27,7 +28,9 @@ export function ClientsView({ clients }: { clients: Client[] }) {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter((c) =>
-      [c.name, c.whatsapp, c.email, c.phone].some((v) => v?.toLowerCase().includes(q)),
+      [c.name, ...c.contacts.flatMap((ct) => [ct.name, ct.whatsapp, ct.email])].some((v) =>
+        v?.toLowerCase().includes(q),
+      ),
     );
   }, [clients, query]);
 
@@ -89,22 +92,28 @@ export function ClientsView({ clients }: { clients: Client[] }) {
           <THead>
             <TR>
               <TH>Name</TH>
-              <TH>WhatsApp</TH>
-              <TH>Email</TH>
+              <TH>Type</TH>
+              <TH>Primary contact</TH>
               <TH>Added</TH>
               <TH className="text-right">Actions</TH>
             </TR>
           </THead>
           <TBody>
-            {filtered.map((c) => (
-              <TR key={c.id}>
+            {filtered.map((c) => {
+              const pc = primaryContact(c);
+              return (
+              <TR key={c.id} className="transition-colors hover:bg-muted/50">
                 <TD>
                   <Link href={`/admin/clients/${c.id}`} className="font-medium hover:underline">
                     {c.name}
                   </Link>
                 </TD>
-                <TD className="text-muted-foreground">{c.whatsapp}</TD>
-                <TD className="text-muted-foreground">{c.email ?? "—"}</TD>
+                <TD>
+                  <Badge>{c.type === "organisation" ? "Org" : "Individual"}</Badge>
+                </TD>
+                <TD className="text-muted-foreground">
+                  {pc ? `${pc.whatsapp}${c.type === "organisation" ? ` · ${pc.name}` : ""}` : "—"}
+                </TD>
                 <TD className="text-muted-foreground">
                   {new Date(c.createdAt).toLocaleDateString()}
                 </TD>
@@ -119,7 +128,8 @@ export function ClientsView({ clients }: { clients: Client[] }) {
                   </div>
                 </TD>
               </TR>
-            ))}
+              );
+            })}
           </TBody>
         </Table>
       )}

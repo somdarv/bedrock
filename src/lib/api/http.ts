@@ -3,16 +3,32 @@ import type { AdminSession, Client, SessionUser, WorkPackage } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
+/**
+ * Attach the Sanctum bearer token for authenticated calls. The token lives in the
+ * httpOnly session cookie; these API calls run server-side (server components /
+ * actions), so we read it from the request cookies and forward it as a bearer.
+ */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (typeof window !== "undefined") return {};
+  try {
+    const { cookies } = await import("next/headers");
+    const token = (await cookies()).get("bedrock_token")?.value;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      ...(await authHeaders()),
       ...init?.headers,
     },
-    // Sanctum token rides in an httpOnly cookie set by the auth route handler.
-    credentials: "include",
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -100,13 +116,14 @@ export const httpApi: BedrockApi = {
         body: JSON.stringify({ done }),
       }),
     addDeliverable: async (packageId, file) => {
-      // Multipart upload — let the browser set the multipart boundary; no JSON header.
+      // Multipart upload — no Content-Type so the boundary is set automatically.
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${BASE_URL}/api/admin/packages/${packageId}/deliverables`, {
         method: "POST",
         body: form,
-        credentials: "include",
+        headers: { Accept: "application/json", ...(await authHeaders()) },
+        cache: "no-store",
       });
       if (!res.ok) throw new ApiError(res.status, res.statusText);
       return (await res.json()) as WorkPackage;
@@ -114,6 +131,10 @@ export const httpApi: BedrockApi = {
     removeDeliverable: (packageId, deliverableId) =>
       request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/${deliverableId}`, {
         method: "DELETE",
+      }),
+    purgeDeliverables: (packageId) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/purge`, {
+        method: "POST",
       }),
     recordPayment: (packageId, input) =>
       request<WorkPackage>(`/api/admin/packages/${packageId}/payments`, {

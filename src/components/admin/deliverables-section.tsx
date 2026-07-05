@@ -5,10 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import type { Deliverable, WorkPackage } from "@/lib/api";
-import { deleteDeliverable, uploadDeliverable } from "@/lib/packages/actions";
+import { deleteDeliverable, purgeDeliverables, uploadDeliverable } from "@/lib/packages/actions";
 
 const ACCEPT = "image/*,application/pdf,video/*";
 
@@ -19,8 +20,11 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
   const [uploading, startUpload] = React.useTransition();
   const [removingId, setRemovingId] = React.useState<string | null>(null);
   const [pendingRemove, startRemove] = React.useTransition();
+  const [purging, startPurge] = React.useTransition();
+  const [confirmPurge, setConfirmPurge] = React.useState(false);
 
   const anyProcessing = pkg.deliverables.some((d) => d.processingStatus === "processing");
+  const hasStoredOriginals = pkg.deliverables.some((d) => !d.archived);
 
   // Poll while the mock/backend pipeline finishes generating previews.
   React.useEffect(() => {
@@ -45,6 +49,18 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
     });
   }
 
+  function purge() {
+    startPurge(async () => {
+      const res = await purgeDeliverables(pkg.id);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Originals removed from storage.", "success");
+        router.refresh();
+      }
+      setConfirmPurge(false);
+    });
+  }
+
   function remove(d: Deliverable) {
     setRemovingId(d.id);
     startRemove(async () => {
@@ -62,7 +78,12 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight">Deliverables</h2>
-        <div>
+        <div className="flex items-center gap-2">
+          {hasStoredOriginals && pkg.deliverables.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setConfirmPurge(true)} disabled={purging}>
+              Free up storage
+            </Button>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -109,8 +130,8 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
                   </span>
                 )}
                 <div className="absolute right-2 top-2">
-                  <Badge variant={d.locked ? "warning" : "success"}>
-                    {d.locked ? "Locked" : "Unlocked"}
+                  <Badge variant={d.archived ? "default" : d.locked ? "warning" : "success"}>
+                    {d.archived ? "Archived" : d.locked ? "Locked" : "Unlocked"}
                   </Badge>
                 </div>
               </div>
@@ -132,6 +153,24 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
           ))}
         </div>
       )}
+
+      <Modal
+        open={confirmPurge}
+        onClose={() => !purging && setConfirmPurge(false)}
+        title="Free up storage?"
+        description="Deletes the original files from storage to save space. Previews stay, but the client can no longer download. Do this after the work is delivered and paid for."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmPurge(false)} disabled={purging}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={purge} disabled={purging}>
+              {purging ? <Spinner /> : null}
+              Delete originals
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

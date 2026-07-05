@@ -49,6 +49,8 @@ export interface BedrockApi {
     /** Upload an original; the backend stores it in R2 and queues preview generation. */
     addDeliverable(packageId: string, file: File): Promise<WorkPackage>;
     removeDeliverable(packageId: string, deliverableId: string): Promise<WorkPackage>;
+    /** Delete all original files from storage (keep previews) to free space after handoff. */
+    purgeDeliverables(packageId: string): Promise<WorkPackage>;
     /**
      * Record a confirmed payment and run the two-gate logic. In production this is
      * driven by the verified Paystack webhook; admin entry covers offline payments.

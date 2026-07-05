@@ -6,39 +6,9 @@ import { api, ApiError, type ClientInput } from "@/lib/api";
 export interface ClientFormState {
   ok?: boolean;
   error?: string;
-  fieldErrors?: Partial<Record<keyof ClientInput, string>>;
 }
 
-function parseClient(formData: FormData): {
-  input?: ClientInput;
-  fieldErrors?: ClientFormState["fieldErrors"];
-} {
-  const name = String(formData.get("name") ?? "").trim();
-  const whatsapp = String(formData.get("whatsapp") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
-
-  const fieldErrors: ClientFormState["fieldErrors"] = {};
-  if (!name) fieldErrors.name = "Name is required.";
-  if (!whatsapp) fieldErrors.whatsapp = "WhatsApp number is required.";
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    fieldErrors.email = "Enter a valid email address.";
-  }
-
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
-
-  return {
-    input: { name, whatsapp, email: email || null, phone: phone || null },
-  };
-}
-
-export async function createClient(
-  _prev: ClientFormState,
-  formData: FormData,
-): Promise<ClientFormState> {
-  const { input, fieldErrors } = parseClient(formData);
-  if (!input) return { fieldErrors };
-
+export async function createClient(input: ClientInput): Promise<ClientFormState> {
   try {
     await api.clients.create(input);
   } catch (e) {
@@ -48,14 +18,7 @@ export async function createClient(
   return { ok: true };
 }
 
-export async function updateClient(
-  id: string,
-  _prev: ClientFormState,
-  formData: FormData,
-): Promise<ClientFormState> {
-  const { input, fieldErrors } = parseClient(formData);
-  if (!input) return { fieldErrors };
-
+export async function updateClient(id: string, input: ClientInput): Promise<ClientFormState> {
   try {
     await api.clients.update(id, input);
   } catch (e) {

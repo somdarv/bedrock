@@ -33,10 +33,10 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-surface px-6 py-16 text-center">
-      <h3 className="text-base font-semibold">{title}</h3>
-      {description && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface px-6 py-20 text-center">
+      <h3 className="font-display text-lg font-semibold tracking-tight">{title}</h3>
+      {description && <p className="mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

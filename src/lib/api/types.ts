@@ -23,20 +23,43 @@ export type PaymentStatus = "pending" | "success" | "failed";
 
 export type PaymentKind = "deposit" | "final" | "full";
 
-export interface Client {
+export type ClientType = "organisation" | "individual";
+
+export interface Contact {
   id: string;
   name: string;
   whatsapp: string;
-  email: string | null;
   phone: string | null;
+  email: string | null;
+  isPrimary: boolean;
+}
+
+export interface ContactInput {
+  name: string;
+  whatsapp: string;
+  phone: string | null;
+  email: string | null;
+  isPrimary: boolean;
+}
+
+export interface Client {
+  id: string;
+  type: ClientType;
+  /** Organisation name, or the individual's name. */
+  name: string;
+  contacts: Contact[];
   createdAt: string;
 }
 
 export interface ClientInput {
+  type: ClientType;
   name: string;
-  whatsapp: string;
-  email: string | null;
-  phone: string | null;
+  contacts: ContactInput[];
+}
+
+/** The primary contact (or first), used wherever a single number/email is needed. */
+export function primaryContact(client: Client): Contact | null {
+  return client.contacts.find((c) => c.isPrimary) ?? client.contacts[0] ?? null;
 }
 
 export interface LineItem {
@@ -83,6 +106,8 @@ export interface Deliverable {
   filename: string;
   previewUrl: string | null;
   locked: boolean;
+  /** True once the original file has been deleted from storage (preview kept). */
+  archived: boolean;
   processingStatus: ProcessingStatus;
 }
 

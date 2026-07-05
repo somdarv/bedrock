@@ -108,6 +108,7 @@ export function PackageFormModal({ open, onClose, clients, pkg, onDone }: Props)
               type="number"
               min={0}
               step="0.01"
+              placeholder="e.g. 2500.00"
               defaultValue={pkg?.totalOverride ?? ""}
             />
           </Field>
