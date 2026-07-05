@@ -71,8 +71,13 @@ Backend env highlights (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERA
   webhook HMAC verify → record → gates) is NOT built. ← **most likely next**
 - **Termii** — "Send invoice" only flips status draft→sent + logs; it does **not** actually send
   WhatsApp/SMS/email.
-- **Media pipeline** — deliverable previews are placeholder SVG data-URIs, not real watermarked
-  previews (Intervention Image / Ghostscript / FFmpeg per ARCHITECTURE §6).
+- **Media pipeline** — **images are LIVE**: real downscaled JPEG previews with a tiled diagonal
+  SAHARABASE watermark, built with **PHP-GD + FreeType** (no Intervention — composer/github was
+  unreachable in this env). **PDF (Ghostscript) and video (FFmpeg)** drivers exist but degrade to a
+  branded placeholder until the server has those binaries (set `MEDIA_GHOSTSCRIPT` / `MEDIA_FFMPEG`).
+  Previews generate inline in dev (`MEDIA_SYNC=true`) or on the `media` queue in prod; served
+  ungated via `GET /api/deliverables/{id}/preview`. Backfill with `php artisan media:regenerate`.
+  Admin also previews the **clean original** via a Next proxy (`/api/admin/deliverables/...`).
 - **Public portal** — `/p/[slug]` view exists (scope, price, previews, gated download). OTP
   lookup and Paystack pay button are not wired.
 - **Admin file download** — only the **public portal** download is wired (browser can't carry the
@@ -145,7 +150,9 @@ dependence — renders open in SSR on its route).
    `/transaction/verify`, then records the payment (idempotent on reference) and runs the gates.
    This makes the Pay button real and the gates fire without manual entry.
 2. **Termii** — real send on "Send invoice" (WhatsApp + SMS + OTP) + a notifications log.
-3. **Media pipeline** — real watermarked previews (image/PDF/video) on a queue.
+3. **Media pipeline** — images done. Remaining: install **Ghostscript + FFmpeg** on the server
+   and set `MEDIA_GHOSTSCRIPT`/`MEDIA_FFMPEG` so PDF/video previews light up; switch
+   `MEDIA_SYNC=false` + run a `media` queue worker (Horizon) in prod.
 4. **Public portal polish** — OTP lookup (`/lookup`), receipt view.
 
 ## 10. Current running state at handoff
