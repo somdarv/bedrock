@@ -134,7 +134,10 @@ export function ClientsView({ clients }: { clients: Client[] }) {
         </Table>
       )}
 
-      <ClientFormModal open={creating} onClose={() => setCreating(false)} onDone={handleDone} />
+      {/* Mount only while open so each "New client" starts from a blank form. */}
+      {creating && (
+        <ClientFormModal open onClose={() => setCreating(false)} onDone={handleDone} />
+      )}
       {editing && (
         <ClientFormModal
           key={editing.id}

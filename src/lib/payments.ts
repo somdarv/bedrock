@@ -25,6 +25,27 @@ export function computePaymentPlan(total: number): PaymentPlan {
   return { rule: "split", depositDue, finalDue: round2(total - depositDue), total };
 }
 
+/**
+ * Payment methods offered when recording a payment manually. `paystack` is reserved for
+ * payments that came through the online Paystack flow (recorded by the webhook, not by hand).
+ */
+export const PAYMENT_METHODS = [
+  { value: "momo", label: "Mobile money (MoMo)" },
+  { value: "bank", label: "Bank transfer" },
+  { value: "cash", label: "Cash" },
+  { value: "cheque", label: "Cheque" },
+  { value: "paystack", label: "Paystack (online)" },
+  { value: "other", label: "Other" },
+] as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]["value"];
+
+/** Human label for a stored payment method value; falls back to the raw value, then a dash. */
+export function paymentMethodLabel(method: string | null | undefined): string {
+  if (!method) return "—";
+  return PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
+}
+
 export function paidTotal(pkg: Pick<WorkPackage, "payments">): number {
   return pkg.payments
     .filter((p) => p.status === "success")

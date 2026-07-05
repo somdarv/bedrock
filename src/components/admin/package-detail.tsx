@@ -280,17 +280,21 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
             <THead>
               <TR>
                 <TH className="w-12">Done</TH>
-                <TH>Description</TH>
-                <TH className="text-right">Qty</TH>
-                <TH className="text-right">Unit</TH>
-                <TH className="text-right">Line total</TH>
+                <TH>{isFixed ? "Scope" : "Description"}</TH>
+                {!isFixed && (
+                  <>
+                    <TH className="text-right">Qty</TH>
+                    <TH className="text-right">Unit</TH>
+                    <TH className="text-right">Line total</TH>
+                  </>
+                )}
                 <TH />
               </TR>
             </THead>
             <TBody>
               {pkg.lineItems.length === 0 ? (
                 <TR>
-                  <TD colSpan={6} className="text-center text-muted-foreground">
+                  <TD colSpan={isFixed ? 3 : 6} className="text-center text-muted-foreground">
                     No line items yet.
                   </TD>
                 </TR>
@@ -310,15 +314,13 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
                     <TD className={cn("font-medium", li.done && "text-muted-foreground line-through")}>
                       {li.description}
                     </TD>
-                    <TD className={cn("text-right", isFixed && "text-subtle line-through")}>
-                      {li.quantity}
-                    </TD>
-                    <TD className={cn("text-right", isFixed && "text-subtle line-through")}>
-                      {formatCedis(li.unitPrice)}
-                    </TD>
-                    <TD className={cn("text-right", isFixed && "text-subtle line-through")}>
-                      {formatCedis(li.quantity * li.unitPrice)}
-                    </TD>
+                    {!isFixed && (
+                      <>
+                        <TD className="text-right">{li.quantity}</TD>
+                        <TD className="text-right">{formatCedis(li.unitPrice)}</TD>
+                        <TD className="text-right">{formatCedis(li.quantity * li.unitPrice)}</TD>
+                      </>
+                    )}
                     <TD>
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="ghost" onClick={() => setEditingItem(li)}>
@@ -434,18 +436,22 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           router.refresh();
         }}
       />
-      <LineItemModal
-        open={addingItem}
-        packageId={pkg.id}
-        onClose={() => setAddingItem(false)}
-        onDone={itemDone}
-      />
+      {addingItem && (
+        <LineItemModal
+          open
+          packageId={pkg.id}
+          fixed={isFixed}
+          onClose={() => setAddingItem(false)}
+          onDone={itemDone}
+        />
+      )}
       {editingItem && (
         <LineItemModal
           key={editingItem.id}
           open
           packageId={pkg.id}
           item={editingItem}
+          fixed={isFixed}
           onClose={() => setEditingItem(null)}
           onDone={itemDone}
         />

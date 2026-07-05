@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { PortalPreviews } from "@/components/portal/portal-previews";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
@@ -95,7 +95,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
         <h2 className="font-display text-lg font-semibold tracking-tight">What&apos;s included</h2>
         <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
           {pkg.lineItems.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground">Scope will appear here.</p>
+            <p className="px-5 py-6 text-sm text-muted-foreground">No scope included.</p>
           ) : (
             <ul className="divide-y divide-border">
               {pkg.lineItems.map((li) => (
@@ -120,51 +120,12 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
 
       {/* Deliverables — watermarked previews; originals unlock at zero balance */}
       {pkg.deliverables.length > 0 && (
-        <section>
-          <h2 className="font-display text-lg font-semibold tracking-tight">Preview</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {settled
-              ? "Your final files are ready to download."
-              : "Watermarked previews. Clean originals unlock once the balance is cleared."}
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {pkg.deliverables.map((d) => (
-              <div key={d.id} className="overflow-hidden rounded-xl border border-border bg-surface">
-                <div className="relative flex h-44 items-center justify-center bg-muted">
-                  {d.previewUrl ? (
-                    <Image src={d.previewUrl} alt={d.filename} fill unoptimized className="object-cover" />
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Preparing…</span>
-                  )}
-                  {d.locked && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-ink/40 text-white backdrop-blur-[1px]">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
-                        <rect x="4" y="11" width="16" height="9" rx="2" />
-                        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                      </svg>
-                      <span className="text-[11px] font-medium uppercase tracking-wider">Locked</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between gap-2 p-3">
-                  <span className="truncate text-sm font-medium">{d.filename}</span>
-                  {d.archived ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">Archived</span>
-                  ) : d.locked ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">Unlocks at GHS 0</span>
-                  ) : (
-                    <a
-                      href={`${apiBase}/api/p/${slug}/deliverables/${d.id}/download`}
-                      className="shrink-0 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-                    >
-                      Download
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <PortalPreviews
+          deliverables={pkg.deliverables}
+          slug={slug}
+          apiBase={apiBase}
+          settled={settled}
+        />
       )}
     </div>
   );

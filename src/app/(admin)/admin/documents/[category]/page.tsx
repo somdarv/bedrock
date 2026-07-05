@@ -50,6 +50,8 @@ export default async function DocumentCategoryPage({
               <li key={d.id}>
                 <Link
                   href={`/d/${d.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 md:px-6"
                 >
                   <div className="min-w-0">

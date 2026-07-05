@@ -17,10 +17,12 @@ interface Props {
   onClose: () => void;
   packageId: string;
   item?: LineItem;
+  /** Fixed-pricing package: line items are scope only, so no qty/price. */
+  fixed?: boolean;
   onDone: (message: string) => void;
 }
 
-export function LineItemModal({ open, onClose, packageId, item, onDone }: Props) {
+export function LineItemModal({ open, onClose, packageId, item, fixed = false, onDone }: Props) {
   const isEdit = Boolean(item);
   const action = React.useMemo(
     () =>
@@ -44,46 +46,63 @@ export function LineItemModal({ open, onClose, packageId, item, onDone }: Props)
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit line item" : "Add line item"}>
       <form action={formAction} className="space-y-4">
-        <Field label="Description" htmlFor="description" required error={state.fieldErrors?.description}>
+        <Field
+          label={fixed ? "Scope item" : "Description"}
+          htmlFor="description"
+          required
+          error={state.fieldErrors?.description}
+          hint={fixed ? "Shown to the client as scope. The fixed total is unaffected." : undefined}
+        >
           <Input
             id="description"
             name="description"
-            placeholder="e.g. Logo design"
+            placeholder={fixed ? "e.g. Logo design" : "e.g. Logo design"}
             defaultValue={item?.description}
             required
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Quantity" htmlFor="quantity" required error={state.fieldErrors?.quantity}>
-            <Input
-              id="quantity"
-              name="quantity"
-              type="number"
-              min={1}
-              step="1"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              required
-            />
-          </Field>
-          <Field label="Unit price (GHS)" htmlFor="unitPrice" required error={state.fieldErrors?.unitPrice}>
-            <Input
-              id="unitPrice"
-              name="unitPrice"
-              type="number"
-              min={0}
-              step="0.01"
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(Number(e.target.value))}
-              required
-            />
-          </Field>
-        </div>
 
-        <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-          <span className="text-muted-foreground">Line total</span>
-          <span className="font-semibold">{formatCedis(lineTotal)}</span>
-        </div>
+        {fixed ? (
+          // Scope-only: keep a valid qty/price so the record stays consistent, hidden from the admin.
+          <>
+            <input type="hidden" name="quantity" value={1} />
+            <input type="hidden" name="unitPrice" value={0} />
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Quantity" htmlFor="quantity" required error={state.fieldErrors?.quantity}>
+                <Input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  required
+                />
+              </Field>
+              <Field label="Unit price (GHS)" htmlFor="unitPrice" required error={state.fieldErrors?.unitPrice}>
+                <Input
+                  id="unitPrice"
+                  name="unitPrice"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(Number(e.target.value))}
+                  required
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Line total</span>
+              <span className="font-semibold">{formatCedis(lineTotal)}</span>
+            </div>
+          </>
+        )}
 
         {state.error && (
           <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{state.error}</p>

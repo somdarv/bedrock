@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/ui/back-button";
+import { NewPackageButton } from "@/components/admin/new-package-button";
 import { EmptyState } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
@@ -63,11 +64,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Work packages</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Work packages</h2>
+          {packages.length > 0 && (
+            <NewPackageButton clientId={client.id} clientName={client.name} size="sm" />
+          )}
+        </div>
         {packages.length === 0 ? (
           <EmptyState
             title="No packages yet"
-            description="Work packages for this client appear here (Phase 3)."
+            description="Create the first work package for this client."
+            action={<NewPackageButton clientId={client.id} clientName={client.name} />}
           />
         ) : (
           <Table>

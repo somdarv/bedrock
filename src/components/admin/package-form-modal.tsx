@@ -19,14 +19,16 @@ const initial: PackageFormState = {};
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Required in create mode to pick a client. */
+  /** Required in create mode to pick a client (omit when creating for a fixed client). */
   clients?: Client[];
+  /** Create mode for one specific client — skips the picker and pins this client. */
+  lockedClient?: { id: string; name: string };
   /** Provided in edit mode. */
   pkg?: WorkPackage;
   onDone: (message: string, packageId?: string) => void;
 }
 
-export function PackageFormModal({ open, onClose, clients, pkg, onDone }: Props) {
+export function PackageFormModal({ open, onClose, clients, lockedClient, pkg, onDone }: Props) {
   const isEdit = Boolean(pkg);
   const action = React.useMemo(
     () => (pkg ? updatePackage.bind(null, pkg.id) : createPackage),
@@ -49,20 +51,28 @@ export function PackageFormModal({ open, onClose, clients, pkg, onDone }: Props)
       title={isEdit ? "Edit package" : "New work package"}
     >
       <form action={formAction} className="space-y-4">
-        {!isEdit && (
-          <Field label="Client" htmlFor="clientId" required error={state.fieldErrors?.clientId}>
-            <Select id="clientId" name="clientId" defaultValue="">
-              <option value="" disabled>
-                Select a client…
-              </option>
-              {clients?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+        {!isEdit &&
+          (lockedClient ? (
+            <>
+              <input type="hidden" name="clientId" value={lockedClient.id} />
+              <Field label="Client" htmlFor="clientName">
+                <Input id="clientName" value={lockedClient.name} readOnly disabled />
+              </Field>
+            </>
+          ) : (
+            <Field label="Client" htmlFor="clientId" required error={state.fieldErrors?.clientId}>
+              <Select id="clientId" name="clientId" defaultValue="">
+                <option value="" disabled>
+                  Select a client…
                 </option>
-              ))}
-            </Select>
-          </Field>
-        )}
+                {clients?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ))}
 
         <Field label="Title" htmlFor="title" required error={state.fieldErrors?.title}>
           <Input

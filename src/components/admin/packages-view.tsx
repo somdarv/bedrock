@@ -121,12 +121,15 @@ export function PackagesView({
         </Table>
       )}
 
-      <PackageFormModal
-        open={creating}
-        onClose={() => setCreating(false)}
-        clients={clients}
-        onDone={handleDone}
-      />
+      {/* Mount only while open so each "New package" starts from a blank form. */}
+      {creating && (
+        <PackageFormModal
+          open
+          onClose={() => setCreating(false)}
+          clients={clients}
+          onDone={handleDone}
+        />
+      )}
     </div>
   );
 }

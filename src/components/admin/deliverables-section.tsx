@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
+import { PreviewLightbox } from "@/components/media/preview-lightbox";
 import type { Deliverable, WorkPackage } from "@/lib/api";
 import { deleteDeliverable, purgeDeliverables, uploadDeliverable } from "@/lib/packages/actions";
 
@@ -22,6 +23,7 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
   const [pendingRemove, startRemove] = React.useTransition();
   const [purging, startPurge] = React.useTransition();
   const [confirmPurge, setConfirmPurge] = React.useState(false);
+  const [previewing, setPreviewing] = React.useState<Deliverable | null>(null);
 
   const anyProcessing = pkg.deliverables.some((d) => d.processingStatus === "processing");
   const hasStoredOriginals = pkg.deliverables.some((d) => !d.archived);
@@ -115,13 +117,23 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
             <div key={d.id} className="overflow-hidden rounded-lg border bg-surface">
               <div className="relative flex h-40 items-center justify-center bg-muted">
                 {d.processingStatus === "ready" && d.previewUrl ? (
-                  <Image
-                    src={d.previewUrl}
-                    alt={`${d.filename} preview`}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setPreviewing(d)}
+                    className="group absolute inset-0 cursor-pointer"
+                    aria-label={`Preview ${d.filename}`}
+                  >
+                    <Image
+                      src={d.previewUrl}
+                      alt={`${d.filename} preview`}
+                      fill
+                      unoptimized
+                      className="object-cover transition-transform group-hover:scale-[1.02]"
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center bg-ink/0 text-xs font-medium uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:bg-ink/30 group-hover:opacity-100">
+                      Preview
+                    </span>
+                  </button>
                 ) : d.processingStatus === "failed" ? (
                   <span className="text-sm text-danger">Processing failed</span>
                 ) : (
@@ -153,6 +165,14 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
           ))}
         </div>
       )}
+
+      {/* Admin gets a clean, full-size look at the preview (no client-side deterrents). */}
+      <PreviewLightbox
+        open={Boolean(previewing?.previewUrl)}
+        src={previewing?.previewUrl ?? ""}
+        alt={previewing?.filename ?? "Preview"}
+        onClose={() => setPreviewing(null)}
+      />
 
       <Modal
         open={confirmPurge}

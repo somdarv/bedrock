@@ -16,6 +16,8 @@ import {
   computePaymentPlan,
   downloadGateOpen,
   paidTotal,
+  paymentMethodLabel,
+  PAYMENT_METHODS,
   startGateOpen,
 } from "@/lib/payments";
 import { recordPayment, type PaymentFormState } from "@/lib/packages/actions";
@@ -116,7 +118,7 @@ export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
               <TR key={p.id}>
                 <TD className="font-medium capitalize">{p.kind}</TD>
                 <TD className="text-right">{formatCedis(p.amount)}</TD>
-                <TD className="text-muted-foreground">{p.method ?? "—"}</TD>
+                <TD className="text-muted-foreground">{paymentMethodLabel(p.method)}</TD>
                 <TD className="font-mono text-xs text-muted-foreground">
                   {p.paystackReference ?? "—"}
                 </TD>
@@ -213,8 +215,14 @@ function RecordPaymentModal({
             <option value="full">Full</option>
           </Select>
         </Field>
-        <Field label="Method" htmlFor="method" hint="e.g. mobile_money, bank, cash">
-          <Input id="method" name="method" placeholder="mobile_money" />
+        <Field label="Method" htmlFor="method">
+          <Select id="method" name="method" defaultValue="momo">
+            {PAYMENT_METHODS.filter((m) => m.value !== "paystack").map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         {state.error && (
