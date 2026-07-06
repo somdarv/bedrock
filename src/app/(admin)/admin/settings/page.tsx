@@ -1,6 +1,9 @@
-import { EmptyState } from "@/components/ui/states";
+import { ReminderCalendar } from "@/components/admin/reminder-calendar";
+import { api } from "@/lib/api";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const reminders = await api.settings.getReminders();
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <header>
@@ -13,7 +16,7 @@ export default function SettingsPage() {
         </p>
       </header>
 
-      <EmptyState title="Nothing to configure yet" description="Settings arrive as the admin matures." />
+      <ReminderCalendar initial={reminders} />
     </div>
   );
 }

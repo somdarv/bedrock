@@ -28,7 +28,7 @@ export function PortalPreviews({
       <p className="mt-1 text-sm text-muted-foreground">
         {settled
           ? "Your final files are ready to download."
-          : "Watermarked previews — tap to view. Clean originals unlock once the balance is cleared."}
+          : "Review previews — tap to view. Clean, full-resolution originals unlock once the balance is cleared."}
       </p>
       <div
         className="mt-4 grid grid-cols-1 gap-4 select-none sm:grid-cols-2"
@@ -89,6 +89,7 @@ export function PortalPreviews({
         open={Boolean(viewing?.previewUrl)}
         src={viewing?.previewUrl ?? ""}
         alt={viewing?.filename ?? "Preview"}
+        kind={viewing?.type}
         onClose={() => setViewing(null)}
         protect
       />

@@ -5,6 +5,8 @@ import type {
   ClientNotifyEvent,
   LineItemInput,
   PaymentInput,
+  ReminderRuleInput,
+  ReminderSettings,
   SessionUser,
   WorkPackage,
   WorkPackageInput,
@@ -59,6 +61,12 @@ export interface BedrockApi {
      * driven by the verified Paystack webhook; admin entry covers offline payments.
      */
     recordPayment(packageId: string, input: PaymentInput): Promise<WorkPackage>;
+  };
+  settings: {
+    /** The reminder calendar + the list of events that may be scheduled. */
+    getReminders(): Promise<ReminderSettings>;
+    /** Replace the whole reminder rule set. */
+    saveReminders(rules: ReminderRuleInput[]): Promise<ReminderSettings>;
   };
 }
 

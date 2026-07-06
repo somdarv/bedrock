@@ -1,5 +1,11 @@
 import { ApiError, type BedrockApi } from "./contract";
-import type { AdminSession, Client, SessionUser, WorkPackage } from "./types";
+import type {
+  AdminSession,
+  Client,
+  ReminderSettings,
+  SessionUser,
+  WorkPackage,
+} from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -145,6 +151,14 @@ export const httpApi: BedrockApi = {
       request<WorkPackage>(`/api/admin/packages/${packageId}/payments`, {
         method: "POST",
         body: JSON.stringify(input),
+      }),
+  },
+  settings: {
+    getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),
+    saveReminders: (rules) =>
+      request<ReminderSettings>(`/api/admin/settings/reminders`, {
+        method: "PUT",
+        body: JSON.stringify({ rules }),
       }),
   },
 };

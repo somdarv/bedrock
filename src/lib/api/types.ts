@@ -16,6 +16,22 @@ export type WorkPackageStatus =
 /** On-demand client messages for long-running accounts (the "Send statement" actions). */
 export type ClientNotifyEvent = "account_statement" | "payment_reminder";
 
+/** A row in the admin reminder calendar: fire `event` on `dayOfMonth` for accounts with a balance. */
+export interface ReminderRule {
+  id: string;
+  dayOfMonth: number;
+  event: ClientNotifyEvent;
+  enabled: boolean;
+}
+
+/** Rule shape when saving (no id — the whole set is replaced). */
+export type ReminderRuleInput = Omit<ReminderRule, "id">;
+
+export interface ReminderSettings {
+  rules: ReminderRule[];
+  events: ClientNotifyEvent[];
+}
+
 export type PricingMode = "itemized" | "fixed";
 
 export type DeliverableType = "image" | "pdf" | "video";

@@ -73,8 +73,10 @@ Key backend env (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERABLES_DI
   new tab. Records live in the DB; author locally + seed (see §6).
 - **R2 storage** — originals stored private; downloads **gated** (locked until balance 0) via
   signed, time-limited URLs; "free up storage" purges originals → download 410.
-- **Media pipeline (images)** — **real** watermarked JPEG previews (downscale + tiled diagonal
-  SAHARABASE watermark) via **PHP-GD + FreeType**. Served ungated at
+- **Media pipeline (images)** — **real** downscaled low-res JPEG previews via **PHP-GD**. The tiled
+  watermark is now **off by default** (`MEDIA_WATERMARK_ENABLED=false`) — for graphic review the
+  low-res preview + view-only framed portal modal + gated originals are the protection; flip the env
+  to re-enable the watermark. Served ungated at
   `GET /api/deliverables/{id}/preview`. Admin previews the **clean original** via a Next proxy
   (`/api/admin/deliverables/[packageId]/[deliverableId]`) that forwards the Sanctum token
   server-side. Backfill with `php artisan media:regenerate`.
@@ -204,7 +206,11 @@ endpoint · `74a8fb9` media pipeline (real image previews) · `d40d841` watermar
 + `package_delivered` events; **long-running-account statements & reminders** (`account_statement`
 /`payment_reminder` templates, `PackageController::notify` + `/notify` route, `statements:send`
 scheduled command run monthly, frontend "Send statement/reminder" buttons). Verified end-to-end on
-`LogOnlyProvider`.
+`LogOnlyProvider`. **Then:** configurable **reminder calendar** (`reminder_rules` table + model,
+`SettingsController` + `/admin/settings/reminders`, `statements:send` rewritten calendar-driven +
+scheduled **daily** 09:00 Accra, admin Settings page editor); **review-preview change** — watermark
+off by default, portal preview lightbox now a **framed captioned view-only modal**
+(`preview-lightbox.tsx`), copy updated, previews regenerated.
 
 ## 11. Current running state at handoff
 

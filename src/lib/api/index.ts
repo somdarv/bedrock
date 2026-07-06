@@ -25,6 +25,8 @@ export const api: BedrockApi = {
   auth: isLive("auth") ? httpApi.auth : mockApi.auth,
   clients: isLive("clients") ? httpApi.clients : mockApi.clients,
   packages: isLive("packages") ? httpApi.packages : mockApi.packages,
+  // Settings ride the packages switch (same admin surface) unless flipped on their own.
+  settings: isLive("settings") || isLive("packages") ? httpApi.settings : mockApi.settings,
 };
 
 export * from "./contract";

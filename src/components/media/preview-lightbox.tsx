@@ -13,8 +13,9 @@ interface Props {
   kind?: Kind;
   /**
    * When true, apply view-only deterrents: block the context menu, media drag, and text
-   * selection so the preview can't be trivially saved. This is deterrence, not true DRM —
-   * a determined viewer can always screenshot; the visible watermark is the real protection.
+   * selection, and frame images in a captioned matte so a screenshot carries the "review
+   * preview" frame rather than a clean asset. This is deterrence, not true DRM — a determined
+   * viewer can always screenshot; the low-res preview + gated originals are the real protection.
    */
   protect?: boolean;
 }
@@ -75,15 +76,30 @@ export function PreviewLightbox({ src, alt, open, onClose, kind = "image", prote
             onContextMenu={protect ? (e) => e.preventDefault() : undefined}
             className="max-h-[90vh] max-w-[92vw] rounded-lg"
           />
+        ) : protect ? (
+          // Framed, captioned matte: a screenshot carries the frame + "review preview" note,
+          // not a clean full-bleed asset. No pixel watermark — the frame is around the image.
+          <figure className="rounded-xl bg-white p-3 shadow-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={alt}
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              className="block max-h-[78vh] w-auto max-w-[86vw] rounded-md object-contain"
+              style={{ WebkitUserSelect: "none", userSelect: "none" }}
+            />
+            <figcaption className="flex items-center justify-between gap-4 px-1 pt-2.5 text-xs text-ink/55">
+              <span className="font-semibold tracking-wide">SaharaBase · Review preview</span>
+              <span>Final files delivered once payment is complete</span>
+            </figcaption>
+          </figure>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={src}
             alt={alt}
-            draggable={!protect}
-            onDragStart={protect ? (e) => e.preventDefault() : undefined}
             className="max-h-[90vh] w-auto max-w-[92vw] rounded-lg object-contain"
-            style={protect ? { WebkitUserSelect: "none", userSelect: "none" } : undefined}
           />
         )}
       </div>

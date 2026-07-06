@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type Payment, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type Payment, type ReminderRule, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -459,4 +459,20 @@ export const mockApi: BedrockApi = {
       return pkg;
     },
   },
+  settings: {
+    async getReminders() {
+      await delay();
+      return { rules: [...reminderRules], events: ["account_statement", "payment_reminder"] };
+    },
+    async saveReminders(rules) {
+      await delay();
+      reminderRules = rules.map((r) => ({ id: `rr_${crypto.randomUUID().slice(0, 8)}`, ...r }));
+      return { rules: [...reminderRules], events: ["account_statement", "payment_reminder"] };
+    },
+  },
 };
+
+let reminderRules: ReminderRule[] = [
+  { id: "rr_seed1", dayOfMonth: 25, event: "payment_reminder", enabled: true },
+  { id: "rr_seed2", dayOfMonth: 1, event: "account_statement", enabled: true },
+];
