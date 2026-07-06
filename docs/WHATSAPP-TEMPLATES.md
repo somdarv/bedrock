@@ -28,10 +28,10 @@ exactly — Bedrock fills `{{1}}, {{2}}, …` in the order listed.
 ### 1a. `client_welcome_individual` — UTILITY · no button
 Sent to an **individual** client (one person). **Body params:** `{{1}}` clientName
 
-> Hi {{1}}, you've been registered as a client at SaharaBase Technologies. 🎉 Here's how we work:
-> every job runs as a tracked *work package* — you'll get a secure link to follow progress and
-> review previews, and your final files unlock once payment is complete. Invoices, updates and
-> receipts all come right here. We look forward to working with you.
+> Hi {{1}}, welcome to SaharaBase Technologies! 🎉 Here's how we work: for each project, we'll send
+> you a private link. There you can follow progress, preview your work, and pay. Once payment is
+> complete, your final files unlock for download. We'll also send invoices, updates and receipts
+> right here. We're glad to be working with you!
 
 *Sample:* `{{1}}` = `Ama Boateng`
 
@@ -39,10 +39,10 @@ Sent to an **individual** client (one person). **Body params:** `{{1}}` clientNa
 Sent to **each contact** of an **organisation**, naming their role + the organisation.
 **Body params:** `{{1}}` contactName · `{{2}}` roleLabel · `{{3}}` orgName
 
-> Hi {{1}}, you've been added as the {{2}} for {{3}} at SaharaBase Technologies. You'll receive
-> that organisation's updates, invoices and receipts here. Here's how we work: every job runs as a
-> tracked *work package* with a secure link to follow progress and review previews; final files
-> unlock once payment is complete. Glad to have you!
+> Hi {{1}}, you've been added as the {{2}} for {{3}} at SaharaBase Technologies. You'll get updates,
+> invoices and receipts for their projects here. Here's how we work: for each project we send a
+> private link where you can follow progress, preview the work, and pay. Once payment is complete,
+> the final files unlock for download. Glad to have you on board!
 
 *Sample:* `{{1}}` = `Richard`, `{{2}}` = `primary contact`, `{{3}}` = `Acme Ltd`
 *(`roleLabel` is “primary contact” or “secondary contact”.)*
