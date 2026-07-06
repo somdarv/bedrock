@@ -85,13 +85,14 @@ Sent to **each contact** of an **organisation**, naming their role + the organis
 **Header:** Media → Document (the receipt PDF; upload any PDF as the approval sample).
 **Button:** `https://hub.saharabasetech.com/p/{{1}}` · label e.g. “Download files”
 
-### 6. `package_delivered` — UTILITY · **URL button**
+### 6. `package_delivered` — UTILITY · **static URL button (→ /track)**
 **Body params:** `{{1}}` clientName · `{{2}}` packageTitle
 
-> Hi {{1}}, *{{2}}* is complete and delivered. Everything stays available in your portal — thank you
-> for working with SaharaBase!
+> Hi {{1}}, *{{2}}* is complete and delivered. You can view this and all your projects anytime —
+> thank you for working with SaharaBase!
 
-**Button:** `https://hub.saharabasetech.com/p/{{1}}` · label e.g. “Open portal”
+**Button:** Visit website · **Static** · `https://hub.saharabasetech.com/track` · label e.g.
+“Track your projects”. (Static, not dynamic — Bedrock sends no button parameter for this one.)
 
 ### 7. `payment_reminder` — UTILITY · **URL button**
 **Body params:** `{{1}}` clientName · `{{2}}` packageTitle · `{{3}}` amountDue
