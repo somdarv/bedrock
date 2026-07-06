@@ -36,18 +36,12 @@ The backend reads `config('services.whatsapp')` from these `.env` keys (see `bed
 5. **Permanent token** — Business Settings → **System Users** → create one → assign the app with
    `whatsapp_business_messaging` + `whatsapp_business_management` → **Generate token** → copy it to
    `WHATSAPP_TOKEN`. (The 24-hour dev token on the dashboard is for testing only.)
-6. **Message templates** — WhatsApp Manager → author + submit these, matching the parameter order in
-   `bedrock-api/config/notifications.php`:
-
-   | Template name | Category | Body parameters (in order) |
-   |---------------|----------|----------------------------|
-   | `invoice_sent` | UTILITY | clientName, packageTitle, amountDue, portalLink |
-   | `deposit_received` | UTILITY | clientName, amountPaid, packageTitle |
-   | `files_ready` | UTILITY | clientName, packageTitle, portalLink |
-   | `payment_complete` | UTILITY | clientName, packageTitle, portalLink |
-   | `otp_code` | AUTHENTICATION | the code |
-
-   Approval is usually minutes-to-hours. The template **names** must match exactly.
+6. **Message templates** — WhatsApp Manager → author + submit them. **Exact copy + parameter order
+   for every template is in [WHATSAPP-TEMPLATES.md](./WHATSAPP-TEMPLATES.md)** (ready to paste).
+   Currently wired: `client_welcome`, `invoice_sent`, `deposit_received`, `files_ready`,
+   `payment_complete`, `package_delivered` (all UTILITY) and `otp_code` (AUTHENTICATION). Names must
+   match `bedrock-api/config/notifications.php` exactly. Approval is usually minutes-to-hours. You
+   can add as many templates as you need (Meta allows up to ~250 per account).
 7. **Webhook (do this LAST, after the API is deployed).** Sending works without it — the webhook
    only powers delivery receipts + inbound replies. When ready:
    - Callback URL: **`https://api.saharabasetech.com/api/webhooks/whatsapp`**
