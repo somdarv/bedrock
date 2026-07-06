@@ -80,7 +80,7 @@ const REGISTRY: DocumentRecord[] = [
     id: "SAH-BD-20260706-PRO-GHIS-53",
     reference: "PRO-GHIS-53",
     category: "proposals",
-    type: "Proposal",
+    type: "Collaboration Brief",
     title: "Digitizing School Operations: A Collaboration Proposal",
     client: "Greater Heights International School",
     project: "School Operations Digitisation",

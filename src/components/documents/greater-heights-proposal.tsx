@@ -105,8 +105,10 @@ export function GreaterHeightsProposal({ record }: { record: DocumentRecord }) {
           <p className="mt-1 text-sm text-gray-600">059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584</p>
           <p className="mt-1 text-sm text-gray-600">www.saharabasetech.com</p>
         </div>
-        <div className="w-56 text-right">
-          <h2 className="mb-2 text-2xl font-semibold text-gray-800">{record.type}</h2>
+        <div className="w-64 text-right">
+          <h2 className="mb-2 whitespace-nowrap text-xl font-semibold text-gray-800">
+            {record.type}
+          </h2>
           <p className="text-sm text-gray-600">Ref: {record.reference}</p>
           <p className="text-sm text-gray-600">Issue Date: {record.issueDate}</p>
           {record.validUntil && (
