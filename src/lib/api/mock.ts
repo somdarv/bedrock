@@ -15,6 +15,7 @@ const clients: Client[] = [
   {
     id: "cl_1",
     type: "individual",
+    accountType: "standard",
     name: "Ama Boateng",
     contacts: [
       {
@@ -31,6 +32,7 @@ const clients: Client[] = [
   {
     id: "cl_2",
     type: "individual",
+    accountType: "standard",
     name: "Kojo Mensah",
     contacts: [
       {
@@ -168,6 +170,7 @@ export const mockApi: BedrockApi = {
       const client: Client = {
         id: `cl_${crypto.randomUUID().slice(0, 8)}`,
         type: input.type,
+        accountType: input.accountType,
         name: input.name,
         contacts: input.contacts.map((c) => ({ id: `ct_${crypto.randomUUID().slice(0, 8)}`, ...c })),
         createdAt: new Date().toISOString(),
@@ -182,6 +185,7 @@ export const mockApi: BedrockApi = {
         "Client",
       );
       existing.type = input.type;
+      existing.accountType = input.accountType;
       existing.name = input.name;
       existing.contacts = input.contacts.map((c) => ({
         id: `ct_${crypto.randomUUID().slice(0, 8)}`,

@@ -6,7 +6,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/states";
-import type { Client, ClientInput, ClientType } from "@/lib/api";
+import type { AccountType, Client, ClientInput, ClientType } from "@/lib/api";
 import { createClient, updateClient } from "@/lib/clients/actions";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ export function ClientFormModal({ open, onClose, client, onDone }: Props) {
   const isEdit = Boolean(client);
 
   const [type, setType] = React.useState<ClientType>(client?.type ?? "individual");
+  const [accountType, setAccountType] = React.useState<AccountType>(client?.accountType ?? "standard");
   const [name, setName] = React.useState(client?.name ?? "");
   const [contacts, setContacts] = React.useState<ContactDraft[]>(
     client
@@ -56,6 +57,7 @@ export function ClientFormModal({ open, onClose, client, onDone }: Props) {
 
     const input: ClientInput = {
       type,
+      accountType,
       name: name.trim(),
       contacts: contacts.map((c, i) => ({
         // For an individual the person is the contact, so their name is the client name.
@@ -110,6 +112,23 @@ export function ClientFormModal({ open, onClose, client, onDone }: Props) {
             required
           />
         </Field>
+
+        {/* Ongoing account = rolling work billed on terms, with a rolled-up account statement. */}
+        <label className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={accountType === "ongoing"}
+            onChange={(e) => setAccountType(e.target.checked ? "ongoing" : "standard")}
+            className="mt-0.5 h-4 w-4 rounded border-input"
+          />
+          <span>
+            <span className="font-medium">Ongoing account</span>
+            <span className="block text-xs text-muted-foreground">
+              Rolling work billed on terms, not per project. Gets a terms-setting welcome and a
+              rolled-up account statement across all their projects.
+            </span>
+          </span>
+        </label>
 
         {isOrg ? (
           <div className="space-y-3">

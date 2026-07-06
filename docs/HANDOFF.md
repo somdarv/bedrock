@@ -212,7 +212,11 @@ endpoint · `74a8fb9` media pipeline (real image previews) · `d40d841` watermar
 + `package_delivered` events; **long-running-account statements & reminders** (`account_statement`
 /`payment_reminder` templates, `PackageController::notify` + `/notify` route, `statements:send`
 scheduled command run monthly, frontend "Send statement/reminder" buttons). Verified end-to-end on
-`LogOnlyProvider`. **Then:** configurable **reminder calendar** (`reminder_rules` table + model,
+`LogOnlyProvider`. **Ongoing accounts:** `clients.account_type` (standard|ongoing) + client-form
+toggle; ongoing clients get terms-setting welcomes (`account_welcome_*`) and a **client-level
+rolled-up `ongoing_account_statement`** (all projects, total outstanding) instead of per-package
+reminders; `statements:send` sends one aggregate per ongoing client and excludes them from the
+per-package loop. **Then:** configurable **reminder calendar** (`reminder_rules` table + model,
 `SettingsController` + `/admin/settings/reminders`, `statements:send` rewritten calendar-driven +
 scheduled **daily** 09:00 Accra, admin Settings page editor); **review-preview change** — watermark
 off by default, portal preview lightbox now a **framed captioned view-only modal**

@@ -25,6 +25,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="mt-2 flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{client.name}</h1>
           <Badge>{client.type === "organisation" ? "Organisation" : "Individual"}</Badge>
+          {client.accountType === "ongoing" && <Badge variant="info">Ongoing account</Badge>}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Added {new Date(client.createdAt).toLocaleDateString()}

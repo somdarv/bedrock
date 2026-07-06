@@ -51,6 +51,9 @@ export type PaymentKind = "deposit" | "final" | "full";
 
 export type ClientType = "organisation" | "individual";
 
+/** standard = pay per project; ongoing = rolling work, deferred billing, account statements. */
+export type AccountType = "standard" | "ongoing";
+
 export interface Contact {
   id: string;
   name: string;
@@ -71,6 +74,7 @@ export interface ContactInput {
 export interface Client {
   id: string;
   type: ClientType;
+  accountType: AccountType;
   /** Organisation name, or the individual's name. */
   name: string;
   contacts: Contact[];
@@ -79,6 +83,7 @@ export interface Client {
 
 export interface ClientInput {
   type: ClientType;
+  accountType: AccountType;
   name: string;
   contacts: ContactInput[];
 }

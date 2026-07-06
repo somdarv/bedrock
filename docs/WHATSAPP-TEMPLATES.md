@@ -52,6 +52,25 @@ Sent to **each contact** of an **organisation**, naming their role + the organis
 *Sample:* `{{1}}` = `Richard`, `{{2}}` = `primary contact`, `{{3}}` = `Acme Ltd`
 *(`roleLabel` is “primary contact” or “secondary contact”.)*
 
+### 1c. `account_welcome_individual` — MARKETING · no button · optional image header
+Ongoing-account **individual** — sets the deferred-billing terms. **Body params:** `{{1}}` clientName
+
+> Hi {{1}}, you've been set up with an ongoing account at SaharaBase Technologies. Here's how it
+> works: we'll take on your projects and add them to your account, and you settle the balance on the
+> terms we agree — not project by project. We'll send a regular statement showing all your projects,
+> what's been paid, and your balance. You can also check your account anytime at
+> hub.saharabasetech.com/track. Glad to be working with you!
+
+### 1d. `account_welcome_contact` — MARKETING · no button
+Ongoing-account **organisation** — sent to each contact. **Body params:** `{{1}}` contactName ·
+`{{2}}` roleLabel · `{{3}}` orgName
+
+> Hi {{1}}, you've been added as the {{2}} for {{3}}, which has an ongoing account with SaharaBase
+> Technologies. Here's how it works: we take on the organisation's projects and add them to the
+> account, settled on agreed terms rather than per project. You'll get regular statements showing
+> all projects, payments and the balance. Check the account anytime at hub.saharabasetech.com/track.
+> Glad to have you on board!
+
 ### 2. `invoice_sent` — UTILITY · **URL button** (`…/p/{{1}}`) · **document header (PDF)**
 **Body params:** `{{1}}` clientName · `{{2}}` packageTitle · `{{3}}` amountDue
 
@@ -110,6 +129,17 @@ Sent to **each contact** of an **organisation**, naming their role + the organis
 > Outstanding balance: *{{4}}*. Tap below for full details and payment.
 
 **Button:** `https://hub.saharabasetech.com/p/{{1}}` · label e.g. “View statement”
+
+### 8b. `ongoing_account_statement` — UTILITY · **static URL button (→ /track)**
+The rolled-up statement for **ongoing accounts** (all projects in one message). Client-level, so
+the button is a **static** `/track` link. **Body params:** `{{1}}` clientName · `{{2}}` accountSummary
+(one line, e.g. “Brand pack — GHS 1,000.00 due; Logo — paid.”) · `{{3}}` totalOutstanding
+
+> Hi {{1}}, here is your SaharaBase account statement: {{2}} Total outstanding across all projects:
+> *{{3}}*. Tap below to see the full breakdown or settle your balance.
+
+**Button:** Visit website · **Static** · `https://hub.saharabasetech.com/track` · label e.g.
+“View my account”.
 
 ### 9. `otp_code` — AUTHENTICATION
 In WhatsApp Manager choose **Authentication**, enable the **“Copy code”** button; the body is
