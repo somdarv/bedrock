@@ -226,6 +226,24 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
             "Copy link"
           )}
         </Button>
+        <div className="flex w-full gap-4 border-t pt-3 text-sm">
+          <a
+            href={`${publicUrl}/invoice`}
+            target="_blank"
+            rel="noopener"
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            Invoice PDF
+          </a>
+          <a
+            href={`${publicUrl}/receipt`}
+            target="_blank"
+            rel="noopener"
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            Receipt PDF
+          </a>
+        </div>
       </div>
 
       {/* Lifecycle */}

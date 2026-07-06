@@ -146,6 +146,11 @@ to a form yet.
 
 ## 8. Open issues / gotchas (don't repeat these)
 
+- **Invoice/receipt PDFs are now generated server-side** with `@react-pdf/renderer` (pure Node, no
+  browser) at `/p/{slug}/invoice` and `/receipt` (see `src/lib/pdf/`). These are real, verified
+  (`%PDF-`, ~3 KB). **Still open:** the **document-engine** export (`/d/{id}` React pages) — react-pdf
+  can't render those DOM pages; a headless-Chrome render (Puppeteer/Browsershot) would produce them
+  AND fix the pagination below. That's the remaining PDF piece (proposals/fee schedules).
 - **Document PDF export pagination is UNRESOLVED.** "Download PDF" is browser print→PDF against the
   `.doc-sheet` (`document-frame.tsx`, print CSS in `globals.css`). The original CSS marked every
   section `avoid-break`, so on A4 a block that doesn't fit is pushed whole to the next page →

@@ -88,6 +88,36 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
             </div>
           )}
         </div>
+
+        {/* Downloadable documents */}
+        <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-sm">
+          <a
+            href={`/p/${slug}/invoice`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6M9 15l3 3 3-3" />
+            </svg>
+            Invoice (PDF)
+          </a>
+          {paid > 0 && (
+            <a
+              href={`/p/${slug}/receipt`}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6M9 15l3 3 3-3" />
+              </svg>
+              Receipt (PDF)
+            </a>
+          )}
+        </div>
       </section>
 
       {/* Scope */}
