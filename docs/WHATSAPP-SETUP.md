@@ -38,8 +38,9 @@ The backend reads `config('services.whatsapp')` from these `.env` keys (see `bed
    `WHATSAPP_TOKEN`. (The 24-hour dev token on the dashboard is for testing only.)
 6. **Message templates** — WhatsApp Manager → author + submit them. **Exact copy + parameter order
    for every template is in [WHATSAPP-TEMPLATES.md](./WHATSAPP-TEMPLATES.md)** (ready to paste).
-   Currently wired: `client_welcome`, `invoice_sent`, `deposit_received`, `files_ready`,
-   `payment_complete`, `package_delivered` (all UTILITY) and `otp_code` (AUTHENTICATION). Names must
+   Currently wired: `client_welcome_individual`, `client_welcome_contact`, `invoice_sent`,
+   `deposit_received`, `files_ready`, `payment_complete`, `package_delivered` (all UTILITY) and
+   `otp_code` (AUTHENTICATION). Names must
    match `bedrock-api/config/notifications.php` exactly. Approval is usually minutes-to-hours. You
    can add as many templates as you need (Meta allows up to ~250 per account).
 7. **Webhook (do this LAST, after the API is deployed).** Sending works without it — the webhook

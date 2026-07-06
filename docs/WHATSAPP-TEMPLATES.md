@@ -25,13 +25,27 @@ exactly — Bedrock fills `{{1}}, {{2}}, …` in the order listed.
 
 ## Templates (create these now)
 
-### 1. `client_welcome` — UTILITY · no button
-**Body params:** `{{1}}` clientName
+### 1a. `client_welcome_individual` — UTILITY · no button
+Sent to an **individual** client (one person). **Body params:** `{{1}}` clientName
 
-> Hi {{1}}, welcome to SaharaBase! 🎉 Here's how we work: every job runs as a tracked *work
-> package*. We'll send you a secure link to follow progress and review previews, and your final
-> files unlock once payment is complete. Invoices, updates and receipts all come right here on
-> WhatsApp. We look forward to working with you.
+> Hi {{1}}, you've been registered as a client at SaharaBase Technologies. 🎉 Here's how we work:
+> every job runs as a tracked *work package* — you'll get a secure link to follow progress and
+> review previews, and your final files unlock once payment is complete. Invoices, updates and
+> receipts all come right here. We look forward to working with you.
+
+*Sample:* `{{1}}` = `Ama Boateng`
+
+### 1b. `client_welcome_contact` — UTILITY · no button
+Sent to **each contact** of an **organisation**, naming their role + the organisation.
+**Body params:** `{{1}}` contactName · `{{2}}` roleLabel · `{{3}}` orgName
+
+> Hi {{1}}, you've been added as the {{2}} for {{3}} at SaharaBase Technologies. You'll receive
+> that organisation's updates, invoices and receipts here. Here's how we work: every job runs as a
+> tracked *work package* with a secure link to follow progress and review previews; final files
+> unlock once payment is complete. Glad to have you!
+
+*Sample:* `{{1}}` = `Richard`, `{{2}}` = `primary contact`, `{{3}}` = `Acme Ltd`
+*(`roleLabel` is “primary contact” or “secondary contact”.)*
 
 ### 2. `invoice_sent` — UTILITY · **URL button** (`…/p/{{1}}`) · **document header (PDF)**
 **Body params:** `{{1}}` clientName · `{{2}}` packageTitle · `{{3}}` amountDue
