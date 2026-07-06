@@ -63,7 +63,7 @@ and demoable.
 ## Phase 4 — Lifecycle & activity ✅ done
 
 - Status transition controls (Draft → Sent → … → Closed) with the allowed-transition rules.
-- "Send invoice / link" action (triggers backend Termii/email); toggle **line items done** to
+- "Send invoice / link" action (triggers backend WhatsApp + email); toggle **line items done** to
   drive the progress bar.
 - **Activity-log timeline** on the package detail.
 

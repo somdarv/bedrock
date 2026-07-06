@@ -77,6 +77,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20260706-PRO-GHIS-53",
+    reference: "PRO-GHIS-53",
+    category: "proposals",
+    type: "Proposal",
+    title: "Digitizing School Operations: A Collaboration Proposal",
+    client: "Greater Heights International School",
+    project: "School Operations Digitisation",
+    issueDate: "6 July 2026",
+    validUntil: "6 August 2026",
+    status: "valid",
+    approver: { name: "Magdalene Assam", employeeId: "SAH-BD-2021-04" },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260630-BIL-DYN-52",
     reference: "BIL-DYN-52",
     category: "proposals",

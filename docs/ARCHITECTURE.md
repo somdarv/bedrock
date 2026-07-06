@@ -21,7 +21,7 @@ These are settled. Everything below builds on them.
 | Admin UI | **Custom, hand-built in Next.js** (no Filament) | Full control of the business-end UX; one frontend codebase. |
 | Repos | **This repo = Next.js frontend; separate repo = Laravel API** | Independent deploys; backend is API-only. |
 | Database | **PostgreSQL** | Strong relational integrity for money/state. |
-| Messaging | **Termii** (single vendor: WhatsApp + SMS + OTP) | Africa-focused, Ghana coverage, one integration. |
+| Messaging | **WhatsApp Cloud API (Meta direct, no BSP)** + email; SMS = future stub | Lower cost, full control; official Cloud API. See [ADR-0003](./decisions/0003-whatsapp-cloud-api-direct.md). |
 | Deliverables | **Images + PDF + video** | Full media engine (Intervention Image, Imagick/Ghostscript, FFmpeg). |
 | Payments | **Paystack** (webhook = truth) | Ghana Starter Business; swappable to Hubtel via config. |
 | Object storage | **Cloudflare R2** | No egress fees; signed time-limited URLs for originals. |
@@ -38,7 +38,7 @@ Two repositories, one system:
   - **Custom admin** (`/admin/*`) — authenticated. Create/manage clients, packages, line items,
     pricing, status; upload deliverables; toggle line items done.
 - **`bedrock-api`** (separate repo) — **Laravel**, API-only. JSON API, Sanctum auth, Horizon
-  queues, Paystack webhook, Termii integration, media pipeline. **No Filament, no Blade admin.**
+  queues, Paystack webhook, WhatsApp Cloud API integration, media pipeline. **No Filament, no Blade admin.**
 
 ```
                          Cloudflare (DNS + CDN + R2)
@@ -50,7 +50,7 @@ Two repositories, one system:
                                                               │
         Paystack ──webhook (verified, server-side)──────────►│
                                                               │
-                                   Redis queues / Horizon ◄───┤──► Termii (WhatsApp/SMS/OTP)
+                                   Redis queues / Horizon ◄───┤──► WhatsApp Cloud API (Meta)
                                                               │──► Email (Mailable)
                                                               └──► R2 (originals + previews)
 ```
@@ -81,8 +81,8 @@ Two repositories, one system:
 ## 3. Backend architecture (separate Laravel repo — documented here for the contract)
 
 Laravel, API-only: Eloquent models, REST/JSON API, Sanctum, Horizon-managed Redis queues, the
-Paystack webhook controller, Termii integration, and the media-pipeline jobs. **No Filament, no
-Blade admin.**
+Paystack webhook controller, WhatsApp Cloud API integration, and the media-pipeline jobs. **No
+Filament, no Blade admin.**
 
 This document defines the **shared API contract** (endpoints, payloads, auth) so both repos build
 against one source of truth. Representative endpoints (final shapes pinned during backend build):
@@ -94,7 +94,7 @@ against one source of truth. Representative endpoints (final shapes pinned durin
 | Packages | `GET/POST /api/admin/packages`, `GET/PUT /api/admin/packages/{id}` | Sanctum | Package CRUD, status, pricing mode. |
 | Line items | `POST/PUT/DELETE /api/admin/packages/{id}/items` | Sanctum | Line-item CRUD. |
 | Deliverables | `POST /api/admin/packages/{id}/deliverables` | Sanctum | Upload originals; returns processing status. |
-| Send | `POST /api/admin/packages/{id}/send` | Sanctum | Generate invoice/link, fire Termii/email. |
+| Send | `POST /api/admin/packages/{id}/send` | Sanctum | Generate invoice/link, fire WhatsApp/email. |
 | Public package | `GET /api/p/{slug}` | public | Portal read by UUID. |
 | Pay init | `POST /api/p/{slug}/pay` | public | Mint Paystack `access_code`/reference. |
 | Webhook | `POST /api/webhooks/paystack` | signature | Payment truth (server-side verify). |
@@ -201,15 +201,17 @@ the download gate confirms `Balance == 0`.
 
 - **Primary path** — UUID `public_slug` link, no login. Next.js fetches the public package view by
   slug. Unguessable; no enumerable IDs.
-- **Secondary path** — phone + **OTP lookup** for returning clients. Laravel issues the OTP via
-  Termii, verifies it, and returns a short-lived **scoped token** listing that client's packages.
+- **Secondary path** — phone + **OTP lookup** for returning clients. Laravel issues the OTP via a
+  WhatsApp Authentication template, verifies it, and returns a short-lived **scoped token** (a
+  stateless encrypted `PortalToken` — Client ids are ULIDs and don't fit Sanctum's BIGINT tokenable
+  column) listing that client's packages.
 
 ---
 
 ## 8. Notifications
 
-**Termii** behind a `MessagingProvider` interface (WhatsApp templates + SMS/OTP), in Laravel.
-Queued jobs fire on each key event:
+**WhatsApp Cloud API (Meta direct)** behind a `MessagingProvider` interface, in Laravel. Queued
+jobs (`SendClientNotification` on the `notifications` queue) fire on each key event:
 
 - Invoice sent
 - Deposit received
@@ -217,9 +219,11 @@ Queued jobs fire on each key event:
 - Files ready for review
 - Payment complete / receipt
 
-**Email mirrors** each event via a Laravel Mailable (fallback + client preference). WhatsApp uses
-**pre-approved templates** on the Cloud API via Termii — never unofficial libraries. Every send is
-recorded in **NotificationLog**.
+**Email mirrors** each event via a Laravel Mailable (`ClientEventMail`). WhatsApp uses
+**pre-approved templates** on the official Cloud API (`graph.facebook.com`), sent directly — never
+unofficial libraries, never a BSP. Delivery receipts + inbound replies arrive on the
+`/api/webhooks/whatsapp` webhook (`X-Hub-Signature-256` verified). Every send is recorded in
+**NotificationLog**. SMS is a future stub (`SmsProvider`/`NullSmsProvider`).
 
 ---
 
@@ -228,7 +232,8 @@ recorded in **NotificationLog**.
 In the Laravel repo, so vendors swap without a rewrite:
 
 - `PaymentGateway` interface → `PaystackGateway` now, `HubtelGateway` later.
-- `MessagingProvider` interface → `TermiiProvider` now (Twilio / 360dialog swappable).
+- `MessagingProvider` interface → `WhatsAppCloudProvider` now (`LogOnlyProvider` in dev; a BSP
+  swappable later). `SmsProvider` → `NullSmsProvider` stub until an SMS vendor is added.
 - `ObjectStorage` via Laravel's S3 filesystem driver → R2 now.
 
 ---
@@ -261,7 +266,7 @@ In the Laravel repo, so vendors swap without a rewrite:
 3. System computes `effectiveTotal` and applies the payment rule (full upfront ≤ GHS 500, else
    40% deposit).
 4. System generates the invoice + unique UUID tracking link.
-5. Link sent via Termii/email.
+5. Link sent via WhatsApp + email.
 6. Client opens the portal, sees scope + price + a "Pay deposit" button (Paystack inline).
 7. **Paystack webhook** confirms payment server-side → **start gate** opens (status → In Progress).
 8. Admin does the work, uploads deliverables, toggles line items done (progress bar moves).
@@ -275,7 +280,7 @@ In the Laravel repo, so vendors swap without a rewrite:
 
 **In:** Work Package lifecycle, dual-mode line-item/fixed pricing, two-gate payment via Paystack
 webhooks, watermarked-preview + locked-original delivery (image/PDF/video), UUID client links,
-phone+OTP lookup, WhatsApp + email notifications (Termii), custom admin, activity log.
+phone+OTP lookup, WhatsApp + email notifications (Meta Cloud API direct), custom admin, activity log.
 
 **Out (later):** team/worker accounts beyond a single admin, Hubtel payment fallback, any
 analytics/reporting dashboard, recurring or subscription billing. The §9 interfaces leave the door

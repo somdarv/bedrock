@@ -1,6 +1,6 @@
 # Bedrock — Session Handoff
 
-> Living context for continuing work across sessions. **Last updated: 2026-07-05.**
+> Living context for continuing work across sessions. **Last updated: 2026-07-06.**
 > Read this first, then [ARCHITECTURE.md](./ARCHITECTURE.md), [DOCUMENT-CODES.md](./DOCUMENT-CODES.md), [ROADMAP.md](./ROADMAP.md).
 
 ---
@@ -82,8 +82,13 @@ Key backend env (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERABLES_DI
 **Still mock / not built — the road to full potential (priority order in §9):**
 - **Paystack** — Pay button is a placeholder; payments entered **manually**. Real flow (init
   access_code → inline JS → webhook HMAC verify → record → gates) NOT built. ← **biggest next**
-- **Termii** — "Send invoice" only flips draft→sent + logs; no real WhatsApp/SMS/email/OTP send.
-  (User has a new WhatsApp number to configure.)
+- **Messaging (WhatsApp Cloud API, Meta direct)** — **built this session** behind the
+  `MessagingProvider` seam, but runs on `LogOnlyProvider` (`MESSAGING_PROVIDER=log`) until the Meta
+  portal is set up. Send/payment/review events now fire real notifications + email mirror + audit
+  rows; webhook + WhatsApp OTP lookup done. **Pending = the operator's portal setup**
+  (business verification, number registration, permanent token, approved templates) → then flip to
+  `whatsapp_cloud` + run a `notifications` queue worker. See **docs/WHATSAPP-SETUP.md**. SMS is a
+  deliberate stub. (Supersedes Termii — [ADR-0003](./decisions/0003-whatsapp-cloud-api-direct.md).)
 - **Media pipeline (PDF/video)** — drivers exist but **capability-gated**: they fall back to a
   branded placeholder until the server has **Ghostscript + FFmpeg** (`MEDIA_GHOSTSCRIPT` /
   `MEDIA_FFMPEG`). Images already real.
@@ -165,8 +170,12 @@ to a form yet.
    `/transaction/verify`, records the payment (**idempotent on reference**), runs the gates. Makes
    the Pay button real and gates fire without manual entry. `method` value `paystack` is reserved
    for these. See ARCHITECTURE §5.
-2. **Termii notifications** — real WhatsApp + SMS + OTP send on invoice/receipt/status events +
-   a notifications log with resend. Configure the new WhatsApp number. Powers OTP lookup too.
+2. **WhatsApp messaging — go live.** Code is **done** (WhatsApp Cloud API direct + email mirror +
+   webhook + OTP lookup, all behind `MessagingProvider`, running on `LogOnlyProvider`). Remaining is
+   **operator + prod wiring**, not code: complete the Meta portal setup (**docs/WHATSAPP-SETUP.md**),
+   set the `WHATSAPP_*` env, flip `MESSAGING_PROVIDER=whatsapp_cloud`, run a `notifications` queue
+   worker, and (last) point the Meta webhook at `api.saharabasetech.com/api/webhooks/whatsapp`. A
+   frontend notifications-log viewer + resend button is a nice-to-have. SMS stays a stub.
 3. **Media pipeline PDF/video** — install Ghostscript + FFmpeg on the server, set the env paths,
    flip `MEDIA_SYNC=false` + run a `media` queue worker/Horizon.
 4. **Document PDF export** — resolve pagination (§8), ideally server-side rendering; then an
@@ -187,7 +196,12 @@ clean-original preview proxy · `920937a` handoff · `425be9b` GitHub Actions de
 
 **Backend** (`bedrock-api`): `eae70ef` initial Laravel API · `13f64fa` admin inline original-preview
 endpoint · `74a8fb9` media pipeline (real image previews) · `d40d841` watermark opacity 0.18 ·
-`857457f` GitHub Actions deploy.
+`857457f` GitHub Actions deploy · **_uncommitted this session_** — WhatsApp Cloud API messaging
+(config `services.whatsapp` + `notifications`; `NotificationLog`/`OtpCode` migrations+models;
+`app/Services/Messaging/*` provider seam bound in `AppServiceProvider`; `SendClientNotification` job
++ `ClientEventMail`; 5 lifecycle events wired in `PackageController`; `WhatsAppWebhookController` +
+`OtpLookupController` + `PortalToken`; `Contact::client()` relation added). Verified end-to-end on
+`LogOnlyProvider`.
 
 ## 11. Current running state at handoff
 

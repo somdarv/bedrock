@@ -104,6 +104,7 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 |--------|------|
 | Dropyn Trading LLC | `DYN` |
 | Northfield Limited | `NORTHF` |
+| Greater Heights International School | `GHIS` |
 
 Assigned once per client and reused across their documents.
 

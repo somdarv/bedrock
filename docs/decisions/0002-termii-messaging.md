@@ -1,6 +1,12 @@
 # ADR 0002 — Termii as the single messaging vendor
 
-**Status:** Accepted · **Date:** 2026-06-19
+**Status:** ~~Accepted~~ **Superseded by [ADR-0003](./0003-whatsapp-cloud-api-direct.md)** (2026-07-06) ·
+**Date:** 2026-06-19
+
+> **Superseded.** We now integrate Meta's WhatsApp Cloud API **directly** (no BSP) rather than
+> through Termii — lower cost and full control. The consequence is that SMS is no longer bundled;
+> it's a future stub behind the same `MessagingProvider` seam. WhatsApp OTP replaces SMS OTP. See
+> ADR-0003 for the full rationale. The rest of this document is kept for historical context.
 
 ## Decision
 
