@@ -110,6 +110,11 @@ export const httpApi: BedrockApi = {
         body: JSON.stringify({ status }),
       }),
     send: (id) => request<WorkPackage>(`/api/admin/packages/${id}/send`, { method: "POST" }),
+    notify: (id, event) =>
+      request<WorkPackage>(`/api/admin/packages/${id}/notify`, {
+        method: "POST",
+        body: JSON.stringify({ event }),
+      }),
     setLineItemDone: (packageId, itemId, done) =>
       request<WorkPackage>(`/api/admin/packages/${packageId}/items/${itemId}/done`, {
         method: "POST",

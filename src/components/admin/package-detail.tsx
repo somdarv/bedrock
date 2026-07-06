@@ -17,6 +17,7 @@ import { LineItemModal } from "@/components/admin/line-item-modal";
 import { PackageFormModal } from "@/components/admin/package-form-modal";
 import {
   balance,
+  type ClientNotifyEvent,
   effectiveTotal,
   type LineItem,
   type PricingMode,
@@ -28,6 +29,7 @@ import {
   deletePackage,
   deleteLineItem,
   sendPackage,
+  sendStatement,
   setPricingMode,
   setTotalOverride,
   toggleLineItemDone,
@@ -140,6 +142,20 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
     });
   }
 
+  function doNotify(event: ClientNotifyEvent) {
+    startLifecycle(async () => {
+      const res = await sendStatement(pkg.id, event);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast(
+          event === "account_statement" ? "Statement sent to the client." : "Reminder sent to the client.",
+          "success",
+        );
+        router.refresh();
+      }
+    });
+  }
+
   function doToggleDone(item: LineItem, done: boolean) {
     startProgress(async () => {
       const res = await toggleLineItemDone(pkg.id, item.id, done);
@@ -243,6 +259,36 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           )}
         </div>
       </div>
+
+      {/* Client messages — on-demand statement / reminder for long-running accounts.
+          (Sent automatically every month too, for any package with a balance.) */}
+      {pkg.status !== "draft" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface p-4">
+          <div>
+            <div className="text-xs font-medium text-muted-foreground">Client messages</div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Send a progress statement or a payment reminder over WhatsApp + email.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => doNotify("account_statement")}
+              disabled={pendingLifecycle}
+            >
+              Send statement
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => doNotify("payment_reminder")}
+              disabled={pendingLifecycle || balance(pkg) <= 0}
+              title={balance(pkg) <= 0 ? "No outstanding balance" : undefined}
+            >
+              Send reminder
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Pricing + line items */}

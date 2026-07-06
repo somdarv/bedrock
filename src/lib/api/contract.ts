@@ -2,6 +2,7 @@ import type {
   AdminSession,
   Client,
   ClientInput,
+  ClientNotifyEvent,
   LineItemInput,
   PaymentInput,
   SessionUser,
@@ -42,8 +43,10 @@ export interface BedrockApi {
     removeLineItem(packageId: string, itemId: string): Promise<WorkPackage>;
     /** Apply a lifecycle transition (validated against allowed moves). */
     setStatus(id: string, status: WorkPackageStatus): Promise<WorkPackage>;
-    /** Send the invoice + tracking link (Termii/email) and move draft → sent. */
+    /** Send the invoice + tracking link (WhatsApp + email) and move draft → sent. */
     send(id: string): Promise<WorkPackage>;
+    /** On-demand account statement / payment reminder for long-running accounts. */
+    notify(id: string, event: ClientNotifyEvent): Promise<WorkPackage>;
     /** Toggle a line item's done flag to drive the client progress bar. */
     setLineItemDone(packageId: string, itemId: string, done: boolean): Promise<WorkPackage>;
     /** Upload an original; the backend stores it in R2 and queues preview generation. */

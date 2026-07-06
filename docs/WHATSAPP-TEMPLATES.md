@@ -86,11 +86,11 @@ choose **Authentication**, enable the **"Copy code" button**, and the body is ge
 
 ---
 
-## Coming next (safe to pre-create — code being built in the next pass)
+## Long-running accounts (also built & wired)
 
-These power the **long-running-account statements & reminders** (auto monthly **and** a manual
-"Send statement" button). Create the templates now if you like; Bedrock will start firing them once
-the scheduled job + admin button land.
+These power the **account statements & reminders**: sent **automatically every month** (the
+`statements:send` scheduled command, for any package with an outstanding balance) **and** on demand
+from the admin package page (the **Send statement** / **Send reminder** buttons).
 
 ### 8. `payment_reminder` — UTILITY
 A short nudge for an outstanding balance.

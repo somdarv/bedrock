@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   api,
   ApiError,
+  type ClientNotifyEvent,
   effectiveTotal,
   type LineItemInput,
   type PaymentKind,
@@ -162,6 +163,19 @@ export async function sendPackage(id: string): Promise<ActionState> {
     await api.packages.send(id);
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not send package." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
+export async function sendStatement(
+  id: string,
+  event: ClientNotifyEvent,
+): Promise<ActionState> {
+  try {
+    await api.packages.notify(id, event);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not send message." };
   }
   revalidatePackage(id);
   return { ok: true };

@@ -344,6 +344,16 @@ export const mockApi: BedrockApi = {
       logActivity(pkg, "invoice_sent", "Invoice and tracking link sent via WhatsApp + email.");
       return pkg;
     },
+    async notify(id, event) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === id),
+        "Work package",
+      );
+      const label = event === "account_statement" ? "Account statement" : "Payment reminder";
+      logActivity(pkg, "notification_sent", `${label} sent to the client via WhatsApp + email.`);
+      return pkg;
+    },
     async setLineItemDone(packageId, itemId, done) {
       await delay();
       const pkg = found(

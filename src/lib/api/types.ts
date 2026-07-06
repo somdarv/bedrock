@@ -13,6 +13,9 @@ export type WorkPackageStatus =
   | "delivered"
   | "closed";
 
+/** On-demand client messages for long-running accounts (the "Send statement" actions). */
+export type ClientNotifyEvent = "account_statement" | "payment_reminder";
+
 export type PricingMode = "itemized" | "fixed";
 
 export type DeliverableType = "image" | "pdf" | "video";

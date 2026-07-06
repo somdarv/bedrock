@@ -200,7 +200,10 @@ endpoint · `74a8fb9` media pipeline (real image previews) · `d40d841` watermar
 (config `services.whatsapp` + `notifications`; `NotificationLog`/`OtpCode` migrations+models;
 `app/Services/Messaging/*` provider seam bound in `AppServiceProvider`; `SendClientNotification` job
 + `ClientEventMail`; 5 lifecycle events wired in `PackageController`; `WhatsAppWebhookController` +
-`OtpLookupController` + `PortalToken`; `Contact::client()` relation added). Verified end-to-end on
+`OtpLookupController` + `PortalToken`; `Contact::client()` relation added). Also: `client_welcome`
++ `package_delivered` events; **long-running-account statements & reminders** (`account_statement`
+/`payment_reminder` templates, `PackageController::notify` + `/notify` route, `statements:send`
+scheduled command run monthly, frontend "Send statement/reminder" buttons). Verified end-to-end on
 `LogOnlyProvider`.
 
 ## 11. Current running state at handoff
