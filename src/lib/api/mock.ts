@@ -470,6 +470,23 @@ export const mockApi: BedrockApi = {
       return { rules: [...reminderRules], events: ["account_statement", "payment_reminder"] };
     },
   },
+  track: {
+    async request() {
+      await delay();
+      return { message: "If that number is on file, a code has been sent." };
+    },
+    async verify(_phone, code) {
+      await delay();
+      // Mock: the code 123456 always verifies and returns the first client's packages.
+      if (code !== "123456") throw new ApiError(422, "That code is invalid or has expired.");
+      const client = clients[0];
+      return {
+        token: "mock-track-token",
+        client: { id: client.id, name: client.name },
+        packages: packages.filter((p) => p.clientId === client.id),
+      };
+    },
+  },
 };
 
 let reminderRules: ReminderRule[] = [

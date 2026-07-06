@@ -10,10 +10,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <BrandLockup />
           </Link>
           <Link
-            href="/lookup"
+            href="/track"
             className="text-sm font-medium text-muted-foreground hover:text-foreground"
           >
-            Find my packages
+            Track your projects
           </Link>
         </div>
       </header>

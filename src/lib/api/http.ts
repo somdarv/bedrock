@@ -4,6 +4,7 @@ import type {
   Client,
   ReminderSettings,
   SessionUser,
+  TrackResult,
   WorkPackage,
 } from "./types";
 
@@ -159,6 +160,18 @@ export const httpApi: BedrockApi = {
       request<ReminderSettings>(`/api/admin/settings/reminders`, {
         method: "PUT",
         body: JSON.stringify({ rules }),
+      }),
+  },
+  track: {
+    request: (phone) =>
+      request<{ message: string }>(`/api/track/request`, {
+        method: "POST",
+        body: JSON.stringify({ phone }),
+      }),
+    verify: (phone, code) =>
+      request<TrackResult>(`/api/track/verify`, {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
       }),
   },
 };

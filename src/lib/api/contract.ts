@@ -8,6 +8,7 @@ import type {
   ReminderRuleInput,
   ReminderSettings,
   SessionUser,
+  TrackResult,
   WorkPackage,
   WorkPackageInput,
   WorkPackageStatus,
@@ -67,6 +68,12 @@ export interface BedrockApi {
     getReminders(): Promise<ReminderSettings>;
     /** Replace the whole reminder rule set. */
     saveReminders(rules: ReminderRuleInput[]): Promise<ReminderSettings>;
+  };
+  track: {
+    /** Issue a one-time code to the phone (if it's on file). Always resolves generically. */
+    request(phone: string): Promise<{ message: string }>;
+    /** Verify the code → a scoped token + that client's packages. */
+    verify(phone: string, code: string): Promise<TrackResult>;
   };
 }
 

@@ -95,7 +95,8 @@ Key backend env (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERABLES_DI
   branded placeholder until the server has **Ghostscript + FFmpeg** (`MEDIA_GHOSTSCRIPT` /
   `MEDIA_FFMPEG`). Images already real.
 - **Public portal** — `/p/[slug]` view live (scope, price, watermarked previews in a view-only
-  lightbox, gated download). Phone tracking page (`/track`) and the Paystack pay button not wired.
+  lightbox, gated download). **Phone tracking page (`/track`) built** (phone → WhatsApp OTP →
+  package list, via `/api/track/*`). The Paystack pay button is not wired.
 - **Document PDF export** — pagination of the browser print→PDF is **unresolved** (see §8).
 
 ## 5. Media pipeline — how it works (this session's big add)
@@ -188,7 +189,7 @@ to a form yet.
 4. **Document PDF export** — resolve pagination (§8), ideally server-side rendering; then an
    in-admin **document authoring UI** (wire `POST /api/documents` + a body-component workflow)
    instead of code+seed.
-5. **Public portal polish** — phone tracking page (`/track`), receipt/payment-complete view, Paystack pay
+5. **Public portal polish** — ~~phone tracking page (`/track`)~~ ✅ built; receipt/payment-complete view, Paystack pay
    button (depends on #1).
 6. **Prod hardening** — queue worker/Horizon as a service, DB backups, error monitoring, CORS
    locked to the hub origin, rate limiting on public/OTP endpoints, the 500→401 fix, and set the

@@ -32,6 +32,13 @@ export interface ReminderSettings {
   events: ClientNotifyEvent[];
 }
 
+/** Result of a successful phone + OTP track verification. */
+export interface TrackResult {
+  token: string;
+  client: { id: string; name: string };
+  packages: WorkPackage[];
+}
+
 export type PricingMode = "itemized" | "fixed";
 
 export type DeliverableType = "image" | "pdf" | "video";
