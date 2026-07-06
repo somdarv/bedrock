@@ -98,7 +98,7 @@ against one source of truth. Representative endpoints (final shapes pinned durin
 | Public package | `GET /api/p/{slug}` | public | Portal read by UUID. |
 | Pay init | `POST /api/p/{slug}/pay` | public | Mint Paystack `access_code`/reference. |
 | Webhook | `POST /api/webhooks/paystack` | signature | Payment truth (server-side verify). |
-| OTP lookup | `POST /api/lookup/request`, `POST /api/lookup/verify` | public | Issue/verify OTP → scoped token. |
+| Track (OTP) | `POST /api/track/request`, `POST /api/track/verify` | public | Issue/verify OTP → scoped token. |
 | Download | `GET /api/p/{slug}/deliverables/{id}/download` | gate | Mint signed R2 URL if unlocked. |
 
 ---

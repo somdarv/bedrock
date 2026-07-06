@@ -25,13 +25,15 @@ exactly — Bedrock fills `{{1}}, {{2}}, …` in the order listed.
 
 ## Templates (create these now)
 
-### 1a. `client_welcome_individual` — UTILITY · no button
-Sent to an **individual** client (one person). **Body params:** `{{1}}` clientName
+### 1a. `client_welcome_individual` — UTILITY · no button · optional image header
+Sent to an **individual** client (one person). **Body params:** `{{1}}` clientName.
+(A static "Welcome" image header is optional — it's fixed in the template, so no param needed.)
 
-> Hi {{1}}, welcome to SaharaBase Technologies! 🎉 Here's how we work: for each project, we'll send
-> you a private link. There you can follow progress, preview your work, and pay. Once payment is
-> complete, your final files unlock for download. We'll also send invoices, updates and receipts
-> right here. We're glad to be working with you!
+> Hi {{1}}, you have been registered as a client at SaharaBase Technologies. Here's how we work: for
+> each project, we'll send you a private link. There you can follow progress, preview your work, and
+> pay. Once payment is complete, your final files unlock for download. You can also check on your
+> projects anytime — just enter your phone number at hub.saharabasetech.com/track. We'll send
+> invoices, updates and receipts right here. We're glad to be working with you!
 
 *Sample:* `{{1}}` = `Ama Boateng`
 
@@ -42,7 +44,8 @@ Sent to **each contact** of an **organisation**, naming their role + the organis
 > Hi {{1}}, you've been added as the {{2}} for {{3}} at SaharaBase Technologies. You'll get updates,
 > invoices and receipts for their projects here. Here's how we work: for each project we send a
 > private link where you can follow progress, preview the work, and pay. Once payment is complete,
-> the final files unlock for download. Glad to have you on board!
+> the final files unlock for download. You can also check on their projects anytime — just enter
+> this phone number at hub.saharabasetech.com/track. Glad to have you on board!
 
 *Sample:* `{{1}}` = `Richard`, `{{2}}` = `primary contact`, `{{3}}` = `Acme Ltd`
 *(`roleLabel` is “primary contact” or “secondary contact”.)*

@@ -23,7 +23,7 @@ already envisaged in [ARCHITECTURE §9](../ARCHITECTURE.md).
 - **SMS is dropped to a stub.** Meta Cloud API is WhatsApp-only. SMS (a fallback channel) would
   need a separate vendor, so it's deferred: `SmsProvider` + `NullSmsProvider` exist so a
   Hubtel/Termii-SMS implementation can drop in later without touching callers.
-- **OTP moves to WhatsApp.** The `/lookup` OTP is sent via a WhatsApp **Authentication** template
+- **OTP moves to WhatsApp.** The `/track` OTP is sent via a WhatsApp **Authentication** template
   instead of SMS.
 - **Business verification is on the critical path.** Meta business verification (2–10 business
   days) gates production sending volume — same delay ADR-0002 flagged, unavoidable either way.
@@ -35,5 +35,5 @@ already envisaged in [ARCHITECTURE §9](../ARCHITECTURE.md).
 
 Config `services.whatsapp` (provider switch `log` | `whatsapp_cloud`); `WhatsAppCloudProvider` +
 `LogOnlyProvider` (dev); `SendClientNotification` queued job with an email mirror; the webhook
-controller; WhatsApp-OTP `/lookup`. Portal setup steps for the operator live in
+controller; WhatsApp-OTP `/track`. Portal setup steps for the operator live in
 [WHATSAPP-SETUP.md](../WHATSAPP-SETUP.md).
