@@ -17,7 +17,9 @@ exactly — Bedrock fills `{{1}}, {{2}}, …` in the order listed.
   templates **with a document header**. Gated by `PDF_ATTACHMENTS_ENABLED` (off until the frontend
   is deployed). See “Document attachments” at the bottom.
 
-- **Language:** `en`. **Category:** UTILITY (except `otp_code` = AUTHENTICATION).
+- **Language:** `en`. **Category:** UTILITY for the transactional ones; the two **welcomes are
+  MARKETING** (a welcome isn't tied to a transaction — Meta classifies it as marketing); `otp_code`
+  = AUTHENTICATION.
 - Where a template has a button, add it in Meta exactly as described or the send will fail
   (Bedrock sends a button component the template must declare).
 
@@ -25,7 +27,7 @@ exactly — Bedrock fills `{{1}}, {{2}}, …` in the order listed.
 
 ## Templates (create these now)
 
-### 1a. `client_welcome_individual` — UTILITY · no button · optional image header
+### 1a. `client_welcome_individual` — MARKETING · no button · optional image header
 Sent to an **individual** client (one person). **Body params:** `{{1}}` clientName.
 (A static "Welcome" image header is optional — it's fixed in the template, so no param needed.)
 
@@ -37,7 +39,7 @@ Sent to an **individual** client (one person). **Body params:** `{{1}}` clientNa
 
 *Sample:* `{{1}}` = `Ama Boateng`
 
-### 1b. `client_welcome_contact` — UTILITY · no button
+### 1b. `client_welcome_contact` — MARKETING · no button
 Sent to **each contact** of an **organisation**, naming their role + the organisation.
 **Body params:** `{{1}}` contactName · `{{2}}` roleLabel · `{{3}}` orgName
 
