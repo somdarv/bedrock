@@ -473,6 +473,10 @@ export const mockApi: BedrockApi = {
       reminderRules = rules.map((r) => ({ id: `rr_${crypto.randomUUID().slice(0, 8)}`, ...r }));
       return { rules: [...reminderRules], events: ["account_statement", "payment_reminder"] };
     },
+    async wipeTestData() {
+      await delay();
+      return { message: "Test data cleared." };
+    },
   },
   track: {
     async request() {

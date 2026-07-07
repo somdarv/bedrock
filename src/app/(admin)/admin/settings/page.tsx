@@ -1,4 +1,5 @@
 import { ReminderCalendar } from "@/components/admin/reminder-calendar";
+import { WipeTestData } from "@/components/admin/wipe-test-data";
 import { api } from "@/lib/api";
 
 export default async function SettingsPage() {
@@ -17,6 +18,7 @@ export default async function SettingsPage() {
       </header>
 
       <ReminderCalendar initial={reminders} />
+      <WipeTestData />
     </div>
   );
 }

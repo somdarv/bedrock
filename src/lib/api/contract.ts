@@ -68,6 +68,8 @@ export interface BedrockApi {
     getReminders(): Promise<ReminderSettings>;
     /** Replace the whole reminder rule set. */
     saveReminders(rules: ReminderRuleInput[]): Promise<ReminderSettings>;
+    /** TEST-PHASE: delete all test data (keeps the admin account). */
+    wipeTestData(): Promise<{ message: string }>;
   };
   track: {
     /** Issue a one-time code to the phone (if it's on file). Always resolves generically. */

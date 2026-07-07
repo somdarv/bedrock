@@ -161,6 +161,7 @@ export const httpApi: BedrockApi = {
         method: "PUT",
         body: JSON.stringify({ rules }),
       }),
+    wipeTestData: () => request<{ message: string }>(`/api/admin/settings/wipe`, { method: "POST" }),
   },
   track: {
     request: (phone) =>
