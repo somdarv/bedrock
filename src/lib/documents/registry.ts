@@ -77,6 +77,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20260706-PRO-ZEN-54",
+    reference: "PRO-ZEN-54",
+    category: "proposals",
+    type: "Proposal",
+    title: "Bringing Zenith School Online: A Website Proposal",
+    client: "Zenith School",
+    project: "Zenith School Website",
+    issueDate: "6 July 2026",
+    validUntil: "13 July 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260706-PRO-GHIS-53",
     reference: "PRO-GHIS-53",
     category: "proposals",
