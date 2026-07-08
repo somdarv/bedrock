@@ -92,7 +92,7 @@ export function ZenithSchoolProposal({ record }: { record: DocumentRecord }) {
 
         <div className="mt-4 rounded-lg border border-primary/10 bg-white p-5">
           <DetailRow label="What we propose" value="A simple, professional school website" />
-          <DetailRow label="Domain and hosting" value="Arranged and held by the school" />
+          <DetailRow label="Domain and hosting" value="Set up and managed for you" />
           <DetailRow label="Development" value="Heavily discounted, initiative pricing" />
           <DetailRow label="Care plan" value="GHS 500 per month" />
           <DetailRow label="Timing" value="This offer holds if we begin within 7 days" />
@@ -131,8 +131,10 @@ export function ZenithSchoolProposal({ record }: { record: DocumentRecord }) {
           <Bullet>Built to work well on phones and to be found on Google</Bullet>
         </ul>
         <p className="mt-4 text-base leading-8 text-gray-700">
-          You would arrange and hold the domain and hosting yourselves, so the site always stays in your
-          name and fully under your control.
+          You will not have to touch the technical side at all. We set up the domain and hosting and look
+          after them for you as part of caring for the site, so it all sits in one place with the team
+          that built it. You simply get a website that works, and one team to call if anything ever needs
+          attention.
         </p>
       </div>
 
@@ -175,7 +177,7 @@ export function ZenithSchoolProposal({ record }: { record: DocumentRecord }) {
             },
             {
               t: "Always online",
-              d: "We keep the site up, monitored, and quick, so it is there when a parent looks.",
+              d: "We host the site and keep it up, monitored, and quick, so it is there whenever a parent looks.",
             },
             {
               t: "Safe and backed up",
