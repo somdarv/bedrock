@@ -1,11 +1,54 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { api, ApiError, type ClientInput } from "@/lib/api";
 
 export interface ClientFormState {
   ok?: boolean;
   error?: string;
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+export interface SendDocumentState {
+  ok?: boolean;
+  error?: string;
+  sentTo?: string;
+}
+
+/**
+ * Upload a document from the operator's machine and send it to a client contact (WhatsApp + email).
+ * Multipart, so it bypasses the JSON api layer and forwards the FormData with the bearer token.
+ */
+export async function sendClientDocument(
+  clientId: string,
+  formData: FormData,
+): Promise<SendDocumentState> {
+  const token = (await cookies()).get("bedrock_token")?.value;
+  try {
+    const res = await fetch(`${BASE_URL}/api/admin/clients/${clientId}/documents`, {
+      method: "POST",
+      headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      let message = "Could not send the document.";
+      try {
+        const body = (await res.json()) as { message?: string };
+        if (body.message) message = body.message;
+      } catch {
+        // keep the generic message
+      }
+      return { error: message };
+    }
+    const body = (await res.json().catch(() => ({}))) as { sentTo?: string };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { ok: true, sentTo: body.sentTo };
+  } catch {
+    return { error: "Could not reach the server." };
+  }
 }
 
 export async function createClient(input: ClientInput): Promise<ClientFormState> {

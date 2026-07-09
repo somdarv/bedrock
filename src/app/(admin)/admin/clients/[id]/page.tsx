@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/ui/back-button";
 import { NewPackageButton } from "@/components/admin/new-package-button";
+import { SendDocumentButton } from "@/components/admin/send-document-button";
 import { EmptyState } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
@@ -22,14 +23,19 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     <div className="space-y-6">
       <div>
         <BackButton href="/admin/clients" label="Clients" />
-        <div className="mt-2 flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{client.name}</h1>
-          <Badge>{client.type === "organisation" ? "Organisation" : "Individual"}</Badge>
-          {client.accountType === "ongoing" && <Badge variant="info">Ongoing account</Badge>}
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight">{client.name}</h1>
+              <Badge>{client.type === "organisation" ? "Organisation" : "Individual"}</Badge>
+              {client.accountType === "ongoing" && <Badge variant="info">Ongoing account</Badge>}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Added {new Date(client.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+          <SendDocumentButton clientId={client.id} contacts={client.contacts} />
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Added {new Date(client.createdAt).toLocaleDateString()}
-        </p>
       </div>
 
       <div>
