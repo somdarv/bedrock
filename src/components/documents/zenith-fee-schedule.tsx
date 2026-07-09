@@ -26,7 +26,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Zenith School — Fee Schedule. The proposal (PRO-ZEN-54) turned into a firm
+ * Zenith School, Fee Schedule. The proposal (PRO-ZEN-54) turned into a firm
  * bill: a fixed GHS 4,000 website build with eSkooly admissions integration, the
  * domain + hosting billed at cost, and a GHS 500/mo care plan after handover.
  * Bespoke body authored locally; system metadata (ID, dates, system, timestamp,
@@ -73,7 +73,7 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
         </div>
       </div>
 
-      {/* Payment Summary — what's due upfront, at a glance */}
+      {/* Payment Summary: what's due upfront, at a glance */}
       <div className="avoid-break mb-10 rounded-lg border border-primary/20 bg-primary/5 p-6">
         <Eyebrow>Payment Summary</Eyebrow>
         <div className="mt-3 flex items-end justify-between gap-8">
@@ -93,6 +93,14 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
             </p>
           </div>
           <div className="w-72 shrink-0 divide-y divide-gray-200 border-l border-gray-200 pl-6 text-sm">
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">Domain, thezenithschool.org (year 1)</span>
+              <span className="font-semibold tabular-nums text-gray-900">USD 24.00</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">Web hosting (year 1)</span>
+              <span className="font-semibold tabular-nums text-gray-900">USD 48.00</span>
+            </div>
             <div className="flex justify-between py-2">
               <span className="text-gray-600">Balance on completion</span>
               <span className="font-semibold tabular-nums text-gray-900">GHS 2,400.00</span>
@@ -116,8 +124,8 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
           Zenith School Website &amp; Online Admissions
         </h3>
         <p className="mt-3 text-base leading-8 text-gray-700">
-          An informational website that puts the school online — programmes, gallery, and location —
-          with a tap-to-chat line to the office and an admission form that feeds straight into the
+          An informational website that puts the school online: programmes, gallery, and location,
+          plus a tap-to-chat line to the office and an admission form that feeds straight into the
           school&apos;s existing eSkooly records.
         </p>
 
@@ -249,44 +257,6 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
         </p>
       </div>
 
-      {/* Domain & Hosting */}
-      <div className="avoid-break mb-8">
-        <Eyebrow>Domain &amp; Hosting</Eyebrow>
-        <p className="mt-2 text-base leading-8 text-gray-700">
-          The site runs on managed web hosting under the school&apos;s own domain. Both are third-party
-          subscriptions billed at cost — separate from the build fee and the care plan — and renewed
-          annually.
-        </p>
-        <div className="mt-4 grid grid-cols-[1fr_220px] gap-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <p className="text-base font-semibold text-gray-900">Domain Name</p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                thezenithschool.org — registered and pointed to the site.
-              </p>
-              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">USD 24 / year</p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <p className="text-base font-semibold text-gray-900">Web Hosting</p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Managed hosting for the website, email, and the admission form.
-              </p>
-              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">USD 48 / year</p>
-            </div>
-          </div>
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-5 text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-              Third-party / year 1
-            </p>
-            <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-gray-900">USD 72</p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              Payable with the upfront deposit so the domain and server are provisioned before work
-              begins.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Payment Schedule */}
       <div className="mb-8">
         <Eyebrow>Payment Schedule</Eyebrow>
@@ -374,7 +344,7 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
         </div>
       </div>
 
-      {/* Footer — system metadata + verify QR (dynamic on prepare) */}
+      {/* Footer: system metadata + verify QR (dynamic on prepare) */}
       <DocumentFooter record={record} />
     </>
   );
