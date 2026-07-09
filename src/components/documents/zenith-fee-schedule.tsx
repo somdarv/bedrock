@@ -249,6 +249,44 @@ export function ZenithFeeSchedule({ record }: { record: DocumentRecord }) {
         </p>
       </div>
 
+      {/* Domain & Hosting */}
+      <div className="avoid-break mb-8">
+        <Eyebrow>Domain &amp; Hosting</Eyebrow>
+        <p className="mt-2 text-base leading-8 text-gray-700">
+          The site runs on managed web hosting under the school&apos;s own domain. Both are third-party
+          subscriptions billed at cost — separate from the build fee and the care plan — and renewed
+          annually.
+        </p>
+        <div className="mt-4 grid grid-cols-[1fr_220px] gap-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <p className="text-base font-semibold text-gray-900">Domain Name</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                thezenithschool.org — registered and pointed to the site.
+              </p>
+              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">USD 24 / year</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <p className="text-base font-semibold text-gray-900">Web Hosting</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                Managed hosting for the website, email, and the admission form.
+              </p>
+              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">USD 48 / year</p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-5 text-right">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+              Third-party / year 1
+            </p>
+            <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-gray-900">USD 72</p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              Payable with the upfront deposit so the domain and server are provisioned before work
+              begins.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Payment Schedule */}
       <div className="mb-8">
         <Eyebrow>Payment Schedule</Eyebrow>
