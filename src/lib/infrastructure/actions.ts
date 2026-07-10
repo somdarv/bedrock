@@ -6,6 +6,8 @@ import {
   ApiError,
   type ClientAssetInput,
   type HostingServerInput,
+  type TestServerInput,
+  type TestServerResult,
 } from "@/lib/api";
 
 export interface InfraActionState {
@@ -50,6 +52,15 @@ export async function deleteServer(id: string): Promise<InfraActionState> {
   }
   revalidatePath("/admin/infrastructure");
   return { ok: true };
+}
+
+/** Dry-run a cPanel/SSH credential set before saving — surfaces live metrics or a precise error. */
+export async function testServer(input: TestServerInput): Promise<TestServerResult> {
+  try {
+    return await api.infrastructure.testServer(input);
+  } catch (e) {
+    return { ok: false, error: e instanceof ApiError ? e.message : "Could not reach the server." };
+  }
 }
 
 /* ---------------------------------------------------------------- assets */

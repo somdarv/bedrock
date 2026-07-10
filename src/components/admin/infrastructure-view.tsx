@@ -19,19 +19,30 @@ import type {
   InfrastructureOverview,
   ServerAuthType,
   ServerKind,
+  TestServerResult,
 } from "@/lib/api";
 import {
   createAsset,
   createServer,
   deleteAsset,
   deleteServer,
+  testServer,
 } from "@/lib/infrastructure/actions";
 import {
   ASSET_TYPE_LABEL as TYPE_LABEL,
   STATUS_VARIANT,
+  diskLabel,
   expiryLabel,
   formatBytes,
 } from "@/lib/infrastructure/display";
+
+/** Sensible default port per access method — pre-filled so the operator rarely touches it. */
+const DEFAULT_PORT: Record<ServerAuthType, number | null> = {
+  cpanel: 2083,
+  ssh: 22,
+  hostinger: 443,
+  none: null,
+};
 
 const AUTH_LABEL: Record<ServerAuthType, string> = {
   cpanel: "cPanel token",
@@ -477,6 +488,8 @@ function ServerModal({
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = React.useTransition();
+  const [testing, startTest] = React.useTransition();
+  const [testResult, setTestResult] = React.useState<TestServerResult | null>(null);
   const [form, setForm] = React.useState<HostingServerInput>(() => ({
     clientId: null,
     label: "",
@@ -492,6 +505,32 @@ function ServerModal({
 
   function set<K extends keyof HostingServerInput>(key: K, value: HostingServerInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Switching access method resets the port to that method's default and clears any stale test.
+  function setAuthType(authType: ServerAuthType) {
+    setForm((f) => ({ ...f, authType, kind: authType === "ssh" ? "vps" : f.kind, port: DEFAULT_PORT[authType] }));
+    setTestResult(null);
+  }
+
+  const canTest =
+    (form.authType === "cpanel" || form.authType === "ssh") &&
+    Boolean(form.hostname && form.username && form.secret);
+
+  function runTest() {
+    startTest(async () => {
+      setTestResult(
+        await testServer({
+          authType: form.authType,
+          hostname: form.hostname ?? "",
+          port: form.port,
+          username: form.username ?? "",
+          secret: form.secret ?? "",
+          docroot: form.docroot,
+          identifier: null,
+        }),
+      );
+    });
   }
 
   function submit(e: React.FormEvent) {
@@ -550,7 +589,7 @@ function ServerModal({
           <Field label="Access method" required>
             <Select
               value={form.authType}
-              onChange={(e) => set("authType", e.target.value as ServerAuthType)}
+              onChange={(e) => setAuthType(e.target.value as ServerAuthType)}
             >
               {AUTH_TYPES.map((a) => (
                 <option key={a} value={a}>
@@ -601,11 +640,40 @@ function ServerModal({
         >
           <Textarea
             value={form.secret ?? ""}
-            onChange={(e) => set("secret", e.target.value || null)}
+            onChange={(e) => {
+              set("secret", e.target.value || null);
+              setTestResult(null);
+            }}
             placeholder="Paste the API token or key"
             className="font-mono text-xs"
           />
         </Field>
+
+        {(form.authType === "cpanel" || form.authType === "ssh") && (
+          <div className="rounded-md border bg-background p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">
+                Check the credentials against the live host before saving.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canTest || testing}
+                onClick={runTest}
+              >
+                {testing ? "Testing…" : "Test connection"}
+              </Button>
+            </div>
+            {testResult && (
+              <p className={`mt-2 text-sm ${testResult.ok ? "text-success" : "text-danger"}`}>
+                {testResult.ok
+                  ? `Connected ✓ ${diskLabel(testResult.metrics ?? null) ?? "reachable"}`
+                  : testResult.error}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>

@@ -278,6 +278,23 @@ export interface ClientAssetInput {
   monitorEnabled: boolean;
 }
 
+/** Dry-run credential check for a hosting server (cPanel/SSH) before saving it. */
+export interface TestServerInput {
+  authType: ServerAuthType;
+  hostname: string;
+  port: number | null;
+  username: string;
+  secret: string;
+  docroot: string | null;
+  identifier: string | null;
+}
+
+export interface TestServerResult {
+  ok: boolean;
+  metrics?: AssetMetrics | null;
+  error?: string;
+}
+
 /** An asset joined with its owning client's name, for the cross-client attention view. */
 export interface AssetOverviewRow extends ClientAsset {
   clientName: string | null;

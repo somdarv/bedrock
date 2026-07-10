@@ -518,6 +518,14 @@ export const mockApi: BedrockApi = {
       });
       hostingServers.splice(idx, 1);
     },
+    async testServer(input) {
+      await delay(600);
+      // Mock: a token/host containing "bad" fails; otherwise report a sample disk figure.
+      if (/bad|invalid|wrong/i.test(`${input.secret}${input.hostname}`)) {
+        return { ok: false, error: "Credentials were rejected (mock)." };
+      }
+      return { ok: true, metrics: { diskUsed: 4_200_000_000, diskLimit: 10_000_000_000 } };
+    },
     async listAssets(clientId) {
       await delay();
       return clientAssets

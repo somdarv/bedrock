@@ -7,6 +7,7 @@ import type {
   InfrastructureOverview,
   ReminderSettings,
   SessionUser,
+  TestServerResult,
   TrackResult,
   WorkPackage,
 } from "./types";
@@ -171,6 +172,11 @@ export const httpApi: BedrockApi = {
         body: JSON.stringify(input),
       }),
     removeServer: (id) => request<void>(`/api/admin/servers/${id}`, { method: "DELETE" }),
+    testServer: (input) =>
+      request<TestServerResult>(`/api/admin/servers/test`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     listAssets: async (clientId) => {
       const res = await request<{ assets: ClientAsset[] }>(`/api/admin/clients/${clientId}/assets`);
       return res.assets;
