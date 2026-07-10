@@ -203,7 +203,15 @@ export type ServerKind = "vps" | "shared";
 export type ServerAuthType = "cpanel" | "ssh" | "hostinger" | "none";
 export type AssetType = "domain" | "ssl" | "hosting" | "site";
 export type AssetStatus = "ok" | "warn" | "critical" | "down" | "unknown";
-export type AssetSource = "rdap" | "tls" | "http" | "cpanel" | "ssh" | "hostinger" | "manual";
+export type AssetSource =
+  | "website"
+  | "rdap"
+  | "tls"
+  | "http"
+  | "cpanel"
+  | "ssh"
+  | "hostinger"
+  | "manual";
 
 /** A host we control and read metrics from: a shared-hosting cPanel account, or our VPS. */
 export interface HostingServer {
@@ -239,11 +247,22 @@ export interface HostingServerInput {
 
 /** Live figures from the last sync (shape varies by source; storage in bytes). */
 export interface AssetMetrics {
+  // Hosting (cPanel/SSH)
   diskUsed?: number;
   diskLimit?: number;
   bandwidth?: number;
   inodes?: number;
-  [key: string]: number | undefined;
+  // Site (HTTP) — also used inside a website
+  httpStatus?: number;
+  responseMs?: number;
+  httpOk?: number;
+  // Website facets (a "domain" asset carries all three)
+  siteUp?: number;
+  sslExpiry?: string;
+  sslDays?: number;
+  regStatus?: AssetStatus;
+  sslStatus?: AssetStatus;
+  siteStatus?: AssetStatus;
 }
 
 export interface ClientAsset {

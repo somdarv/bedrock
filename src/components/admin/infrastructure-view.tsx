@@ -35,7 +35,33 @@ import {
   diskLabel,
   expiryLabel,
   formatBytes,
+  websiteFacets,
 } from "@/lib/infrastructure/display";
+import type { AssetStatus } from "@/lib/api";
+
+/** Small inline facet chip (Domain / SSL / Site) coloured by status. */
+const FACET_TONE: Record<AssetStatus, string> = {
+  ok: "bg-success-soft text-success",
+  warn: "bg-warning-soft text-warning",
+  critical: "bg-danger-soft text-danger",
+  down: "bg-danger-soft text-danger",
+  unknown: "bg-muted text-muted-foreground",
+};
+
+function FacetChips({ asset }: { asset: AssetOverviewRow }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {websiteFacets(asset).map((f) => (
+        <span
+          key={f.key}
+          className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${FACET_TONE[f.status]}`}
+        >
+          {f.key} {f.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 /** Sensible default port per access method — pre-filled so the operator rarely touches it. */
 const DEFAULT_PORT: Record<ServerAuthType, number | null> = {
@@ -256,7 +282,11 @@ function AssetTable({
                 <td className="py-2.5 pr-3 text-muted-foreground">{TYPE_LABEL[row.type]}</td>
                 <td className="py-2.5 pr-3 font-medium">{row.identifier}</td>
                 <td className="py-2.5 pr-3 text-muted-foreground">
-                  {expiryLabel(row) ?? disk ?? "—"}
+                  {row.type === "domain" ? (
+                    <FacetChips asset={row} />
+                  ) : (
+                    (expiryLabel(row) ?? disk ?? "—")
+                  )}
                 </td>
                 <td className="py-2.5 pr-3 text-muted-foreground">{row.source}</td>
                 <td className="py-2.5 pl-3 text-right">
@@ -421,7 +451,11 @@ function AssetModal({
               ))}
             </Select>
           </Field>
-          <Field label="Type" required>
+          <Field
+            label="Type"
+            required
+            hint={form.type === "domain" ? "Tracks registration + SSL + uptime as one." : undefined}
+          >
             <Select value={form.type} onChange={(e) => set("type", e.target.value as AssetType)}>
               {ASSET_TYPES.map((t) => (
                 <option key={t} value={t}>

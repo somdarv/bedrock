@@ -44,7 +44,42 @@ export function diskLabel(metrics: AssetMetrics | null): string | null {
   return limit ? `${used} / ${limit}` : used;
 }
 
-/** The one-line "what to know" for an asset: expiry countdown, else storage, else a dash. */
-export function assetSummary(row: Pick<ClientAsset, "expiryDate" | "daysUntilExpiry" | "metrics">): string {
+/** Short countdown chip text: "210d", "exp", or "—". */
+function daysShort(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "—";
+  return days < 0 ? "exp" : `${days}d`;
+}
+
+export interface WebsiteFacet {
+  key: "Domain" | "SSL" | "Site";
+  status: AssetStatus;
+  label: string;
+}
+
+/** The three health facets of a website (domain) asset, for the row's chips. */
+export function websiteFacets(
+  a: Pick<ClientAsset, "daysUntilExpiry" | "metrics">,
+): WebsiteFacet[] {
+  const m = a.metrics ?? {};
+  return [
+    { key: "Domain", status: m.regStatus ?? "unknown", label: daysShort(a.daysUntilExpiry) },
+    { key: "SSL", status: m.sslStatus ?? "unknown", label: daysShort(m.sslDays) },
+    {
+      key: "Site",
+      status: m.siteStatus ?? "unknown",
+      label: m.siteUp === 1 ? "up" : m.siteUp === 0 ? "down" : "—",
+    },
+  ];
+}
+
+/** The one-line "what to know" for an asset: website facets, expiry countdown, storage, or a dash. */
+export function assetSummary(
+  row: Pick<ClientAsset, "type" | "expiryDate" | "daysUntilExpiry" | "metrics">,
+): string {
+  if (row.type === "domain") {
+    return websiteFacets(row)
+      .map((f) => `${f.key} ${f.label}`)
+      .join(" · ");
+  }
   return expiryLabel(row) ?? diskLabel(row.metrics) ?? "—";
 }
