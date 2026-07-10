@@ -6,6 +6,7 @@ import type {
   HostingServer,
   InfrastructureOverview,
   ReminderSettings,
+  ServerMetrics,
   SessionUser,
   TestServerResult,
   TrackResult,
@@ -177,6 +178,7 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    serverMetrics: (id) => request<ServerMetrics>(`/api/admin/servers/${id}/metrics`),
     listAssets: async (clientId) => {
       const res = await request<{ assets: ClientAsset[] }>(`/api/admin/clients/${clientId}/assets`);
       return res.assets;

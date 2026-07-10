@@ -295,6 +295,30 @@ export interface TestServerResult {
   error?: string;
 }
 
+/** Rich on-demand detail for a hosting server's dashboard (cPanel exposes the full set). */
+export interface ServerMetricsDetail {
+  kind: string;
+  fetchedAt: string;
+  disk: { usedBytes: number; limitBytes: number | null; percent: number | null };
+  inodes: { used: number; limit: number | null; percent: number | null };
+  composition: { label: string; bytes: number }[];
+  bandwidth: { totalBytes: number; byProtocol: Record<string, number> };
+  email: { count: number; totalBytes: number; top: { login: string; bytes: number }[] };
+  counts: {
+    addonDomains: string | null;
+    subdomains: string | null;
+    emailAccounts: string | null;
+    ftpAccounts: string | null;
+  };
+}
+
+export interface ServerMetrics {
+  server: HostingServer;
+  clientName: string | null;
+  details: ServerMetricsDetail | null;
+  error: string | null;
+}
+
 /** An asset joined with its owning client's name, for the cross-client attention view. */
 export interface AssetOverviewRow extends ClientAsset {
   clientName: string | null;

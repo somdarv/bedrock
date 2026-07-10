@@ -12,6 +12,7 @@ import type {
   PaymentInput,
   ReminderRuleInput,
   ReminderSettings,
+  ServerMetrics,
   SessionUser,
   TestServerInput,
   TestServerResult,
@@ -78,6 +79,8 @@ export interface BedrockApi {
     removeServer(id: string): Promise<void>;
     /** Dry-run a cPanel/SSH credential set (no save) — returns live metrics or a precise error. */
     testServer(input: TestServerInput): Promise<TestServerResult>;
+    /** Rich live detail for a hosting server's dashboard (disk/storage/bandwidth/email/counts). */
+    serverMetrics(id: string): Promise<ServerMetrics>;
     /** A client's monitored assets (domains, SSL, hosting, sites). */
     listAssets(clientId: string): Promise<ClientAsset[]>;
     createAsset(clientId: string, input: ClientAssetInput): Promise<ClientAsset>;

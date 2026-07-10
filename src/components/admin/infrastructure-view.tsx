@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -150,6 +151,47 @@ export function InfrastructureView({
   );
 }
 
+/* ------------------------------------------------------------- row menu */
+
+/** A ⋯ overflow menu so destructive actions (Remove) aren't a single stray click away. */
+function RowMenu({ actions }: { actions: { label: string; onClick: () => void; danger?: boolean }[] }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="relative flex justify-end">
+      <button
+        type="button"
+        aria-label="More options"
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-md px-2 text-lg leading-none text-subtle hover:bg-muted hover:text-foreground"
+      >
+        ⋯
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute right-0 top-7 z-20 min-w-32 rounded-md border bg-surface p-1 shadow-lg">
+            {actions.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  a.onClick();
+                }}
+                className={`block w-full rounded px-3 py-1.5 text-left text-sm hover:bg-muted ${
+                  a.danger ? "text-danger" : ""
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- tables */
 
 function AssetTable({
@@ -161,7 +203,7 @@ function AssetTable({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [pending, startTransition] = React.useTransition();
+  const [, startTransition] = React.useTransition();
 
   if (rows.length === 0) {
     return (
@@ -218,15 +260,11 @@ function AssetTable({
                 </td>
                 <td className="py-2.5 pr-3 text-muted-foreground">{row.source}</td>
                 <td className="py-2.5 pl-3 text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-danger"
-                    disabled={pending}
-                    onClick={() => remove(row.id, row.identifier)}
-                  >
-                    Remove
-                  </Button>
+                  <RowMenu
+                    actions={[
+                      { label: "Remove", danger: true, onClick: () => remove(row.id, row.identifier) },
+                    ]}
+                  />
                 </td>
               </tr>
             );
@@ -246,7 +284,7 @@ function ServerTable({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [pending, startTransition] = React.useTransition();
+  const [, startTransition] = React.useTransition();
 
   if (servers.length === 0) {
     return (
@@ -285,7 +323,11 @@ function ServerTable({
         <tbody>
           {servers.map((s) => (
             <tr key={s.id} className="border-b last:border-0">
-              <td className="py-2.5 pr-3 font-medium">{s.label}</td>
+              <td className="py-2.5 pr-3 font-medium">
+                <Link href={`/admin/servers/${s.id}`} className="hover:underline">
+                  {s.label}
+                </Link>
+              </td>
               <td className="py-2.5 pr-3">{clientName(s.clientId)}</td>
               <td className="py-2.5 pr-3 text-muted-foreground">{s.kind}</td>
               <td className="py-2.5 pr-3 text-muted-foreground">{AUTH_LABEL[s.authType]}</td>
@@ -298,15 +340,7 @@ function ServerTable({
                 </Badge>
               </td>
               <td className="py-2.5 pl-3 text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger"
-                  disabled={pending}
-                  onClick={() => remove(s.id, s.label)}
-                >
-                  Remove
-                </Button>
+                <RowMenu actions={[{ label: "Remove", danger: true, onClick: () => remove(s.id, s.label) }]} />
               </td>
             </tr>
           ))}

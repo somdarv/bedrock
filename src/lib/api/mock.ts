@@ -526,6 +526,49 @@ export const mockApi: BedrockApi = {
       }
       return { ok: true, metrics: { diskUsed: 4_200_000_000, diskLimit: 10_000_000_000 } };
     },
+    async serverMetrics(id) {
+      await delay();
+      const server = found(
+        hostingServers.find((s) => s.id === id),
+        "Hosting server",
+      );
+      const clientName = server.clientId
+        ? (clients.find((c) => c.id === server.clientId)?.name ?? null)
+        : null;
+      if (server.authType !== "cpanel") {
+        return { server, clientName, details: null, error: "Detailed metrics are cPanel-only (mock)." };
+      }
+      return {
+        server,
+        clientName,
+        details: {
+          kind: "cpanel",
+          fetchedAt: new Date().toISOString(),
+          disk: { usedBytes: 19_748_552_704, limitBytes: 21_474_836_480, percent: 92 },
+          inodes: { used: 63_964, limit: 300_000, percent: 21 },
+          composition: [
+            { label: "Website files", bytes: 4_916_000_000 },
+            { label: "Databases", bytes: 0 },
+            { label: "Email", bytes: 14_832_000_000 },
+          ],
+          bandwidth: {
+            totalBytes: 5_120_000_000,
+            byProtocol: { http: 4_052_514_287, imap: 871_339_492, smtp: 197_108_373 },
+          },
+          email: {
+            count: 4,
+            totalBytes: 14_832_000_000,
+            top: [
+              { login: "info@gigcottage.net", bytes: 14_700_000_000 },
+              { login: "frontdesk@gigcottage.net", bytes: 27_652_407 },
+              { login: "demawu@gigcottage.net", bytes: 93_415 },
+            ],
+          },
+          counts: { addonDomains: "2/2", subdomains: "3", emailAccounts: "4", ftpAccounts: "0" },
+        },
+        error: null,
+      };
+    },
     async listAssets(clientId) {
       await delay();
       return clientAssets
