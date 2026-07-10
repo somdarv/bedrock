@@ -193,3 +193,97 @@ export function balance(pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" |
     .reduce((sum, p) => sum + p.amount, 0);
   return effectiveTotal(pkg) - paid;
 }
+
+/* ------------------------------------------------------------------ infrastructure
+ * Client infrastructure monitoring (domains, SSL, hosting, sites). Mirrors the Laravel
+ * models HostingServer + ClientAsset. See bedrock-api/docs/INFRASTRUCTURE-MODULE.md.
+ */
+
+export type ServerKind = "vps" | "shared";
+export type ServerAuthType = "cpanel" | "ssh" | "hostinger" | "none";
+export type AssetType = "domain" | "ssl" | "hosting" | "site";
+export type AssetStatus = "ok" | "warn" | "critical" | "down" | "unknown";
+export type AssetSource = "rdap" | "tls" | "http" | "cpanel" | "ssh" | "hostinger" | "manual";
+
+/** A host we control and read metrics from: a shared-hosting cPanel account, or our VPS. */
+export interface HostingServer {
+  id: string;
+  /** null = Sahara's own infrastructure. */
+  clientId: string | null;
+  label: string;
+  kind: ServerKind;
+  authType: ServerAuthType;
+  hostname: string | null;
+  port: number | null;
+  username: string | null;
+  docroot: string | null;
+  scope: string;
+  /** The secret (token/SSH key) is write-only; the API only tells us whether one is stored. */
+  hasSecret: boolean;
+  createdAt: string;
+}
+
+export interface HostingServerInput {
+  clientId: string | null;
+  label: string;
+  kind: ServerKind;
+  authType: ServerAuthType;
+  hostname: string | null;
+  port: number | null;
+  username: string | null;
+  /** cPanel/WHM token or SSH private key. Leave null on update to keep the stored one. */
+  secret: string | null;
+  docroot: string | null;
+  scope: string | null;
+}
+
+/** Live figures from the last sync (shape varies by source; storage in bytes). */
+export interface AssetMetrics {
+  diskUsed?: number;
+  diskLimit?: number;
+  bandwidth?: number;
+  inodes?: number;
+  [key: string]: number | undefined;
+}
+
+export interface ClientAsset {
+  id: string;
+  clientId: string;
+  hostingServerId: string | null;
+  type: AssetType;
+  label: string | null;
+  identifier: string;
+  source: AssetSource;
+  status: AssetStatus;
+  expiryDate: string | null;
+  renewalDate: string | null;
+  daysUntilExpiry: number | null;
+  metrics: AssetMetrics | null;
+  recommendation: string | null;
+  monitorEnabled: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+}
+
+export interface ClientAssetInput {
+  hostingServerId: string | null;
+  type: AssetType;
+  label: string | null;
+  identifier: string;
+  source: AssetSource | null;
+  expiryDate: string | null;
+  renewalDate: string | null;
+  recommendation: string | null;
+  monitorEnabled: boolean;
+}
+
+/** An asset joined with its owning client's name, for the cross-client attention view. */
+export interface AssetOverviewRow extends ClientAsset {
+  clientName: string | null;
+}
+
+export interface InfrastructureOverview {
+  attention: AssetOverviewRow[];
+  all: AssetOverviewRow[];
+}

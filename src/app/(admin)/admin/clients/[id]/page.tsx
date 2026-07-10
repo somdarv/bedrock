@@ -9,6 +9,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
+import { ASSET_TYPE_LABEL, STATUS_VARIANT, assetSummary } from "@/lib/infrastructure/display";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,6 +19,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     throw e;
   });
   const packages = await api.packages.list({ clientId: id });
+  const assets = await api.infrastructure.listAssets(id).catch(() => []);
 
   return (
     <div className="space-y-6">
@@ -114,6 +116,59 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   </TR>
                 );
               })}
+            </TBody>
+          </Table>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Infrastructure</h2>
+          <div className="flex items-center gap-4">
+            {assets.length > 0 && (
+              <a
+                href={`/admin/clients/${client.id}/statement`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Status statement ↓
+              </a>
+            )}
+            <Link
+              href="/admin/infrastructure"
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Manage
+            </Link>
+          </div>
+        </div>
+        {assets.length === 0 ? (
+          <EmptyState
+            title="No infrastructure tracked"
+            description="Add this client's domains, hosting or sites from the Infrastructure page."
+          />
+        ) : (
+          <Table>
+            <THead>
+              <TR>
+                <TH>Status</TH>
+                <TH>Type</TH>
+                <TH>Identifier</TH>
+                <TH>Expiry / storage</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {assets.map((a) => (
+                <TR key={a.id} className="transition-colors hover:bg-muted/50">
+                  <TD>
+                    <Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge>
+                  </TD>
+                  <TD className="text-muted-foreground">{ASSET_TYPE_LABEL[a.type]}</TD>
+                  <TD className="font-medium">{a.identifier}</TD>
+                  <TD className="text-muted-foreground">{assetSummary(a)}</TD>
+                </TR>
+              ))}
             </TBody>
           </Table>
         )}

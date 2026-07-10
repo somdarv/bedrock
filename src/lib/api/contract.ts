@@ -1,8 +1,13 @@
 import type {
   AdminSession,
   Client,
+  ClientAsset,
+  ClientAssetInput,
   ClientInput,
   ClientNotifyEvent,
+  HostingServer,
+  HostingServerInput,
+  InfrastructureOverview,
   LineItemInput,
   PaymentInput,
   ReminderRuleInput,
@@ -62,6 +67,20 @@ export interface BedrockApi {
      * driven by the verified Paystack webhook; admin entry covers offline payments.
      */
     recordPayment(packageId: string, input: PaymentInput): Promise<WorkPackage>;
+  };
+  infrastructure: {
+    /** Hosting servers we monitor; optionally scoped to one client (null = Sahara's own). */
+    listServers(clientId?: string): Promise<HostingServer[]>;
+    createServer(input: HostingServerInput): Promise<HostingServer>;
+    updateServer(id: string, input: HostingServerInput): Promise<HostingServer>;
+    removeServer(id: string): Promise<void>;
+    /** A client's monitored assets (domains, SSL, hosting, sites). */
+    listAssets(clientId: string): Promise<ClientAsset[]>;
+    createAsset(clientId: string, input: ClientAssetInput): Promise<ClientAsset>;
+    updateAsset(id: string, input: ClientAssetInput): Promise<ClientAsset>;
+    removeAsset(id: string): Promise<void>;
+    /** Cross-client attention overview for the dashboard. */
+    overview(): Promise<InfrastructureOverview>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

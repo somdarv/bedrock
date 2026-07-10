@@ -4,6 +4,7 @@ import { statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/states";
+import { STATUS_VARIANT, expiryLabel } from "@/lib/infrastructure/display";
 
 const ATTENTION_STATUSES: WorkPackage["status"][] = [
   "sent",
@@ -19,7 +20,11 @@ const ACTIVE_STATUSES: WorkPackage["status"][] = [
 ];
 
 export default async function AdminDashboard() {
-  const [packages, clients] = await Promise.all([api.packages.list(), api.clients.list()]);
+  const [packages, clients, infra] = await Promise.all([
+    api.packages.list(),
+    api.clients.list(),
+    api.infrastructure.overview().catch(() => ({ attention: [], all: [] })),
+  ]);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
 
   const active = packages.filter((p) => ACTIVE_STATUSES.includes(p.status));
@@ -112,6 +117,55 @@ export default async function AdminDashboard() {
                         </div>
                         <Badge variant={meta.variant}>{meta.label}</Badge>
                       </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Infrastructure attention */}
+      <section>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="eyebrow">Infrastructure</div>
+            <h2 className="mt-2 font-display text-xl font-semibold tracking-tight">
+              Domains &amp; hosting to watch
+            </h2>
+          </div>
+          <Link
+            href="/admin/infrastructure"
+            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            All infrastructure
+          </Link>
+        </div>
+
+        <div className="mt-5 overflow-hidden rounded-xl border border-border bg-surface">
+          {infra.attention.length === 0 ? (
+            <div className="px-6 py-14 text-center text-sm text-muted-foreground">
+              Everything monitored is healthy.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {infra.attention.map((row) => {
+                const when = expiryLabel(row);
+                return (
+                  <li key={row.id}>
+                    <Link
+                      href="/admin/infrastructure"
+                      className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 md:px-6"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{row.identifier}</div>
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {row.clientName ?? "—"}
+                          {when ? ` · ${when}` : ""}
+                        </div>
+                      </div>
+                      <Badge variant={STATUS_VARIANT[row.status]}>{row.status}</Badge>
                     </Link>
                   </li>
                 );

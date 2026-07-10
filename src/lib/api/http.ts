@@ -2,6 +2,9 @@ import { ApiError, type BedrockApi } from "./contract";
 import type {
   AdminSession,
   Client,
+  ClientAsset,
+  HostingServer,
+  InfrastructureOverview,
   ReminderSettings,
   SessionUser,
   TrackResult,
@@ -153,6 +156,37 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify(input),
       }),
+  },
+  infrastructure: {
+    listServers: async (clientId) => {
+      const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
+      const res = await request<{ servers: HostingServer[] }>(`/api/admin/servers${qs}`);
+      return res.servers;
+    },
+    createServer: (input) =>
+      request<HostingServer>(`/api/admin/servers`, { method: "POST", body: JSON.stringify(input) }),
+    updateServer: (id, input) =>
+      request<HostingServer>(`/api/admin/servers/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeServer: (id) => request<void>(`/api/admin/servers/${id}`, { method: "DELETE" }),
+    listAssets: async (clientId) => {
+      const res = await request<{ assets: ClientAsset[] }>(`/api/admin/clients/${clientId}/assets`);
+      return res.assets;
+    },
+    createAsset: (clientId, input) =>
+      request<ClientAsset>(`/api/admin/clients/${clientId}/assets`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateAsset: (id, input) =>
+      request<ClientAsset>(`/api/admin/assets/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeAsset: (id) => request<void>(`/api/admin/assets/${id}`, { method: "DELETE" }),
+    overview: () => request<InfrastructureOverview>(`/api/admin/infrastructure`),
   },
   settings: {
     getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),

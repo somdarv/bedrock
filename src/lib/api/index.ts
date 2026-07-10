@@ -25,6 +25,9 @@ export const api: BedrockApi = {
   auth: isLive("auth") ? httpApi.auth : mockApi.auth,
   clients: isLive("clients") ? httpApi.clients : mockApi.clients,
   packages: isLive("packages") ? httpApi.packages : mockApi.packages,
+  // Infrastructure monitoring (domains/SSL/hosting). Rides the clients switch (same admin surface).
+  infrastructure:
+    isLive("infrastructure") || isLive("clients") ? httpApi.infrastructure : mockApi.infrastructure,
   // Settings ride the packages switch (same admin surface) unless flipped on their own.
   settings: isLive("settings") || isLive("packages") ? httpApi.settings : mockApi.settings,
   // Track (public phone+OTP) rides the packages switch too.

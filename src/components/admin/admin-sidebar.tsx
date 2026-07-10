@@ -33,6 +33,13 @@ const PackagesIcon = ({ className }: IconProps) => (
     <path d="M12 11.5V21.5" />
   </svg>
 );
+const InfraIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
+    <rect x="3" y="4" width="18" height="6" rx="1.5" />
+    <rect x="3" y="14" width="18" height="6" rx="1.5" />
+    <path d="M7 7h.01M7 17h.01" />
+  </svg>
+);
 const DocumentsIcon = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
     <path d="M6 2.5h7l5 5V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V3a.5.5 0 0 1 .5-.5Z" />
@@ -59,7 +66,7 @@ const PanelIcon = ({ className }: IconProps) => (
 );
 
 /* ------------------------------------------------------------------- model */
-type Counts = { attention: number };
+type Counts = { attention: number; infra: number };
 
 type Item =
   | { kind: "link"; href: string; label: string; Icon: React.FC<IconProps>; badge?: keyof Counts }
@@ -74,6 +81,7 @@ const NAV: Item[] = [
   { kind: "link", href: "/admin", label: "Dashboard", Icon: DashboardIcon },
   { kind: "link", href: "/admin/clients", label: "Clients", Icon: ClientsIcon },
   { kind: "link", href: "/admin/packages", label: "Work Packages", Icon: PackagesIcon, badge: "attention" },
+  { kind: "link", href: "/admin/infrastructure", label: "Infrastructure", Icon: InfraIcon, badge: "infra" },
   {
     kind: "group",
     label: "Documents",

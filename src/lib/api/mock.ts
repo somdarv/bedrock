@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type Client, type Deliverable, type DeliverableType, type LineItem, type Payment, type ReminderRule, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type LineItem, type Payment, type ReminderRule, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -463,6 +463,133 @@ export const mockApi: BedrockApi = {
       return pkg;
     },
   },
+  infrastructure: {
+    async listServers(clientId) {
+      await delay();
+      const all = [...hostingServers].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return clientId ? all.filter((s) => s.clientId === clientId) : all;
+    },
+    async createServer(input) {
+      await delay();
+      const server: HostingServer = {
+        id: `hs_${crypto.randomUUID().slice(0, 8)}`,
+        clientId: input.clientId,
+        label: input.label,
+        kind: input.kind,
+        authType: input.authType,
+        hostname: input.hostname,
+        port: input.port,
+        username: input.username,
+        docroot: input.docroot,
+        scope: input.scope ?? "readonly",
+        hasSecret: Boolean(input.secret),
+        createdAt: new Date().toISOString(),
+      };
+      hostingServers.push(server);
+      return server;
+    },
+    async updateServer(id, input) {
+      await delay();
+      const existing = found(
+        hostingServers.find((s) => s.id === id),
+        "Hosting server",
+      );
+      Object.assign(existing, {
+        clientId: input.clientId,
+        label: input.label,
+        kind: input.kind,
+        authType: input.authType,
+        hostname: input.hostname,
+        port: input.port,
+        username: input.username,
+        docroot: input.docroot,
+        scope: input.scope ?? "readonly",
+        // Only flip hasSecret on when a new secret is supplied; omitting keeps the stored one.
+        hasSecret: input.secret ? true : existing.hasSecret,
+      });
+      return existing;
+    },
+    async removeServer(id) {
+      await delay();
+      const idx = hostingServers.findIndex((s) => s.id === id);
+      if (idx === -1) throw new ApiError(404, "Hosting server not found");
+      clientAssets.forEach((a) => {
+        if (a.hostingServerId === id) a.hostingServerId = null;
+      });
+      hostingServers.splice(idx, 1);
+    },
+    async listAssets(clientId) {
+      await delay();
+      return clientAssets
+        .filter((a) => a.clientId === clientId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    async createAsset(clientId, input) {
+      await delay();
+      const asset: ClientAsset = {
+        id: `ca_${crypto.randomUUID().slice(0, 8)}`,
+        clientId,
+        hostingServerId: input.hostingServerId,
+        type: input.type,
+        label: input.label,
+        identifier: input.identifier,
+        source: input.source ?? "manual",
+        status: "unknown",
+        expiryDate: input.expiryDate,
+        renewalDate: input.renewalDate,
+        daysUntilExpiry: daysUntil(input.expiryDate),
+        metrics: null,
+        recommendation: input.recommendation,
+        monitorEnabled: input.monitorEnabled,
+        lastSyncedAt: null,
+        lastError: null,
+        createdAt: new Date().toISOString(),
+      };
+      clientAssets.push(asset);
+      return asset;
+    },
+    async updateAsset(id, input) {
+      await delay();
+      const existing = found(
+        clientAssets.find((a) => a.id === id),
+        "Asset",
+      );
+      Object.assign(existing, {
+        hostingServerId: input.hostingServerId,
+        type: input.type,
+        label: input.label,
+        identifier: input.identifier,
+        source: input.source ?? existing.source,
+        expiryDate: input.expiryDate,
+        renewalDate: input.renewalDate,
+        daysUntilExpiry: daysUntil(input.expiryDate),
+        recommendation: input.recommendation,
+        monitorEnabled: input.monitorEnabled,
+      });
+      return existing;
+    },
+    async removeAsset(id) {
+      await delay();
+      const idx = clientAssets.findIndex((a) => a.id === id);
+      if (idx === -1) throw new ApiError(404, "Asset not found");
+      clientAssets.splice(idx, 1);
+    },
+    async overview() {
+      await delay();
+      const rank: Record<string, number> = { down: 0, critical: 1, warn: 2, unknown: 3, ok: 4 };
+      const rows: AssetOverviewRow[] = clientAssets
+        .map((a) => ({ ...a, clientName: clients.find((c) => c.id === a.clientId)?.name ?? null }))
+        .sort((a, b) => {
+          const byStatus = (rank[a.status] ?? 9) - (rank[b.status] ?? 9);
+          if (byStatus !== 0) return byStatus;
+          return (a.daysUntilExpiry ?? Infinity) - (b.daysUntilExpiry ?? Infinity);
+        });
+      return {
+        attention: rows.filter((r) => ["down", "critical", "warn"].includes(r.status)),
+        all: rows,
+      };
+    },
+  },
   settings: {
     async getReminders() {
       await delay();
@@ -500,4 +627,105 @@ export const mockApi: BedrockApi = {
 let reminderRules: ReminderRule[] = [
   { id: "rr_seed1", dayOfMonth: 25, event: "payment_reminder", enabled: true },
   { id: "rr_seed2", dayOfMonth: 1, event: "account_statement", enabled: true },
+];
+
+/** Whole days from today until an ISO date (negative = past); null if no date. */
+function daysUntil(date: string | null): number | null {
+  if (!date) return null;
+  const ms = new Date(`${date}T00:00:00Z`).getTime() - new Date().setUTCHours(0, 0, 0, 0);
+  return Math.round(ms / 86_400_000);
+}
+
+const iso = (daysFromNow: number) =>
+  new Date(Date.now() + daysFromNow * 86_400_000).toISOString().slice(0, 10);
+
+const hostingServers: HostingServer[] = [
+  {
+    id: "hs_seed_vps",
+    clientId: null,
+    label: "Sahara VPS (Hostinger)",
+    kind: "vps",
+    authType: "ssh",
+    hostname: "vps.saharabasetech.com",
+    port: 22,
+    username: "sahara",
+    docroot: null,
+    scope: "readonly",
+    hasSecret: true,
+    createdAt: "2026-06-01T09:00:00Z",
+  },
+  {
+    id: "hs_seed_shared",
+    clientId: "cl_1",
+    label: "Ama — cPanel (shared)",
+    kind: "shared",
+    authType: "cpanel",
+    hostname: "server42.host.com",
+    port: 2083,
+    username: "amaboat",
+    docroot: null,
+    scope: "readonly",
+    hasSecret: true,
+    createdAt: "2026-06-02T09:00:00Z",
+  },
+];
+
+const clientAssets: ClientAsset[] = [
+  {
+    id: "ca_seed_1",
+    clientId: "cl_1",
+    hostingServerId: null,
+    type: "domain",
+    label: "Primary domain",
+    identifier: "amaboateng.com",
+    source: "rdap",
+    status: "warn",
+    expiryDate: iso(21),
+    renewalDate: null,
+    daysUntilExpiry: 21,
+    metrics: null,
+    recommendation: "Renew amaboateng.com before it expires to avoid downtime.",
+    monitorEnabled: true,
+    lastSyncedAt: "2026-07-10T06:00:00Z",
+    lastError: null,
+    createdAt: "2026-06-02T09:10:00Z",
+  },
+  {
+    id: "ca_seed_2",
+    clientId: "cl_1",
+    hostingServerId: "hs_seed_shared",
+    type: "hosting",
+    label: "cPanel storage",
+    identifier: "amaboat",
+    source: "cpanel",
+    status: "ok",
+    expiryDate: null,
+    renewalDate: null,
+    daysUntilExpiry: null,
+    metrics: { diskUsed: 4_200_000_000, diskLimit: 10_000_000_000 },
+    recommendation: null,
+    monitorEnabled: true,
+    lastSyncedAt: "2026-07-10T06:00:00Z",
+    lastError: null,
+    createdAt: "2026-06-02T09:12:00Z",
+  },
+  {
+    id: "ca_seed_3",
+    clientId: "cl_2",
+    hostingServerId: null,
+    type: "site",
+    label: "Marketing site",
+    identifier: "https://kojomensah.com",
+    source: "http",
+    status: "down",
+    expiryDate: null,
+    renewalDate: null,
+    daysUntilExpiry: null,
+    metrics: null,
+    recommendation: "Site is not responding — check hosting.",
+    monitorEnabled: true,
+    lastSyncedAt: "2026-07-10T06:00:00Z",
+    lastError: "HTTP 502",
+    createdAt: "2026-06-05T09:00:00Z",
+  },
 ];
