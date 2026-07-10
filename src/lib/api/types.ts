@@ -310,6 +310,7 @@ export interface ServerMetricsDetail {
     emailAccounts: string | null;
     ftpAccounts: string | null;
   };
+  domains: { main: string | null; addon: string[]; sub: string[] };
 }
 
 export interface ServerMetrics {

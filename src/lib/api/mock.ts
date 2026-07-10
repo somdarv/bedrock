@@ -565,6 +565,11 @@ export const mockApi: BedrockApi = {
             ],
           },
           counts: { addonDomains: "2/2", subdomains: "3", emailAccounts: "4", ftpAccounts: "0" },
+          domains: {
+            main: "gigconsult.net",
+            addon: ["ccwimgh.net", "gigcottage.net"],
+            sub: ["mails.gigcottage.net"],
+          },
         },
         error: null,
       };

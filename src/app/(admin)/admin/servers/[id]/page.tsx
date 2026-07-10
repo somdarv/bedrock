@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/ui/back-button";
 import { Badge } from "@/components/ui/badge";
+import { RefreshButton } from "@/components/admin/refresh-button";
 import { api, ApiError, type ServerMetricsDetail } from "@/lib/api";
 import { formatBytes } from "@/lib/infrastructure/display";
 
@@ -29,14 +30,14 @@ export default async function ServerDetailPage({ params }: { params: Promise<{ i
               {server.hostname ? `${server.hostname}${server.port ? `:${server.port}` : ""}` : "—"}
             </p>
           </div>
-          {details && (
-            <p className="text-xs text-subtle">
-              as of {new Date(details.fetchedAt).toLocaleString()} ·{" "}
-              <a href={`/admin/servers/${id}`} className="underline-offset-4 hover:underline">
-                Refresh
-              </a>
-            </p>
-          )}
+          <div className="flex flex-col items-end gap-2">
+            <RefreshButton />
+            {details && (
+              <p className="text-xs text-subtle">
+                as of {new Date(details.fetchedAt).toLocaleString()}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -117,6 +118,24 @@ function Detail({ d }: { d: ServerMetricsDetail }) {
                 percent: Math.round((b / (d.bandwidth.totalBytes || 1)) * 100),
               }))}
           />
+        </Panel>
+      )}
+
+      {/* Sites sharing this account */}
+      {(d.domains.main || d.domains.addon.length > 0 || d.domains.sub.length > 0) && (
+        <Panel
+          title="Sites on this account"
+          hint="These websites share this account's disk and plan. (cPanel can't report per-site file sizes on this host — open cPanel → File Manager to inspect a specific site's folder.)"
+        >
+          <div className="flex flex-wrap gap-2">
+            {d.domains.main && <SiteChip name={d.domains.main} kind="main" />}
+            {d.domains.addon.map((s) => (
+              <SiteChip key={s} name={s} kind="addon" />
+            ))}
+            {d.domains.sub.map((s) => (
+              <SiteChip key={s} name={s} kind="sub" />
+            ))}
+          </div>
         </Panel>
       )}
 
@@ -221,6 +240,17 @@ function BarList({ rows }: { rows: { label: string; valueLabel: string; percent:
         </div>
       ))}
     </div>
+  );
+}
+
+const SITE_KIND_LABEL: Record<string, string> = { main: "main", addon: "addon", sub: "subdomain" };
+
+function SiteChip({ name, kind }: { name: string; kind: "main" | "addon" | "sub" }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
+      <span className="font-medium">{name}</span>
+      <span className="text-[11px] uppercase tracking-wider text-subtle">{SITE_KIND_LABEL[kind]}</span>
+    </span>
   );
 }
 
