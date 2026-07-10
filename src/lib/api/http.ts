@@ -2,6 +2,7 @@ import { ApiError, type BedrockApi } from "./contract";
 import type {
   AdminSession,
   Client,
+  ClientActivity,
   ClientAsset,
   HostingServer,
   InfrastructureOverview,
@@ -83,6 +84,7 @@ export const httpApi: BedrockApi = {
         body: JSON.stringify(input),
       }),
     remove: (id) => request<void>(`/api/admin/clients/${id}`, { method: "DELETE" }),
+    activity: (id) => request<ClientActivity>(`/api/admin/clients/${id}/activity`),
   },
   packages: {
     list: (params) => {

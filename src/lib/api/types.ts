@@ -88,6 +88,34 @@ export interface ClientInput {
   contacts: ContactInput[];
 }
 
+/** A message we sent, with its channel and (for WhatsApp) delivery/read status from the webhook. */
+export type MessageStatus = "queued" | "sent" | "delivered" | "read" | "failed";
+
+export interface ActivityMessage {
+  id: string;
+  event: string;
+  label: string;
+  channel: string; // whatsapp | email
+  recipient: string;
+  status: MessageStatus;
+  error: string | null;
+  at: string | null;
+}
+
+export interface ActivityDocument {
+  id: string;
+  title: string;
+  type: string;
+  filename: string;
+  size: number | null;
+  at: string | null;
+}
+
+export interface ClientActivity {
+  messages: ActivityMessage[];
+  documents: ActivityDocument[];
+}
+
 /** The primary contact (or first), used wherever a single number/email is needed. */
 export function primaryContact(client: Client): Contact | null {
   return client.contacts.find((c) => c.isPrimary) ?? client.contacts[0] ?? null;

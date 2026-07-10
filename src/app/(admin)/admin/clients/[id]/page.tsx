@@ -20,6 +20,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   });
   const packages = await api.packages.list({ clientId: id });
   const assets = await api.infrastructure.listAssets(id).catch(() => []);
+  const activity = await api.clients.activity(id).catch(() => ({ messages: [], documents: [] }));
 
   return (
     <div className="space-y-6">
@@ -173,6 +174,80 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </Table>
         )}
       </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Activity</h2>
+
+        {activity.documents.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {activity.documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-surface px-4 py-3"
+              >
+                <span className="text-muted-foreground">📄</span>
+                <span className="font-medium">{doc.title}</span>
+                <span className="text-xs uppercase tracking-wider text-subtle">{doc.type}</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {doc.at ? new Date(doc.at).toLocaleString() : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activity.messages.length === 0 ? (
+          <EmptyState
+            title="No messages yet"
+            description="Invoices, receipts and documents you send will appear here with their delivery status."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg border bg-surface">
+            <ul className="divide-y divide-border">
+              {activity.messages.map((m) => (
+                <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                  <span className="text-sm">{CHANNEL_ICON[m.channel] ?? "•"}</span>
+                  <span className="font-medium">{m.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {m.channel === "whatsapp" ? "WhatsApp" : "Email"} · {m.recipient}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {m.at ? new Date(m.at).toLocaleString() : "—"}
+                  </span>
+                  <MessageStatusBadge status={m.status} channel={m.channel} error={m.error} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+const CHANNEL_ICON: Record<string, string> = { whatsapp: "🟢", email: "✉️" };
+
+function MessageStatusBadge({
+  status,
+  channel,
+  error,
+}: {
+  status: string;
+  channel: string;
+  error: string | null;
+}) {
+  // Delivered/read only exist on WhatsApp; email tops out at "sent".
+  const map: Record<string, { label: string; variant: "default" | "info" | "success" | "danger" }> = {
+    queued: { label: "Queued", variant: "default" },
+    sent: { label: channel === "email" ? "Sent" : "Sent", variant: "default" },
+    delivered: { label: "Delivered", variant: "info" },
+    read: { label: "Read", variant: "success" },
+    failed: { label: "Failed", variant: "danger" },
+  };
+  const s = map[status] ?? { label: status, variant: "default" as const };
+  return (
+    <Badge variant={s.variant} title={error ?? undefined}>
+      {s.label}
+    </Badge>
   );
 }

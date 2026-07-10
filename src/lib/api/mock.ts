@@ -202,6 +202,21 @@ export const mockApi: BedrockApi = {
       }
       clients.splice(idx, 1);
     },
+    async activity() {
+      await delay();
+      const h = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString();
+      return {
+        messages: [
+          { id: "n1", event: "invoice_sent", label: "Invoice sent", channel: "whatsapp", recipient: "+233201234567", status: "read" as const, error: null, at: h(120) },
+          { id: "n2", event: "invoice_sent", label: "Invoice sent", channel: "email", recipient: "ama@example.com", status: "sent" as const, error: null, at: h(120) },
+          { id: "n3", event: "deposit_received", label: "Deposit received", channel: "whatsapp", recipient: "+233201234567", status: "delivered" as const, error: null, at: h(60) },
+          { id: "n4", event: "files_ready", label: "Files ready to review", channel: "whatsapp", recipient: "+233201234567", status: "sent" as const, error: null, at: h(20) },
+        ],
+        documents: [
+          { id: "d1", title: "Brand proposal", type: "proposal", filename: "brand-proposal.pdf", size: 240_000, at: h(200) },
+        ],
+      };
+    },
   },
   packages: {
     async list(params) {

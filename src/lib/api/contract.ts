@@ -1,6 +1,7 @@
 import type {
   AdminSession,
   Client,
+  ClientActivity,
   ClientAsset,
   ClientAssetInput,
   ClientInput,
@@ -40,6 +41,8 @@ export interface BedrockApi {
     create(input: ClientInput): Promise<Client>;
     update(id: string, input: ClientInput): Promise<Client>;
     remove(id: string): Promise<void>;
+    /** History feed: messages sent (with delivery/read status) + documents shared. */
+    activity(id: string): Promise<ClientActivity>;
   };
   packages: {
     list(params?: { clientId?: string }): Promise<WorkPackage[]>;
