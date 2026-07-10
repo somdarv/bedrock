@@ -659,6 +659,7 @@ function ServerModal({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="shrink-0 whitespace-nowrap"
                 disabled={!canTest || testing}
                 onClick={runTest}
               >
