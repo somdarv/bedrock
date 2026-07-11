@@ -91,6 +91,10 @@ export interface BedrockApi {
     removeAsset(id: string): Promise<void>;
     /** Cross-client attention overview for the dashboard. */
     overview(): Promise<InfrastructureOverview>;
+    /** Re-check one asset live (RDAP/TLS/HTTP/cPanel) and return its fresh state. */
+    syncAsset(id: string): Promise<ClientAsset>;
+    /** Re-check every monitored asset and return the refreshed overview. */
+    syncAll(): Promise<InfrastructureOverview>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

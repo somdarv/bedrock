@@ -645,6 +645,17 @@ export const mockApi: BedrockApi = {
       if (idx === -1) throw new ApiError(404, "Asset not found");
       clientAssets.splice(idx, 1);
     },
+    async syncAsset(id) {
+      await delay(700);
+      return found(
+        clientAssets.find((a) => a.id === id),
+        "Asset",
+      );
+    },
+    async syncAll() {
+      await delay(1200);
+      return this.overview();
+    },
     async overview() {
       await delay();
       const rank: Record<string, number> = { down: 0, critical: 1, warn: 2, unknown: 3, ok: 4 };

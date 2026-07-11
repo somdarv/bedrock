@@ -27,6 +27,8 @@ import {
   createServer,
   deleteAsset,
   deleteServer,
+  syncAllAssets,
+  syncAsset,
   testServer,
 } from "@/lib/infrastructure/actions";
 import {
@@ -87,14 +89,34 @@ export function InfrastructureView({
   clients: Client[];
   servers: HostingServer[];
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [assetOpen, setAssetOpen] = React.useState(false);
   const [serverOpen, setServerOpen] = React.useState(false);
+  const [refreshing, startRefresh] = React.useTransition();
 
   const clientName = (id: string | null) =>
     id ? (clients.find((c) => c.id === id)?.name ?? "—") : "Sahara (own)";
 
+  function refreshAll() {
+    startRefresh(async () => {
+      const res = await syncAllAssets();
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Live status refreshed.", "success");
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-end">
+        <Button variant="outline" size="sm" onClick={refreshAll} disabled={refreshing}>
+          {refreshing ? "Checking live…" : "↻ Refresh now"}
+        </Button>
+      </div>
+
       {/* Attention */}
       <section className="space-y-3 rounded-lg border bg-surface p-5">
         <div className="flex items-center justify-between">
@@ -251,6 +273,17 @@ function AssetTable({
     });
   }
 
+  function checkNow(id: string) {
+    startTransition(async () => {
+      const res = await syncAsset(id);
+      if (res.error) toast(res.error, "danger");
+      else {
+        toast("Re-checked live.", "success");
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-160 text-sm">
@@ -292,6 +325,7 @@ function AssetTable({
                 <td className="py-2.5 pl-3 text-right">
                   <RowMenu
                     actions={[
+                      { label: "Check now", onClick: () => checkNow(row.id) },
                       { label: "Remove", danger: true, onClick: () => remove(row.id, row.identifier) },
                     ]}
                   />

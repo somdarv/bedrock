@@ -63,6 +63,28 @@ export async function testServer(input: TestServerInput): Promise<TestServerResu
   }
 }
 
+/** Re-check one asset live now. */
+export async function syncAsset(id: string): Promise<InfraActionState> {
+  try {
+    await api.infrastructure.syncAsset(id);
+  } catch (e) {
+    return fail(e, "Could not re-check this asset.");
+  }
+  revalidatePath("/admin/infrastructure");
+  return { ok: true };
+}
+
+/** Re-check every monitored asset live now (the "Refresh" button). */
+export async function syncAllAssets(): Promise<InfraActionState> {
+  try {
+    await api.infrastructure.syncAll();
+  } catch (e) {
+    return fail(e, "Could not refresh live status.");
+  }
+  revalidatePath("/admin/infrastructure");
+  return { ok: true };
+}
+
 /* ---------------------------------------------------------------- assets */
 
 export async function createAsset(

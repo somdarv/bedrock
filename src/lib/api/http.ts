@@ -197,6 +197,9 @@ export const httpApi: BedrockApi = {
       }),
     removeAsset: (id) => request<void>(`/api/admin/assets/${id}`, { method: "DELETE" }),
     overview: () => request<InfrastructureOverview>(`/api/admin/infrastructure`),
+    syncAsset: (id) => request<ClientAsset>(`/api/admin/assets/${id}/sync`, { method: "POST" }),
+    syncAll: () =>
+      request<InfrastructureOverview>(`/api/admin/infrastructure/sync`, { method: "POST" }),
   },
   settings: {
     getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),
