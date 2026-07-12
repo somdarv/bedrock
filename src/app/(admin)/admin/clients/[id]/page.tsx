@@ -127,14 +127,22 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <h2 className="text-lg font-semibold tracking-tight">Infrastructure</h2>
           <div className="flex items-center gap-4">
             {assets.length > 0 && (
-              <a
-                href={`/admin/clients/${client.id}/statement`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Status statement ↓
-              </a>
+              <>
+                <Link
+                  href={`/admin/clients/${client.id}/statement/compose`}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Compose statement →
+                </Link>
+                <a
+                  href={`/admin/clients/${client.id}/statement`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Quick statement ↓
+                </a>
+              </>
             )}
             <Link
               href="/admin/infrastructure"

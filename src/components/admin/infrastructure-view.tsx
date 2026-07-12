@@ -111,7 +111,12 @@ export function InfrastructureView({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Button asChild variant="outline" size="sm">
+          <a href="/admin/infrastructure/report" target="_blank" rel="noopener noreferrer">
+            Status document ↓
+          </a>
+        </Button>
         <Button variant="outline" size="sm" onClick={refreshAll} disabled={refreshing}>
           {refreshing ? "Checking live…" : "↻ Refresh now"}
         </Button>

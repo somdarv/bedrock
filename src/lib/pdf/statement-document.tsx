@@ -37,6 +37,8 @@ const s = StyleSheet.create({
   detail: { fontSize: 8, color: muted, marginTop: 1, textAlign: "right" },
   note: { fontSize: 9, color: muted, marginTop: 5 },
   empty: { marginTop: 24, fontSize: 10, color: muted },
+  closing: { marginTop: 20 },
+  closingText: { fontSize: 10, lineHeight: 1.5, color: ink },
   footer: { position: "absolute", bottom: 36, left: 52, right: 52, borderTopWidth: 1, borderTopColor: border, paddingTop: 10, fontSize: 8, color: muted, flexDirection: "row", justifyContent: "space-between" },
 });
 
@@ -88,9 +90,15 @@ function summaryLine(assets: ClientAsset[]): string {
 export function StatementDocument({
   clientName,
   assets,
+  summary,
+  closingNote,
 }: {
   clientName: string;
   assets: ClientAsset[];
+  /** Curated intro line. Falls back to the auto-generated summary when omitted. */
+  summary?: string;
+  /** Optional operator-written closing note, rendered under the table. */
+  closingNote?: string;
 }) {
   return (
     <Document title={`Status statement — ${clientName}`}>
@@ -115,7 +123,7 @@ export function StatementDocument({
         </View>
 
         <View style={s.summary}>
-          <Text style={s.summaryText}>{summaryLine(assets)}</Text>
+          <Text style={s.summaryText}>{summary?.trim() || summaryLine(assets)}</Text>
         </View>
 
         {assets.length === 0 ? (
@@ -147,6 +155,12 @@ export function StatementDocument({
             ))}
           </>
         )}
+
+        {closingNote?.trim() ? (
+          <View style={s.closing}>
+            <Text style={s.closingText}>{closingNote.trim()}</Text>
+          </View>
+        ) : null}
 
         <View style={s.footer} fixed>
           <Text>SaharaBase Technologies</Text>
