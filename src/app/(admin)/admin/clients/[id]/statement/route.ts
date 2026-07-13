@@ -1,5 +1,4 @@
-import { api, ApiError } from "@/lib/api";
-import { renderStatementPdf } from "@/lib/pdf/render";
+import { ApiError } from "@/lib/api";
 import {
   renderCuratedStatement,
   type CuratedStatementInput,
@@ -34,11 +33,8 @@ function handleError(e: unknown): Response {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const [client, assets] = await Promise.all([
-      api.clients.get(id),
-      api.infrastructure.listAssets(id),
-    ]);
-    return pdfResponse(await renderStatementPdf(client.name, assets), client.name);
+    const { clientName, pdf } = await renderCuratedStatement(id, {});
+    return pdfResponse(pdf, clientName);
   } catch (e) {
     return handleError(e);
   }

@@ -1,6 +1,9 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import type { ClientAsset, InfrastructureOverview, WorkPackage } from "@/lib/api";
+import { VERIFY_BASE_URL } from "@/lib/documents/registry";
+import { logoDataUri, registerBrandFonts } from "./brand";
 import { InfraReportDocument } from "./infra-report-document";
 import { PackageDocument } from "./package-document";
 import { StatementDocument } from "./statement-document";
@@ -13,18 +16,50 @@ export async function renderPackagePdf(
   return renderToBuffer(<PackageDocument pkg={pkg} variant={variant} />);
 }
 
-/** Render a client's infrastructure status statement to a PDF buffer. */
+export interface StatementRenderOpts {
+  summary?: string;
+  closingNote?: string;
+  /** Verification reference the QR resolves to (…/verify/{reference}). */
+  reference: string;
+  /** Verification serial — present only on an issued (not preview) statement. */
+  serial?: string;
+  preparedBy?: { name: string; phone?: string };
+  /** True on a preview → SPECIMEN watermark + "pending issue" serial. */
+  specimen?: boolean;
+  issuedDate?: string;
+}
+
+/** Render a client's infrastructure status statement (branded, with a verify QR) to a PDF buffer. */
 export async function renderStatementPdf(
   clientName: string,
   assets: ClientAsset[],
-  opts?: { summary?: string; closingNote?: string },
+  opts: StatementRenderOpts,
 ): Promise<Buffer> {
+  registerBrandFonts();
+
+  const verifyUrl = `${VERIFY_BASE_URL}/verify/${opts.reference}`;
+  const verifyQr = await QRCode.toDataURL(verifyUrl, {
+    margin: 0,
+    width: 220,
+    errorCorrectionLevel: "H",
+    color: { dark: "#0a0a0a", light: "#ffffff" },
+  });
+
   return renderToBuffer(
     <StatementDocument
       clientName={clientName}
       assets={assets}
-      summary={opts?.summary}
-      closingNote={opts?.closingNote}
+      summary={opts.summary}
+      closingNote={opts.closingNote}
+      logo={logoDataUri()}
+      meta={{
+        reference: opts.reference,
+        serial: opts.serial,
+        verifyQr,
+        issuedDate: opts.issuedDate,
+        preparedBy: opts.preparedBy,
+        specimen: opts.specimen,
+      }}
     />,
   );
 }
