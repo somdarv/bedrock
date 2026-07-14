@@ -35,7 +35,8 @@ export function Modal({ open, onClose, title, description, children, footer, cla
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-xl border bg-surface p-6 shadow-xl",
+          // Cap to the viewport and scroll within the dialog so long forms always fit on screen.
+          "relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-y-auto rounded-xl border bg-surface p-6 shadow-xl",
           className,
         )}
       >

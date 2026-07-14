@@ -1,5 +1,5 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import type { AssetStatus, ClientAsset } from "@/lib/api";
+import type { AssetStatus, ClientAsset, ClientType } from "@/lib/api";
 import { formatBytes } from "@/lib/infrastructure/display";
 import { LOGO_ASPECT, brand, company } from "./brand";
 
@@ -112,10 +112,10 @@ const STATUS: Record<AssetStatus, { label: string; color: string; bg: string }> 
 
 /** The four plain-language definitions clients read before their status. */
 const DEFINITIONS: { term: string; text: string }[] = [
-  { term: "Domain", text: "Your web address — what people type to reach you. It has to be renewed from time to time, or your website and email go offline." },
+  { term: "Domain", text: "Your web address (what people type to reach you). It has to be renewed from time to time, or your site and email go offline." },
   { term: "Security certificate", text: "The padlock shown in the browser. It keeps every visitor's connection to your site private and trusted." },
-  { term: "Hosting & storage", text: "The space on our servers where your website's files and email live. It has a set size, and filling it up can cause problems." },
-  { term: "Website health", text: "Whether your site is online right now and reachable to the people trying to visit it." },
+  { term: "Hosting & storage", text: "The space on our servers where your files and email live. It has a set size, and filling it up can cause problems." },
+  { term: "Website health", text: "Whether a site is online right now and reachable to the people trying to visit it." },
 ];
 
 function fmtDate(iso?: string | null) {
@@ -141,7 +141,7 @@ function domainFacet(a: ClientAsset): Facet {
   const renews = a.expiryDate ? ` It renews around ${fmtDate(a.expiryDate)}.` : "";
   let value: string;
   if (d === null) value = "Registered. We're confirming its next renewal date.";
-  else if (d < 0) value = `Expired ${-d} days ago — it needs renewing now to bring your site and email back online.`;
+  else if (d < 0) value = `Expired ${-d} days ago, so it needs renewing now to bring your site and email back online.`;
   else if (d <= 30) value = `Needs renewing within ${d} days to keep your site and email online.${renews}`;
   else value = `Registered and good for another ${d} days.${renews}`;
   return { label: "Domain", value };
@@ -151,8 +151,8 @@ function domainFacet(a: ClientAsset): Facet {
 function certFacet(days: number | null): Facet {
   let value: string;
   if (days === null) value = "In place. We're confirming its next renewal.";
-  else if (days < 0) value = `Has lapsed — visitors may see a security warning. We're renewing it.`;
-  else if (days <= 21) value = `Renews in ${days} days — we take care of this for you, nothing to do.`;
+  else if (days < 0) value = `Has lapsed, so visitors may see a security warning. We're renewing it.`;
+  else if (days <= 21) value = `Renews in ${days} days. We take care of this for you, so there's nothing to do.`;
   else value = `Valid and protecting your visitors for another ${days} days.`;
   return { label: "Security certificate", value };
 }
@@ -161,7 +161,7 @@ function certFacet(days: number | null): Facet {
 function healthFacet(up: number | null | undefined, lastError: string | null): Facet {
   const value =
     up === 0
-      ? `Your site isn't responding right now${lastError ? ` (${lastError})` : ""} — we're looking into it.`
+      ? `Your site isn't responding right now${lastError ? ` (${lastError})` : ""}. We're looking into it.`
       : up === 1
         ? "Online and reachable to your visitors."
         : "We'll confirm this on the next check.";
@@ -178,8 +178,8 @@ function storageFacet(a: ClientAsset): Facet {
     const pct = Math.round((a.metrics.diskUsed / a.metrics.diskLimit) * 100);
     value =
       pct >= 85
-        ? `Using ${used} of your ${limit} (${pct}% full) — worth clearing space or upgrading soon.`
-        : `Using ${used} of your ${limit} (${pct}% full) — plenty of room.`;
+        ? `Using ${used} of your ${limit} (${pct}% full), so it's worth clearing space or upgrading soon.`
+        : `Using ${used} of your ${limit} (${pct}% full), with plenty of room.`;
   } else value = `Using ${used}.`;
   return { label: "Where your files live", value };
 }
@@ -209,22 +209,39 @@ function present(a: ClientAsset): { title: string; tech?: string; facets: Facet[
   }
 }
 
+/** How we address the account holder: "your organisation (Name)" or "your account (Name)". */
+function ownerPhrase(clientName: string, clientType: ClientType): string {
+  const noun = clientType === "individual" ? "your account" : "your organisation";
+  return `${noun} (${clientName})`;
+}
+
 /** Default dated intro when the operator hasn't written their own. */
-function defaultIntro(clientName: string, assets: ClientAsset[], issuedIso?: string): string {
+function defaultIntro(
+  clientName: string,
+  clientType: ClientType,
+  assets: ClientAsset[],
+  issuedIso?: string,
+): string {
   const asOf = fmtLongDate(issuedIso);
+  // Multiple online assets (websites/sites) → plural framing so it never reads as a single site.
+  const multi = assets.filter((a) => a.type === "domain" || a.type === "site").length > 1;
+  const addresses = multi
+    ? "the web addresses people use to find you"
+    : "the web address people use to find you";
+  const running = multi ? "whether your sites are up and running" : "whether your site is up and running";
   const need = assets.filter((a) => ["critical", "down", "warn"].includes(a.status)).length;
   const tail =
     assets.length === 0
       ? "We'll list each part here as soon as it's set up."
       : need === 0
-        ? "Everything is in good shape right now; here's the detail."
+        ? "Everything is in good shape right now, and the detail is below."
         : need === 1
-          ? "Most things are in good shape — one item needs attention soon, and it's flagged below."
-          : `Most things are in good shape — ${need} items need attention soon, flagged below.`;
+          ? "Most things are in good shape. One item needs attention soon, and it's flagged below."
+          : `Most things are in good shape. ${need} items need attention soon, and they're flagged below.`;
   return (
-    `As of ${asOf}, here's a straightforward look at everything that keeps ${clientName}'s website ` +
-    `online: the web address people use to find you, the security that protects your visitors, the ` +
-    `space where your files are stored, and whether your site is up and running. ${tail}`
+    `As of ${asOf}, here's a straightforward look at everything that keeps ${ownerPhrase(clientName, clientType)} ` +
+    `online: ${addresses}, the security that protects your visitors, the space where your files are stored, ` +
+    `and ${running}. ${tail}`
   );
 }
 
@@ -239,6 +256,7 @@ function StatusPill({ status }: { status: AssetStatus }) {
 
 export function StatementDocument({
   clientName,
+  clientType = "organisation",
   assets,
   summary,
   closingNote,
@@ -246,6 +264,8 @@ export function StatementDocument({
   meta,
 }: {
   clientName: string;
+  /** Drives how the account holder is addressed ("your organisation" vs "your account"). */
+  clientType?: ClientType;
   assets: ClientAsset[];
   summary?: string;
   closingNote?: string;
@@ -255,10 +275,10 @@ export function StatementDocument({
 }) {
   const issued = fmtDate(meta.issuedDate);
   const preparedBy = meta.preparedBy ?? { name: "Richard Somda", phone: company.phone };
-  const introText = summary?.trim() || defaultIntro(clientName, assets, meta.issuedDate);
+  const introText = summary?.trim() || defaultIntro(clientName, clientType, assets, meta.issuedDate);
 
   return (
-    <Document title={`Infrastructure statement — ${clientName}`}>
+    <Document title={`Infrastructure statement: ${clientName}`}>
       <Page size="A4" style={s.page}>
         {meta.specimen ? <Text style={s.specimen} fixed>SPECIMEN</Text> : null}
 
@@ -353,7 +373,7 @@ export function StatementDocument({
         <View style={s.signoff} wrap={false}>
           <Text style={s.closing}>
             If anything here is unclear, or you&apos;d like us to take care of something before it comes
-            due, just reply — we&apos;re glad to help.
+            due, just reply and we&apos;re glad to help.
           </Text>
           <Text style={[s.signName, { marginTop: 14 }]}>{preparedBy.name}</Text>
           <Text style={s.signLine}>{company.name}</Text>
@@ -370,7 +390,7 @@ export function StatementDocument({
             {meta.serial ? (
               <Text style={s.verifyMeta}>Verification serial: {meta.serial}</Text>
             ) : (
-              <Text style={s.verifyMeta}>Verification serial: — pending issue —</Text>
+              <Text style={s.verifyMeta}>Verification serial: pending issue</Text>
             )}
           </View>
           <View style={s.stamp}>

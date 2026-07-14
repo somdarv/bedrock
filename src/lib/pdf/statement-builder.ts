@@ -59,21 +59,24 @@ export async function renderCuratedStatement(
   clientId: string,
   input: CuratedStatementInput,
   issue: StatementIssue = {},
-): Promise<{ clientName: string; pdf: Buffer; reference: string }> {
+): Promise<{ clientName: string; pdf: Buffer; reference: string; serial?: string; issuedDate: string }> {
   const [client, assets] = await Promise.all([
     api.clients.get(clientId),
     api.infrastructure.listAssets(clientId),
   ]);
   const curated = curateAssets(assets, input.items);
   const reference = issue.reference ?? mintStatementReference();
+  const issuedDate = new Date().toISOString().slice(0, 10);
   const pdf = await renderStatementPdf(client.name, curated, {
     summary: input.summary,
     closingNote: input.closingNote,
+    clientType: client.type,
     reference,
     serial: issue.serial,
     preparedBy: issue.preparedBy,
+    issuedDate,
     // No serial → this is a preview: mark it SPECIMEN so it can't pass as issued.
     specimen: !issue.serial,
   });
-  return { clientName: client.name, pdf, reference };
+  return { clientName: client.name, pdf, reference, serial: issue.serial, issuedDate };
 }

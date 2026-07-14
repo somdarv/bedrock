@@ -1,7 +1,7 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
-import type { ClientAsset, InfrastructureOverview, WorkPackage } from "@/lib/api";
+import type { ClientAsset, ClientType, InfrastructureOverview, WorkPackage } from "@/lib/api";
 import { VERIFY_BASE_URL } from "@/lib/documents/registry";
 import { logoDataUri, registerBrandFonts } from "./brand";
 import { InfraReportDocument } from "./infra-report-document";
@@ -19,6 +19,7 @@ export async function renderPackagePdf(
 export interface StatementRenderOpts {
   summary?: string;
   closingNote?: string;
+  clientType?: ClientType;
   /** Verification reference the QR resolves to (…/verify/{reference}). */
   reference: string;
   /** Verification serial — present only on an issued (not preview) statement. */
@@ -48,6 +49,7 @@ export async function renderStatementPdf(
   return renderToBuffer(
     <StatementDocument
       clientName={clientName}
+      clientType={opts.clientType}
       assets={assets}
       summary={opts.summary}
       closingNote={opts.closingNote}

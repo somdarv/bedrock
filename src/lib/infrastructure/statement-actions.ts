@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import {
+  mintStatementReference,
+  mintStatementSerial,
   renderCuratedStatement,
   type CuratedStatementInput,
 } from "@/lib/pdf/statement-builder";
@@ -38,11 +40,19 @@ export async function finalizeStatement(
   if (!input.replyToValue.trim()) return { error: "Add the reply contact's number or email." };
 
   try {
-    const { clientName, pdf } = await renderCuratedStatement(clientId, {
-      summary: input.summary,
-      closingNote: input.closingNote,
-      items: input.items,
-    });
+    // Issue for real: mint a verification reference + serial and render WITHOUT the SPECIMEN
+    // watermark, so the sent document is a valid, verifiable statement (not the preview).
+    const reference = mintStatementReference();
+    const serial = mintStatementSerial();
+    const { clientName, pdf, issuedDate } = await renderCuratedStatement(
+      clientId,
+      {
+        summary: input.summary,
+        closingNote: input.closingNote,
+        items: input.items,
+      },
+      { reference, serial },
+    );
 
     const safe = clientName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     const fd = new FormData();
@@ -57,6 +67,10 @@ export async function finalizeStatement(
     fd.append("replyToName", input.replyToName.trim());
     fd.append("replyToMethod", input.replyToMethod);
     fd.append("replyToValue", input.replyToValue.trim());
+    // Register the statement in the verification registry so its QR resolves at /verify/{ref}.
+    fd.append("reference", reference);
+    fd.append("serial", serial);
+    fd.append("issueDate", issuedDate);
 
     const token = (await cookies()).get("bedrock_token")?.value;
     const res = await fetch(`${BASE_URL}/api/admin/clients/${clientId}/documents`, {
