@@ -29,8 +29,8 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
  * Dei Gratia Medical Services, Fee Schedule. A firm bill for the clinic's public
  * website: a fixed GHS 4,000 build (the full services site plus WhatsApp appointment
  * booking), managed hosting billed at cost (the clinic provides its own domain), and a
- * GHS 2,000/mo care plan after handover. The retainer is a full partnership — site
- * care, ongoing development updates, brand design work, and blog publishing — which is
+ * GHS 2,000/mo care plan after handover. The retainer is a full partnership (site
+ * care, ongoing development updates, brand design work, and blog publishing), which is
  * what carries the higher monthly figure. Bespoke body authored locally; system
  * metadata (ID, dates, system, timestamp, verify QR) is driven by the registry record
  * so it stays in sync with /verify/{id}.
@@ -141,7 +141,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
                 <ul className="mt-3 space-y-2">
                   <MiniBullet>Responsive, SEO-ready site: home, our story, our team, visit us, and contact</MiniBullet>
                   <MiniBullet>A full services section covering maternal &amp; child health, 24/7 emergency &amp; urgent care, laboratory, imaging, outpatient, pharmacy, screenings, and specialist services</MiniBullet>
-                  <MiniBullet>WhatsApp appointment booking — every &ldquo;Book an appointment&rdquo; opens a ready-to-send chat straight to the clinic</MiniBullet>
+                  <MiniBullet>WhatsApp appointment booking: every &ldquo;Book an appointment&rdquo; opens a ready-to-send chat straight to the clinic</MiniBullet>
                   <MiniBullet>Health blog the clinic can update with articles, notices, and announcements</MiniBullet>
                   <MiniBullet>Location with map and directions, OPD hours, emergency line, and NHIS-accepted messaging throughout</MiniBullet>
                   <MiniBullet>Tap-to-call and tap-to-chat on every page, testing, deployment, and handover</MiniBullet>
@@ -207,7 +207,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
         </div>
 
         <p className="mt-4 px-6 text-base leading-8 text-gray-700">
-          For a clinic, the website is never just a brochure — it carries the emergency line, the
+          For a clinic, the website is never just a brochure. It carries the emergency line, the
           booking button, and the service and hours a worried patient relies on at any hour. The
           retainer is a full partnership, not only upkeep: it keeps the site live and secure, carries
           the ongoing development as the clinic grows, handles graphic design work for the Dei Gratia
@@ -217,9 +217,9 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
 
         <div className="mx-6 mt-4 grid grid-cols-2 gap-px border border-gray-200 bg-gray-200">
           {[
-            { t: "Site care & uptime", d: "The site is watched around the clock and kept secure, patched, backed up, and fast — so the emergency line and booking button are always live and correct." },
-            { t: "Ongoing development updates", d: "New sections, features, and changes as the clinic grows, so the site keeps evolving instead of going stale — no separate build fee each time." },
-            { t: "Graphic design for your brand", d: "Design work for the Dei Gratia brand — social graphics, flyers, and visuals that keep the clinic looking sharp and consistent." },
+            { t: "Site care & uptime", d: "The site is watched around the clock and kept secure, patched, backed up, and fast, so the emergency line and booking button are always live and correct." },
+            { t: "Ongoing development updates", d: "New sections, features, and changes as the clinic grows, so the site keeps evolving instead of going stale, with no separate build fee each time." },
+            { t: "Graphic design for your brand", d: "Design work for the Dei Gratia brand: social graphics, flyers, and visuals that keep the clinic looking sharp and consistent." },
             { t: "Blog & content publishing", d: "We write up and put up your blog posts, notices, and announcements, so the health blog stays active and worth following." },
           ].map((p, i) => (
             <div key={p.t} className="avoid-break bg-white px-5 py-4">
@@ -237,7 +237,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
         <p className="mt-4 px-6 text-sm leading-relaxed text-gray-600">
           <span className="font-semibold text-gray-800">What it avoids:</span> without the plan, security
           gaps go unpatched and backups drift, the blog goes quiet, and every update, graphic, or new
-          section becomes a separate billable job — on a site patients turn to in an emergency, that
+          section becomes a separate billable job. On a site patients turn to in an emergency, that
           risk is real. The retainer prevents it and keeps someone accountable for the site at all times.
         </p>
 
