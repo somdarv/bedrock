@@ -13,7 +13,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export interface FinalizeStatementInput extends CuratedStatementInput {
   title: string;
-  contactId?: string;
+  /** Contacts to send to (primary + any secondary). Empty → backend falls back to the primary. */
+  contactIds?: string[];
   replyToName: string;
   replyToMethod: string;
   replyToValue: string;
@@ -63,7 +64,7 @@ export async function finalizeStatement(
     );
     fd.append("type", "infrastructure statement");
     fd.append("title", input.title.trim());
-    if (input.contactId) fd.append("contactId", input.contactId);
+    (input.contactIds ?? []).forEach((id) => fd.append("contactIds[]", id));
     fd.append("replyToName", input.replyToName.trim());
     fd.append("replyToMethod", input.replyToMethod);
     fd.append("replyToValue", input.replyToValue.trim());

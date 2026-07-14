@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import type { ClientAsset, Contact } from "@/lib/api";
 import { ASSET_TYPE_LABEL, STATUS_VARIANT, assetSummary } from "@/lib/infrastructure/display";
+import { RecipientPicker } from "@/components/admin/recipient-picker";
 import { finalizeStatement } from "@/lib/infrastructure/statement-actions";
 
 /**
@@ -38,7 +39,6 @@ export function StatementComposer({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const primary = contacts.find((c) => c.isPrimary) ?? contacts[0];
 
   const [previewing, setPreviewing] = React.useState(false);
   const [sending, startSend] = React.useTransition();
@@ -50,9 +50,10 @@ export function StatementComposer({
     ),
   );
 
-  // Send fields (contact + reply-to), confirmed here before dispatch.
+  // Send fields (recipients + reply-to), confirmed here before dispatch. Default to every contact
+  // so the primary and any secondary are reached at once; the operator can untick any.
   const [title, setTitle] = React.useState(defaultTitle);
-  const [contactId, setContactId] = React.useState(primary?.id ?? "");
+  const [recipientIds, setRecipientIds] = React.useState<string[]>(() => contacts.map((c) => c.id));
   const [replyName, setReplyName] = React.useState("");
   const [replyMethod, setReplyMethod] = React.useState("whatsapp");
   const [replyValue, setReplyValue] = React.useState("");
@@ -104,17 +105,21 @@ export function StatementComposer({
       toast("Include at least one item first.", "danger");
       return;
     }
+    if (recipientIds.length === 0) {
+      toast("Pick at least one contact to send to.", "danger");
+      return;
+    }
     if (!title.trim() || !replyName.trim() || !replyValue.trim()) {
       toast("Add a title and the reply-to contact before sending.", "danger");
       return;
     }
-    if (!confirm(`Prepare and send this statement to ${primaryLabel()}?`)) return;
+    if (!confirm(`Prepare and send this statement to ${recipientsLabel()}?`)) return;
 
     startSend(async () => {
       const res = await finalizeStatement(clientId, {
         ...buildCurated(),
         title,
-        contactId: contactId || undefined,
+        contactIds: recipientIds,
         replyToName: replyName,
         replyToMethod: replyMethod,
         replyToValue: replyValue,
@@ -128,9 +133,11 @@ export function StatementComposer({
     });
   }
 
-  function primaryLabel() {
-    const c = contacts.find((x) => x.id === contactId);
-    return c?.name ?? "the client";
+  function recipientsLabel() {
+    const names = contacts.filter((c) => recipientIds.includes(c.id)).map((c) => c.name);
+    if (names.length === 0) return "the client";
+    if (names.length <= 2) return names.join(" and ");
+    return `${names.length} contacts`;
   }
 
   if (assets.length === 0) {
@@ -241,23 +248,15 @@ export function StatementComposer({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Title" required hint="Shown to the client, e.g. “Infrastructure status — Jul 2026”.">
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Field label="Title" required hint="Shown to the client, e.g. “Infrastructure status, Jul 2026”.">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+
+        {contacts.length > 1 && (
+          <Field label="Send to" hint="Everyone ticked receives it at once over WhatsApp + email.">
+            <RecipientPicker contacts={contacts} selected={recipientIds} onChange={setRecipientIds} />
           </Field>
-          {contacts.length > 1 && (
-            <Field label="Send to">
-              <Select value={contactId} onChange={(e) => setContactId(e.target.value)}>
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.isPrimary ? " (primary)" : ""}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-        </div>
+        )}
 
         <div className="rounded-lg border border-border bg-muted/30 p-3">
           <div className="text-sm font-medium">Reply-to contact</div>

@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import type { Contact } from "@/lib/api";
+import { RecipientPicker } from "@/components/admin/recipient-picker";
 import { sendClientDocument } from "@/lib/clients/actions";
 
 const TYPE_OPTIONS = ["proposal", "fee schedule", "quote", "contract", "invoice", "document"];
@@ -44,8 +45,8 @@ function SendDocumentModal({
   const router = useRouter();
   const { toast } = useToast();
 
-  const primary = contacts.find((c) => c.isPrimary) ?? contacts[0];
-  const [contactId, setContactId] = React.useState(primary?.id ?? "");
+  // Default to every contact so primary + secondary are reached at once; operator can untick.
+  const [recipientIds, setRecipientIds] = React.useState<string[]>(() => contacts.map((c) => c.id));
   const [type, setType] = React.useState("proposal");
   const [title, setTitle] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
@@ -63,6 +64,7 @@ function SendDocumentModal({
     setError(null);
     if (!file) return setError("Choose a file to send.");
     if (!title.trim()) return setError("Give the document a title.");
+    if (recipientIds.length === 0) return setError("Pick at least one contact to send to.");
     if (!replyName.trim()) return setError("Add a contact name for replies.");
     if (!replyValue.trim()) return setError("Add the contact's number or email.");
 
@@ -70,7 +72,7 @@ function SendDocumentModal({
     fd.append("file", file);
     fd.append("type", type);
     fd.append("title", title.trim());
-    if (contactId) fd.append("contactId", contactId);
+    recipientIds.forEach((id) => fd.append("contactIds[]", id));
     fd.append("replyToName", replyName.trim());
     fd.append("replyToMethod", replyMethod);
     fd.append("replyToValue", replyValue.trim());
@@ -96,15 +98,8 @@ function SendDocumentModal({
     >
       <form onSubmit={submit} className="space-y-4">
         {contacts.length > 1 && (
-          <Field label="Send to" htmlFor="sd-contact">
-            <Select id="sd-contact" value={contactId} onChange={(e) => setContactId(e.target.value)}>
-              {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.isPrimary ? " (primary)" : ""}
-                </option>
-              ))}
-            </Select>
+          <Field label="Send to" hint="Everyone ticked receives it at once over WhatsApp + email.">
+            <RecipientPicker contacts={contacts} selected={recipientIds} onChange={setRecipientIds} />
           </Field>
         )}
 
