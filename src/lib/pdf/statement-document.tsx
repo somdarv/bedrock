@@ -77,9 +77,10 @@ const s = StyleSheet.create({
   facetValue: { flex: 1, fontSize: 11, lineHeight: 1.5, color: brand.body },
   itemRec: { fontSize: 10.5, color: brand.muted, marginTop: 8, lineHeight: 1.5, fontFamily: "GeneralSans" },
 
-  // status pill
-  pill: { borderRadius: 4, paddingVertical: 3, paddingHorizontal: 8 },
-  pillText: { fontSize: 8.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 },
+  // status pill — no letter-spacing (its trailing space made the right padding look larger);
+  // lineHeight 1 + a hair more top than bottom padding vertically centres the all-caps label.
+  pill: { borderRadius: 4, paddingTop: 3.5, paddingBottom: 3, paddingHorizontal: 9, alignSelf: "flex-start" },
+  pillText: { fontSize: 9, fontWeight: 600, textTransform: "uppercase", lineHeight: 1 },
 
   // closing / sign-off
   closing: { marginTop: 26, fontSize: 11.5, lineHeight: 1.6, color: brand.body },
