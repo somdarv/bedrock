@@ -77,9 +77,9 @@ const s = StyleSheet.create({
   facetValue: { flex: 1, fontSize: 11, lineHeight: 1.5, color: brand.body },
   itemRec: { fontSize: 10.5, color: brand.muted, marginTop: 8, lineHeight: 1.5, fontFamily: "GeneralSans" },
 
-  // status pill — no letter-spacing (its trailing space made the right padding look larger);
-  // lineHeight 1 + a hair more top than bottom padding vertically centres the all-caps label.
-  pill: { borderRadius: 4, paddingTop: 3.5, paddingBottom: 3, paddingHorizontal: 9, alignSelf: "flex-start" },
+  // status pill — equal padding on all sides; lineHeight 1 keeps the all-caps label tight so the
+  // uniform padding reads evenly. No letter-spacing (its trailing space skewed the right side).
+  pill: { borderRadius: 4, padding: 6, alignSelf: "flex-start" },
   pillText: { fontSize: 9, fontWeight: 600, textTransform: "uppercase", lineHeight: 1 },
 
   // closing / sign-off
