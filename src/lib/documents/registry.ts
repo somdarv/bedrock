@@ -77,6 +77,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20260714-BIL-DEIG-56",
+    reference: "BIL-DEIG-56",
+    category: "proposals",
+    type: "Fee Schedule",
+    title: "Dei Gratia Website & Online Appointment Booking",
+    client: "Dei Gratia Medical Services",
+    project: "Dei Gratia Website & WhatsApp Appointment Booking",
+    issueDate: "14 July 2026",
+    validUntil: "14 August 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260709-BIL-ZEN-55",
     reference: "BIL-ZEN-55",
     category: "proposals",
