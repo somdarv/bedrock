@@ -1,13 +1,14 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { AssetStatus, ClientAsset } from "@/lib/api";
-import { ASSET_TYPE_LABEL, assetSummary } from "@/lib/infrastructure/display";
-import { LOGO_ASPECT, brand } from "./brand";
+import { formatBytes } from "@/lib/infrastructure/display";
+import { LOGO_ASPECT, brand, company } from "./brand";
 
 /**
- * Infrastructure Status Statement — a per-client "here's where your setup stands" document in the
- * SaharaBase document house style (the proposal design language: logo wordmark, Sora display +
- * General Sans text, monochrome ink/paper, an eyebrow-led layout, a Prepared-for / Prepared-by
- * frame, and a scan-to-verify stamp). Built from the client's monitored assets + recommendations.
+ * Infrastructure Status Statement — a per-client, plain-language "here's how your website setup is
+ * doing" document in the SaharaBase house style (proposal design language: logo letterhead, Sora
+ * display + General Sans text, monochrome ink/paper, an eyebrow-led layout, and a scan-to-verify
+ * stamp). Written for non-technical owners: every figure is explained in ordinary words, and the
+ * terms (domain, certificate, hosting, health) are defined up front.
  *
  * Fonts must be registered (registerBrandFonts) before this renders — done in render.tsx.
  */
@@ -25,102 +26,80 @@ export interface StatementMeta {
   specimen?: boolean;
 }
 
-const LOGO_W = 132;
-const ACCENT = brand.ink;
+const LOGO_W = 128;
 
 const s = StyleSheet.create({
   page: {
     paddingTop: 44,
     paddingBottom: 56,
     paddingHorizontal: 48,
-    fontSize: 11,
+    fontSize: 11.5,
     lineHeight: 1.5,
     color: brand.body,
     fontFamily: "GeneralSans",
   },
 
-  // header
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 },
+  // header — refined letterhead
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   logo: { width: LOGO_W, height: LOGO_W / LOGO_ASPECT },
+  contactLine: { fontSize: 9, color: brand.muted, marginTop: 8 },
   headerRight: { alignItems: "flex-end" },
-  docType: { fontFamily: "Sora", fontSize: 15, fontWeight: 600, color: brand.ink, letterSpacing: 0.3 },
-  metaRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 4 },
-  metaLabel: { fontSize: 9, color: brand.muted, textTransform: "uppercase", letterSpacing: 0.8 },
-  metaValue: { fontSize: 9, color: brand.body, fontWeight: 500 },
+  docType: { fontFamily: "Sora", fontSize: 14, fontWeight: 600, color: brand.ink, letterSpacing: 0.3, textTransform: "uppercase" },
+  metaRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 5 },
+  metaLabel: { fontSize: 8.5, color: brand.muted, textTransform: "uppercase", letterSpacing: 0.8, width: 58, textAlign: "right" },
+  metaValue: { fontSize: 9.5, color: brand.body, fontWeight: 500 },
+  rule: { borderTopWidth: 1, borderTopColor: brand.ink, marginTop: 14 },
 
   eyebrow: { fontFamily: "Sora", fontSize: 9, fontWeight: 600, color: brand.ink, textTransform: "uppercase", letterSpacing: 1.6 },
 
-  // prepared for + summary
-  clientName: { fontFamily: "Sora", fontSize: 22, fontWeight: 600, color: brand.ink, marginTop: 6 },
-  clientSub: { fontSize: 11, color: brand.muted, marginTop: 2 },
-  summaryCard: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: brand.line,
-    borderTopWidth: 2,
-    borderTopColor: ACCENT,
-    borderRadius: 4,
-    backgroundColor: brand.panel,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  summaryText: { fontSize: 12.5, lineHeight: 1.55, color: brand.body },
+  // prepared for + intro
+  preparedFor: { marginTop: 24 },
+  clientName: { fontFamily: "Sora", fontSize: 21, fontWeight: 600, color: brand.ink, marginTop: 3 },
+  clientSub: { fontSize: 10.5, color: brand.muted, marginTop: 2 },
+  intro: { fontSize: 12, lineHeight: 1.6, color: brand.body, marginTop: 16 },
 
-  // section
+  // definitions panel — no box; hairline-separated rows
+  defs: { marginTop: 22 },
+  defsHead: { marginBottom: 4 },
+  defRow: { flexDirection: "row", gap: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: brand.hair },
+  defTerm: { fontFamily: "Sora", fontSize: 10.5, fontWeight: 600, color: brand.ink, width: 116 },
+  defText: { flex: 1, fontSize: 10.5, lineHeight: 1.5, color: brand.muted },
+
+  // items
   section: { marginTop: 28 },
-  sectionHead: { fontFamily: "Sora", fontSize: 15, fontWeight: 600, color: brand.ink, marginTop: 6 },
-  sectionIntro: { fontSize: 11, color: brand.muted, marginTop: 4 },
-
-  // asset item
-  item: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: brand.hair },
+  sectionHead: { marginBottom: 2 },
+  item: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: brand.line },
   itemHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
-  itemName: { fontFamily: "Sora", fontSize: 13, fontWeight: 600, color: brand.ink },
-  itemType: { fontSize: 8.5, color: brand.faint, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 },
-  itemDetail: { fontSize: 11, color: brand.body, marginTop: 6 },
-  itemRec: { fontSize: 11, color: brand.muted, marginTop: 4, lineHeight: 1.5 },
+  itemName: { fontFamily: "Sora", fontSize: 13.5, fontWeight: 600, color: brand.ink },
+  itemTech: { fontSize: 9, color: brand.faint, marginTop: 2 },
+  facetRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  facetLabel: { fontSize: 10, color: brand.muted, width: 108, fontWeight: 500 },
+  facetValue: { flex: 1, fontSize: 11, lineHeight: 1.5, color: brand.body },
+  itemRec: { fontSize: 10.5, color: brand.muted, marginTop: 8, lineHeight: 1.5, fontFamily: "GeneralSans" },
 
   // status pill
   pill: { borderRadius: 4, paddingVertical: 3, paddingHorizontal: 8 },
   pillText: { fontSize: 8.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 },
 
-  // closing note
-  closing: {
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: brand.line,
-    borderRadius: 4,
-    backgroundColor: brand.panel,
-    padding: 16,
-  },
-  closingText: { fontSize: 11.5, lineHeight: 1.6, color: brand.body },
+  // closing / sign-off
+  closing: { marginTop: 26, fontSize: 11.5, lineHeight: 1.6, color: brand.body },
+  signoff: { marginTop: 22, borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 14 },
+  signName: { fontFamily: "Sora", fontSize: 13, fontWeight: 600, color: brand.ink },
+  signLine: { fontSize: 10.5, color: brand.muted, marginTop: 2 },
 
-  // prepared by
-  preparedCard: {
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: brand.line,
-    borderTopWidth: 2,
-    borderTopColor: ACCENT,
-    borderRadius: 4,
-    padding: 16,
-  },
-  preparedName: { fontFamily: "Sora", fontSize: 13, fontWeight: 600, color: brand.ink, marginTop: 6 },
-  preparedLine: { fontSize: 11, color: brand.body, marginTop: 2 },
-  preparedCompany: { fontSize: 10.5, color: brand.muted, marginTop: 2 },
-
-  empty: { marginTop: 20, fontSize: 11, color: brand.muted, lineHeight: 1.6 },
+  empty: { marginTop: 18, fontSize: 11.5, color: brand.muted, lineHeight: 1.6 },
 
   // verification footer
-  verify: { marginTop: 28, borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16 },
-  verifyMeta: { fontSize: 9, color: brand.muted, lineHeight: 1.6 },
-  verifyMetaStrong: { fontSize: 9.5, color: brand.body },
+  verify: { marginTop: 26, borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 16 },
+  verifyMeta: { fontSize: 8.5, color: brand.muted, lineHeight: 1.6 },
+  verifyMetaStrong: { fontSize: 9.5, color: brand.body, fontWeight: 500 },
   stamp: { alignItems: "center" },
-  qrBox: { width: 74, height: 74, borderWidth: 1, borderColor: brand.line, padding: 4, alignItems: "center", justifyContent: "center" },
-  qrImg: { width: 66, height: 66 },
+  qrBox: { width: 72, height: 72, borderWidth: 1, borderColor: brand.line, padding: 4, alignItems: "center", justifyContent: "center" },
+  qrImg: { width: 64, height: 64 },
   qrPlaceholder: { fontSize: 7, color: brand.faint, textAlign: "center" },
   scan: { marginTop: 5, fontSize: 8, fontWeight: 600, color: brand.muted, textTransform: "uppercase", letterSpacing: 1 },
 
-  specimen: { position: "absolute", top: 300, left: 90, fontFamily: "Sora", fontSize: 90, fontWeight: 700, color: "#0a0a0a", opacity: 0.05, transform: "rotate(-32deg)" },
+  specimen: { position: "absolute", top: 300, left: 96, fontFamily: "Sora", fontSize: 88, fontWeight: 700, color: "#0a0a0a", opacity: 0.04, transform: "rotate(-32deg)" },
 });
 
 const STATUS: Record<AssetStatus, { label: string; color: string; bg: string }> = {
@@ -131,28 +110,122 @@ const STATUS: Record<AssetStatus, { label: string; color: string; bg: string }> 
   unknown: { label: "Pending", color: brand.muted, bg: brand.hair },
 };
 
+/** The four plain-language definitions clients read before their status. */
+const DEFINITIONS: { term: string; text: string }[] = [
+  { term: "Domain", text: "Your web address — what people type to reach you. It has to be renewed from time to time, or your website and email go offline." },
+  { term: "Security certificate", text: "The padlock shown in the browser. It keeps every visitor's connection to your site private and trusted." },
+  { term: "Hosting & storage", text: "The space on our servers where your website's files and email live. It has a set size, and filling it up can cause problems." },
+  { term: "Website health", text: "Whether your site is online right now and reachable to the people trying to visit it." },
+];
+
 function fmtDate(iso?: string | null) {
   const d = iso ? new Date(iso) : new Date();
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function detailText(a: ClientAsset): string {
-  if (a.type === "site") {
-    return a.status === "down" ? (a.lastError ?? "Not responding") : "Online";
-  }
-  return assetSummary(a);
+function fmtLongDate(iso?: string | null) {
+  const d = iso ? new Date(iso) : new Date();
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function autoSummary(assets: ClientAsset[]): string {
-  if (assets.length === 0) return "No infrastructure is being tracked for this account yet.";
+function periodOf(iso?: string | null) {
+  const d = iso ? new Date(iso) : new Date();
+  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+}
+
+type Facet = { label: string; value: string };
+
+/** Plain-language line for a domain's registration. */
+function domainFacet(a: ClientAsset): Facet {
+  const d = a.daysUntilExpiry;
+  const renews = a.expiryDate ? ` It renews around ${fmtDate(a.expiryDate)}.` : "";
+  let value: string;
+  if (d === null) value = "Registered. We're confirming its next renewal date.";
+  else if (d < 0) value = `Expired ${-d} days ago — it needs renewing now to bring your site and email back online.`;
+  else if (d <= 30) value = `Needs renewing within ${d} days to keep your site and email online.${renews}`;
+  else value = `Registered and good for another ${d} days.${renews}`;
+  return { label: "Domain", value };
+}
+
+/** Plain-language line for the SSL certificate, from a website's metrics or a standalone ssl asset. */
+function certFacet(days: number | null): Facet {
+  let value: string;
+  if (days === null) value = "In place. We're confirming its next renewal.";
+  else if (days < 0) value = `Has lapsed — visitors may see a security warning. We're renewing it.`;
+  else if (days <= 21) value = `Renews in ${days} days — we take care of this for you, nothing to do.`;
+  else value = `Valid and protecting your visitors for another ${days} days.`;
+  return { label: "Security certificate", value };
+}
+
+/** Plain-language line for site reachability. */
+function healthFacet(up: number | null | undefined, lastError: string | null): Facet {
+  const value =
+    up === 0
+      ? `Your site isn't responding right now${lastError ? ` (${lastError})` : ""} — we're looking into it.`
+      : up === 1
+        ? "Online and reachable to your visitors."
+        : "We'll confirm this on the next check.";
+  return { label: "Website health", value };
+}
+
+/** Plain-language storage line for a hosting account. */
+function storageFacet(a: ClientAsset): Facet {
+  const used = formatBytes(a.metrics?.diskUsed);
+  const limit = formatBytes(a.metrics?.diskLimit);
+  let value: string;
+  if (!used) value = "We're reading your current storage use.";
+  else if (limit && a.metrics?.diskUsed && a.metrics?.diskLimit) {
+    const pct = Math.round((a.metrics.diskUsed / a.metrics.diskLimit) * 100);
+    value =
+      pct >= 85
+        ? `Using ${used} of your ${limit} (${pct}% full) — worth clearing space or upgrading soon.`
+        : `Using ${used} of your ${limit} (${pct}% full) — plenty of room.`;
+  } else value = `Using ${used}.`;
+  return { label: "Where your files live", value };
+}
+
+/** The friendly title + optional technical sub-line + plain-language facets for one asset. */
+function present(a: ClientAsset): { title: string; tech?: string; facets: Facet[] } {
+  switch (a.type) {
+    case "domain": {
+      const m = a.metrics ?? {};
+      const facets = [domainFacet(a)];
+      if (m.sslDays != null || m.sslStatus) facets.push(certFacet(m.sslDays ?? null));
+      if (m.siteUp != null || m.siteStatus) facets.push(healthFacet(m.siteUp, a.lastError));
+      return { title: a.identifier, facets };
+    }
+    case "hosting":
+      return {
+        title: a.label?.trim() || "Website hosting & email",
+        tech: `Account: ${a.identifier}`,
+        facets: [storageFacet(a)],
+      };
+    case "ssl":
+      return { title: a.label?.trim() || a.identifier, facets: [certFacet(a.daysUntilExpiry)] };
+    case "site":
+      return { title: a.identifier, facets: [healthFacet(a.status === "down" ? 0 : 1, a.lastError)] };
+    default:
+      return { title: a.identifier, facets: [] };
+  }
+}
+
+/** Default dated intro when the operator hasn't written their own. */
+function defaultIntro(clientName: string, assets: ClientAsset[], issuedIso?: string): string {
+  const asOf = fmtLongDate(issuedIso);
   const need = assets.filter((a) => ["critical", "down", "warn"].includes(a.status)).length;
-  const healthy = assets.filter((a) => a.status === "ok").length;
-  const parts: string[] = [];
-  if (need > 0) parts.push(`${need} item${need > 1 ? "s" : ""} need${need > 1 ? "" : "s"} attention`);
-  if (healthy > 0) parts.push(`${healthy} healthy`);
-  const pending = assets.length - need - healthy;
-  if (pending > 0) parts.push(`${pending} pending a first check`);
-  return parts.length ? parts.join(" · ") + "." : "All tracked items are up to date.";
+  const tail =
+    assets.length === 0
+      ? "We'll list each part here as soon as it's set up."
+      : need === 0
+        ? "Everything is in good shape right now; here's the detail."
+        : need === 1
+          ? "Most things are in good shape — one item needs attention soon, and it's flagged below."
+          : `Most things are in good shape — ${need} items need attention soon, flagged below.`;
+  return (
+    `As of ${asOf}, here's a straightforward look at everything that keeps ${clientName}'s website ` +
+    `online: the web address people use to find you, the security that protects your visitors, the ` +
+    `space where your files are stored, and whether your site is up and running. ${tail}`
+  );
 }
 
 function StatusPill({ status }: { status: AssetStatus }) {
@@ -181,18 +254,25 @@ export function StatementDocument({
   meta: StatementMeta;
 }) {
   const issued = fmtDate(meta.issuedDate);
-  const preparedBy = meta.preparedBy ?? { name: "Richard Somda", phone: "059 212 3054 · 050 988 6584" };
+  const preparedBy = meta.preparedBy ?? { name: "Richard Somda", phone: company.phone };
+  const introText = summary?.trim() || defaultIntro(clientName, assets, meta.issuedDate);
 
   return (
     <Document title={`Infrastructure statement — ${clientName}`}>
       <Page size="A4" style={s.page}>
         {meta.specimen ? <Text style={s.specimen} fixed>SPECIMEN</Text> : null}
 
-        {/* Header — logo + document meta (no letterhead) */}
+        {/* Refined letterhead — logo + contact left, document meta right, thin rule under */}
         <View style={s.header}>
-          {/* react-pdf Image (PDF canvas, not HTML) — no alt attribute exists */}
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <Image src={logo} style={s.logo} />
+          <View>
+            {/* react-pdf Image (PDF canvas, not HTML) — no alt attribute exists */}
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={logo} style={s.logo} />
+            <Text style={s.contactLine}>{company.addressLine}</Text>
+            <Text style={s.contactLine}>
+              {company.phone} · {company.website}
+            </Text>
+          </View>
           <View style={s.headerRight}>
             <Text style={s.docType}>Infrastructure Statement</Text>
             <View style={s.metaRow}>
@@ -203,63 +283,87 @@ export function StatementDocument({
               <Text style={s.metaLabel}>Issued</Text>
               <Text style={s.metaValue}>{issued}</Text>
             </View>
+            <View style={s.metaRow}>
+              <Text style={s.metaLabel}>Period</Text>
+              <Text style={s.metaValue}>{periodOf(meta.issuedDate)}</Text>
+            </View>
           </View>
         </View>
+        <View style={s.rule} />
 
-        {/* Prepared for + summary */}
-        <Text style={s.eyebrow}>Prepared for</Text>
-        <Text style={s.clientName}>{clientName}</Text>
-        <View style={s.summaryCard}>
-          <Text style={s.summaryText}>{summary?.trim() || autoSummary(assets)}</Text>
+        {/* Prepared for + dated plain-language intro (no box) */}
+        <View style={s.preparedFor}>
+          <Text style={s.eyebrow}>Prepared for</Text>
+          <Text style={s.clientName}>{clientName}</Text>
+        </View>
+        <Text style={s.intro}>{introText}</Text>
+
+        {/* What you're looking at — plain definitions up front */}
+        <View style={s.defs}>
+          <View style={s.defsHead}>
+            <Text style={s.eyebrow}>What you&apos;re looking at</Text>
+          </View>
+          {DEFINITIONS.map((d) => (
+            <View style={s.defRow} key={d.term}>
+              <Text style={s.defTerm}>{d.term}</Text>
+              <Text style={s.defText}>{d.text}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Items */}
+        {/* Items — each part, in plain language */}
         <View style={s.section}>
-          <Text style={s.eyebrow}>Your infrastructure</Text>
-          <Text style={s.sectionIntro}>
-            The domains, hosting and sites we monitor for you, and what each needs.
-          </Text>
+          <View style={s.sectionHead}>
+            <Text style={s.eyebrow}>How each part is doing</Text>
+          </View>
 
           {assets.length === 0 ? (
             <Text style={s.empty}>
-              Once your domains, hosting and sites are added, they&apos;ll be listed here with their
-              status and upcoming renewals.
+              As soon as your domain, hosting and site are set up, each one will be listed here with a
+              plain-language note on how it&apos;s doing and anything coming up.
             </Text>
           ) : (
-            assets.map((a) => (
-              <View style={s.item} key={a.id} wrap={false}>
-                <View style={s.itemHead}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.itemName}>{a.identifier}</Text>
-                    <Text style={s.itemType}>{ASSET_TYPE_LABEL[a.type]}</Text>
+            assets.map((a) => {
+              const p = present(a);
+              return (
+                <View style={s.item} key={a.id} wrap={false}>
+                  <View style={s.itemHead}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.itemName}>{p.title}</Text>
+                      {p.tech ? <Text style={s.itemTech}>{p.tech}</Text> : null}
+                    </View>
+                    <StatusPill status={a.status} />
                   </View>
-                  <StatusPill status={a.status} />
+                  {p.facets.map((f) => (
+                    <View style={s.facetRow} key={f.label}>
+                      <Text style={s.facetLabel}>{f.label}</Text>
+                      <Text style={s.facetValue}>{f.value}</Text>
+                    </View>
+                  ))}
+                  {a.recommendation ? <Text style={s.itemRec}>{a.recommendation}</Text> : null}
                 </View>
-                <Text style={s.itemDetail}>{detailText(a)}</Text>
-                {a.recommendation ? <Text style={s.itemRec}>{a.recommendation}</Text> : null}
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
-        {closingNote?.trim() ? (
-          <View style={s.closing} wrap={false}>
-            <Text style={s.closingText}>{closingNote.trim()}</Text>
-          </View>
-        ) : null}
+        {closingNote?.trim() ? <Text style={s.closing}>{closingNote.trim()}</Text> : null}
 
-        {/* Prepared by */}
-        <View style={s.preparedCard} wrap={false}>
-          <Text style={s.eyebrow}>Prepared by</Text>
-          <Text style={s.preparedName}>{preparedBy.name}</Text>
-          {preparedBy.phone ? <Text style={s.preparedLine}>{preparedBy.phone}</Text> : null}
-          <Text style={s.preparedCompany}>SaharaBase Technologies · Accra, Ghana</Text>
+        {/* Genuine sign-off — no label, reads as authored */}
+        <View style={s.signoff} wrap={false}>
+          <Text style={s.closing}>
+            If anything here is unclear, or you&apos;d like us to take care of something before it comes
+            due, just reply — we&apos;re glad to help.
+          </Text>
+          <Text style={[s.signName, { marginTop: 14 }]}>{preparedBy.name}</Text>
+          <Text style={s.signLine}>{company.name}</Text>
+          {preparedBy.phone ? <Text style={s.signLine}>{preparedBy.phone}</Text> : null}
         </View>
 
         {/* Verification footer */}
         <View style={s.verify} wrap={false}>
           <View>
-            <Text style={s.verifyMetaStrong}>SaharaBase Technologies</Text>
+            <Text style={s.verifyMetaStrong}>{company.name}</Text>
             <Text style={s.verifyMeta}>Reference: {meta.reference}</Text>
             <Text style={s.verifyMeta}>Generated on system: SAH-HUB-INFRA-2026</Text>
             <Text style={s.verifyMeta}>Issued: {issued}</Text>

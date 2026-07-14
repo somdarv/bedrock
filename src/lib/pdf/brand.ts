@@ -15,6 +15,15 @@ import { Font } from "@react-pdf/renderer";
 const FONT_DIR = path.join(process.cwd(), "src/lib/pdf/fonts");
 const BRAND_DIR = path.join(process.cwd(), "public/brand");
 
+/** Letterhead identity for the document header + sign-off. */
+export const company = {
+  name: "SaharaBase Technologies",
+  addressLine: "Abelemkpe, Accra",
+  phone: "059 212 3054",
+  altPhone: "050 988 6584",
+  website: "saharabasetech.com",
+} as const;
+
 /** House palette — monochrome ink/paper, matching the marketing site + document engine. */
 export const brand = {
   ink: "#0a0a0a", // --color-primary
@@ -53,8 +62,19 @@ export function registerBrandFonts(): void {
     ],
   });
 
-  // Keep words intact — the default hyphenation splits identifiers/URLs awkwardly.
-  Font.registerHyphenationCallback((word) => [word]);
+  // Don't hyphenate ordinary words, but DO let long unbroken tokens (web addresses, URLs,
+  // account names) wrap — otherwise react-pdf can't break them and they run off the edge and
+  // get clipped. Break preferably at URL separators, then hard-wrap any remaining long run.
+  Font.registerHyphenationCallback((word) => {
+    if (word.length <= 18) return [word];
+    const chunks = word.match(/[^./\-_@]+[./\-_@]*|[./\-_@]+/g) ?? [word];
+    const out: string[] = [];
+    for (const chunk of chunks) {
+      if (chunk.length <= 18) out.push(chunk);
+      else for (let i = 0; i < chunk.length; i += 16) out.push(chunk.slice(i, i + 16));
+    }
+    return out;
+  });
 
   fontsRegistered = true;
 }
