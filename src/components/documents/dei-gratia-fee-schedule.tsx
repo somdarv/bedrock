@@ -28,11 +28,12 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 /**
  * Dei Gratia Medical Services, Fee Schedule. A firm bill for the clinic's public
  * website: a fixed GHS 4,000 build (the full services site plus WhatsApp appointment
- * booking), domain + hosting billed at cost, and a GHS 2,000/mo care plan after
- * handover — the higher retainer reflecting a live, 24/7 clinic where the emergency
- * line, booking, and service details always have to be up. Bespoke body authored
- * locally; system metadata (ID, dates, system, timestamp, verify QR) is driven by the
- * registry record so it stays in sync with /verify/{id}.
+ * booking), managed hosting billed at cost (the clinic provides its own domain), and a
+ * GHS 2,000/mo care plan after handover. The retainer is a full partnership — site
+ * care, ongoing development updates, brand design work, and blog publishing — which is
+ * what carries the higher monthly figure. Bespoke body authored locally; system
+ * metadata (ID, dates, system, timestamp, verify QR) is driven by the registry record
+ * so it stays in sync with /verify/{id}.
  */
 export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
   return (
@@ -86,18 +87,14 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               GHS 1,600.00
             </p>
             <p className="mt-2 text-lg font-semibold tabular-nums text-primary">
-              + USD 72.00 domain &amp; hosting (year 1)
+              + USD 48.00 hosting (year 1)
             </p>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              40% deposit on the build fee plus the first year of domain and hosting, payable before
-              work commences.
+              40% deposit on the build fee plus the first year of hosting, payable before work
+              commences.
             </p>
           </div>
           <div className="w-72 shrink-0 divide-y divide-gray-200 border-l border-gray-200 pl-6 text-sm">
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">Domain, deigratiamedical.com (year 1)</span>
-              <span className="font-semibold tabular-nums text-gray-900">USD 24.00</span>
-            </div>
             <div className="flex justify-between py-2">
               <span className="text-gray-600">Web hosting (year 1)</span>
               <span className="font-semibold tabular-nums text-gray-900">USD 48.00</span>
@@ -201,7 +198,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
         <div className="flex items-end justify-between gap-6 px-6 pt-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Care Plan</p>
-            <h3 className="mt-1 text-2xl font-semibold text-gray-900">Website Continuity &amp; Assurance Retainer</h3>
+            <h3 className="mt-1 text-2xl font-semibold text-gray-900">Website Care &amp; Growth Retainer</h3>
           </div>
           <div className="shrink-0 text-right">
             <p className="text-3xl font-semibold leading-none tabular-nums text-gray-900">GHS 2,000</p>
@@ -212,17 +209,18 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
         <p className="mt-4 px-6 text-base leading-8 text-gray-700">
           For a clinic, the website is never just a brochure — it carries the emergency line, the
           booking button, and the service and hours a worried patient relies on at any hour. The
-          retainer keeps all of that live and correct: monitoring, security, backups, and support,
-          plus keeping services, team, hours, and the blog current. It gives the clinic a fixed,
-          predictable monthly cost instead of unplanned repair bills.
+          retainer is a full partnership, not only upkeep: it keeps the site live and secure, carries
+          the ongoing development as the clinic grows, handles graphic design work for the Dei Gratia
+          brand, and writes up and publishes the blog. It gives the clinic a fixed, predictable
+          monthly cost instead of unplanned bills for each change.
         </p>
 
         <div className="mx-6 mt-4 grid grid-cols-2 gap-px border border-gray-200 bg-gray-200">
           {[
-            { t: "Uptime & performance monitoring", d: "The site is watched around the clock, so a patient reaching for the emergency line or the booking button never meets a dead site." },
-            { t: "Security & patching", d: "Software, access controls, and SSL are kept current, protecting the clinic's name and every enquiry that comes through the site." },
-            { t: "Backups & data integrity", d: "Site content and the booking and contact flows are backed up on a schedule and verified, so a failure never means lost work or lost enquiries." },
-            { t: "Content updates & priority support", d: "Services, team, hours, and blog updates plus small fixes are handled first, so the site keeps pace with the clinic." },
+            { t: "Site care & uptime", d: "The site is watched around the clock and kept secure, patched, backed up, and fast — so the emergency line and booking button are always live and correct." },
+            { t: "Ongoing development updates", d: "New sections, features, and changes as the clinic grows, so the site keeps evolving instead of going stale — no separate build fee each time." },
+            { t: "Graphic design for your brand", d: "Design work for the Dei Gratia brand — social graphics, flyers, and visuals that keep the clinic looking sharp and consistent." },
+            { t: "Blog & content publishing", d: "We write up and put up your blog posts, notices, and announcements, so the health blog stays active and worth following." },
           ].map((p, i) => (
             <div key={p.t} className="avoid-break bg-white px-5 py-4">
               <div className="flex gap-3">
@@ -237,10 +235,10 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
         </div>
 
         <p className="mt-4 px-6 text-sm leading-relaxed text-gray-600">
-          <span className="font-semibold text-gray-800">What it avoids:</span> without ongoing care, small
-          issues turn into outages, security gaps go unpatched, backups drift, and every change becomes a
-          separate billable job — on a site patients turn to in an emergency, that risk is real. The
-          retainer prevents it and keeps someone accountable for the site at all times.
+          <span className="font-semibold text-gray-800">What it avoids:</span> without the plan, security
+          gaps go unpatched and backups drift, the blog goes quiet, and every update, graphic, or new
+          section becomes a separate billable job — on a site patients turn to in an emergency, that
+          risk is real. The retainer prevents it and keeps someone accountable for the site at all times.
         </p>
 
         <div className="mx-6 mb-1 mt-4 flex gap-px border border-gray-200 bg-gray-200">
@@ -264,18 +262,19 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
       <div className="avoid-break mb-8">
         <Eyebrow>Domain &amp; Hosting</Eyebrow>
         <p className="mt-2 text-base leading-8 text-gray-700">
-          The site runs on managed web hosting under the clinic&apos;s own domain. Both are third-party
-          subscriptions billed at cost, separate from the build fee and the care plan, and renewed
-          annually.
+          The clinic provides its own domain; we point it to the site at no charge. Managed hosting is
+          a third-party subscription billed at cost, separate from the build fee and the care plan, and
+          renewed annually.
         </p>
         <div className="mt-4 grid grid-cols-[1fr_220px] gap-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <p className="text-base font-semibold text-gray-900">Domain Name</p>
               <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                deigratiamedical.com, registered and pointed to the site.
+                Provided by the clinic. Dei Gratia registers and owns its domain; we point it to the
+                site.
               </p>
-              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">USD 24 / year</p>
+              <p className="mt-3 text-lg font-semibold tabular-nums text-gray-900">Provided by client</p>
             </div>
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <p className="text-base font-semibold text-gray-900">Web Hosting</p>
@@ -289,10 +288,9 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
               Third-party / year 1
             </p>
-            <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-gray-900">USD 72</p>
+            <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-gray-900">USD 48</p>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
-              Payable with the upfront deposit so the domain and server are provisioned before work
-              begins.
+              Payable with the upfront deposit so the server is provisioned before work begins.
             </p>
           </div>
         </div>
@@ -308,11 +306,11 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">Due before commencement</p>
             </div>
             <p className="text-sm leading-relaxed text-gray-600">
-              40% deposit on the build fee, plus the first year of domain and hosting.
+              40% deposit on the build fee, plus the first year of hosting.
             </p>
             <div className="text-right">
               <p className="text-base font-semibold tabular-nums text-gray-900">GHS 1,600.00</p>
-              <p className="mt-1 text-base font-semibold tabular-nums text-primary">+ USD 72.00</p>
+              <p className="mt-1 text-base font-semibold tabular-nums text-primary">+ USD 48.00</p>
             </div>
           </div>
           <div className="avoid-break grid grid-cols-[160px_1fr_180px] gap-4 py-4">
@@ -332,8 +330,8 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               <p className="mt-1 text-xs uppercase tracking-wider text-gray-500">Recurring after handover</p>
             </div>
             <p className="text-sm leading-relaxed text-gray-600">
-              Website Continuity &amp; Assurance Retainer, beginning the month after handover: monitoring,
-              security, backups, content updates, and priority support.
+              Website Care &amp; Growth Retainer, beginning the month after handover: site care, ongoing
+              development updates, brand design work, and blog publishing.
             </p>
             <p className="text-right text-base font-semibold text-gray-900">GHS 2,000.00 / mo</p>
           </div>
@@ -343,7 +341,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
           <div className="w-80">
             <div className="flex justify-between py-1.5 text-sm">
               <span className="text-gray-600">Due at project start</span>
-              <span className="font-semibold tabular-nums text-gray-900">GHS 1,600 + USD 72</span>
+              <span className="font-semibold tabular-nums text-gray-900">GHS 1,600 + USD 48</span>
             </div>
             <div className="flex justify-between py-1.5 text-sm">
               <span className="text-gray-600">Due at completion</span>
@@ -354,7 +352,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               <span className="font-bold tabular-nums text-primary">GHS 4,000.00</span>
             </div>
             <p className="mt-1 text-right text-xs text-gray-500">
-              + USD 72 domain &amp; hosting (year 1) · GHS 2,000 / month retainer after handover
+              + USD 48 hosting (year 1) · GHS 2,000 / month retainer after handover
             </p>
           </div>
         </div>
@@ -377,9 +375,9 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
             <li>Please include payment reference DEIG56 in your payment confirmation.</li>
             <li>The build fee is a fixed price for the agreed launch scope.</li>
             <li>
-              The domain deigratiamedical.com (USD 24/yr) and web hosting (USD 48/yr) are third-party
-              subscriptions billed at cost and renewed annually. Appointment booking runs through the
-              clinic&apos;s WhatsApp line.
+              The clinic provides its own domain. Web hosting (USD 48/yr) is a third-party subscription
+              billed at cost and renewed annually. Appointment booking runs through the clinic&apos;s
+              WhatsApp line.
             </li>
           </ul>
         </div>
