@@ -79,36 +79,34 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
       {/* Payment Summary: the whole picture at a glance */}
       <div className="avoid-break mb-10 rounded-lg border border-primary/20 bg-primary/5 p-6">
         <Eyebrow>Payment Summary</Eyebrow>
-        <div className="mt-3 flex items-end justify-between gap-8">
-          <div>
-            <p className="text-base font-semibold uppercase tracking-wider text-gray-500">
-              Agreed first payment
-            </p>
-            <p className="mt-1 whitespace-nowrap text-5xl font-bold leading-none tabular-nums text-gray-900">
-              GHS 2,000.00
-            </p>
-            <p className="mt-3 text-xl font-semibold tabular-nums text-primary">
-              + USD 48.00 hosting (year 1)
-            </p>
-            <p className="mt-3 text-lg leading-8 text-gray-700">
-              Two-thirds of the GHS 3,000 total, agreed with the clinic. The remaining GHS 1,000
-              balance falls due on handover.
-            </p>
-          </div>
-          <div className="w-80 shrink-0 divide-y divide-gray-200 border-l border-gray-200 pl-6 text-base">
-            <div className="flex justify-between gap-4 py-3">
-              <span className="text-gray-600">Web hosting (year 1)</span>
-              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">USD 48.00</span>
+        <p className="mt-3 text-base font-semibold uppercase tracking-wider text-gray-500">
+          Agreed first payment
+        </p>
+        <p className="mt-1 whitespace-nowrap text-5xl font-bold leading-none tabular-nums text-gray-900">
+          GHS 2,000.00
+        </p>
+        <p className="mt-3 text-xl font-semibold tabular-nums text-primary">
+          + USD 48.00 hosting (year 1)
+        </p>
+        <p className="mt-3 max-w-2xl text-lg leading-8 text-gray-700">
+          Two-thirds of the GHS 3,000 total, agreed with the clinic. The remaining GHS 1,000 balance is
+          to be paid at handover.
+        </p>
+
+        {/* Breakdown as a full-width row so the amounts can't crowd the card edge */}
+        <div className="mt-6 grid grid-cols-3 gap-6 border-t border-gray-200 pt-4">
+          {[
+            { l: "Hosting (year 1)", v: "USD 48.00" },
+            { l: "Balance at handover", v: "GHS 1,000.00" },
+            { l: "Total build fee", v: "GHS 3,000.00" },
+          ].map((row) => (
+            <div key={row.l}>
+              <p className="text-sm text-gray-600">{row.l}</p>
+              <p className="mt-1 whitespace-nowrap text-base font-semibold tabular-nums text-gray-900">
+                {row.v}
+              </p>
             </div>
-            <div className="flex justify-between gap-4 py-3">
-              <span className="text-gray-600">Balance on handover</span>
-              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">GHS 1,000.00</span>
-            </div>
-            <div className="flex justify-between gap-4 py-3">
-              <span className="text-gray-600">Total build fee</span>
-              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">GHS 3,000.00</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
