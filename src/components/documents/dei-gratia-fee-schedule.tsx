@@ -27,13 +27,14 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 /**
  * Dei Gratia Medical Services, Fee Schedule (revised after the client meeting).
- * A firm bill for the clinic's website, now delivered: a fixed GHS 3,000 build (the
- * full services site plus WhatsApp appointment booking), with GHS 2,000 taken as the
- * agreed first payment and a GHS 1,000 balance on handover. No monthly retainer; instead
- * a short, unpriced statement that beyond handover we keep an eye on uptime and help with
- * the blog, as our contribution to the clinic's growth. Managed hosting billed at cost
- * (USD 48/yr); the domain sits outside this document. Typeset a size up for an older
- * reader who may skim; the footer and verification metadata keep their smaller scale.
+ * A firm bill for the clinic's website and SEO: a fixed GHS 3,000 build (the full
+ * services site plus search-engine optimization), currently in review ahead of handover,
+ * with GHS 2,000 taken as the agreed first payment and a GHS 1,000 balance on handover.
+ * No monthly retainer; instead a short, unpriced statement that beyond handover we keep
+ * an eye on uptime and help with the blog, as our contribution to the clinic's growth.
+ * Managed hosting billed at cost (USD 48/yr); the domain sits outside this document.
+ * Typeset a size up for an older reader who may skim; the footer and verification
+ * metadata keep their smaller scale.
  */
 export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
   return (
@@ -69,7 +70,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
           <p className="text-lg text-gray-600">Wayamba Junction, Tamale-Bolgatanga Road, Tamale</p>
         </div>
         <div className="mt-4 rounded-lg border border-primary/10 bg-white p-5">
-          <DetailRow label="Engagement" value="Website Build + Online Appointment Booking" />
+          <DetailRow label="Engagement" value="Website Build + SEO" />
           <DetailRow label="Project Code" value="JUL2026-DEIG" />
           <DetailRow label="Billing Type" value="Fixed Build Fee" />
         </div>
@@ -94,18 +95,18 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               balance falls due on handover.
             </p>
           </div>
-          <div className="w-80 shrink-0 divide-y divide-gray-200 border-l border-gray-200 pl-6 text-lg">
-            <div className="flex justify-between py-3">
+          <div className="w-80 shrink-0 divide-y divide-gray-200 border-l border-gray-200 pl-6 text-base">
+            <div className="flex justify-between gap-4 py-3">
               <span className="text-gray-600">Web hosting (year 1)</span>
-              <span className="font-semibold tabular-nums text-gray-900">USD 48.00</span>
+              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">USD 48.00</span>
             </div>
-            <div className="flex justify-between py-3">
+            <div className="flex justify-between gap-4 py-3">
               <span className="text-gray-600">Balance on handover</span>
-              <span className="font-semibold tabular-nums text-gray-900">GHS 1,000.00</span>
+              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">GHS 1,000.00</span>
             </div>
-            <div className="flex justify-between py-3">
+            <div className="flex justify-between gap-4 py-3">
               <span className="text-gray-600">Total build fee</span>
-              <span className="font-semibold tabular-nums text-gray-900">GHS 3,000.00</span>
+              <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900">GHS 3,000.00</span>
             </div>
           </div>
         </div>
@@ -113,14 +114,14 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
 
       {/* Project Investment */}
       <div className="mb-10">
-        <Eyebrow>What Was Built</Eyebrow>
+        <Eyebrow>What&apos;s Included</Eyebrow>
         <h3 className="mt-2 text-3xl font-semibold leading-tight text-gray-900 md:text-4xl">
-          Dei Gratia Website &amp; Online Appointment Booking
+          Dei Gratia Website &amp; SEO
         </h3>
         <p className="mt-3 text-lg leading-8 text-gray-700">
-          A professional website that puts the clinic online: its services, team, and location, with a
-          tap-to-chat WhatsApp line for booking and a health blog the clinic can keep growing. Built to
-          load fast on a phone and to be found when a patient searches in Tamale.
+          A professional website that puts the clinic online (its services, team, and location) with a
+          tap-to-chat WhatsApp line for booking and a health blog the clinic can keep growing, tuned so
+          patients find Dei Gratia when they search for care in Tamale.
         </p>
 
         <table className="mt-5 w-full border-collapse text-lg">
@@ -135,8 +136,9 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
               <td className="py-4 pr-8">
                 <p className="text-xl font-semibold text-gray-900">Full Website Build</p>
                 <ul className="mt-3 space-y-2.5">
-                  <MiniBullet>Home, our story, our team, visit us, and contact, all responsive and SEO-ready</MiniBullet>
+                  <MiniBullet>Home, our story, our team, visit us, and contact, all responsive and fast on a phone</MiniBullet>
                   <MiniBullet>Full services section: maternal &amp; child health, 24/7 emergency care, laboratory, imaging, outpatient, pharmacy, screenings, and specialist services</MiniBullet>
+                  <MiniBullet>Search-engine optimization (SEO) so the clinic shows up on Google when patients search for care in Tamale</MiniBullet>
                   <MiniBullet>WhatsApp appointment booking that opens a ready-to-send chat to the clinic</MiniBullet>
                   <MiniBullet>Health blog for articles, notices, and announcements</MiniBullet>
                   <MiniBullet>Map and directions, OPD hours, emergency line, and NHIS-accepted messaging</MiniBullet>
@@ -166,8 +168,8 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
       <div className="avoid-break mb-10 rounded-lg border border-gray-200 bg-white p-6">
         <Eyebrow>Delivery &amp; Handover</Eyebrow>
         <p className="mt-3 text-lg leading-8 text-gray-700">
-          The site was delivered as one coordinated cycle, from build through to handover, so the clinic
-          received a finished, tested website ready to go live.
+          The site is built and now in review with the clinic. Delivery runs as one coordinated cycle,
+          from build and testing through to deployment and handover.
         </p>
         <div className="mt-5 flex border-t-2 border-gray-900">
           {["Build", "Testing", "Deployment", "Handover"].map((item, i) => (
