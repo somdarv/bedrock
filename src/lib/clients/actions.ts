@@ -51,6 +51,52 @@ export async function sendClientDocument(
   }
 }
 
+export interface AddContactInput {
+  name: string;
+  whatsapp: string;
+  phone: string | null;
+  email: string | null;
+}
+
+/**
+ * Add a single contact to an existing client from the client page. The new contact receives their
+ * own welcome; existing contacts are untouched. Direct fetch (like sendClientDocument) so it works
+ * against the live API with the forwarded bearer token.
+ */
+export async function addClientContact(
+  clientId: string,
+  input: AddContactInput,
+): Promise<ClientFormState & { name?: string }> {
+  const token = (await cookies()).get("bedrock_token")?.value;
+  try {
+    const res = await fetch(`${BASE_URL}/api/admin/clients/${clientId}/contacts`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      let message = "Could not add the contact.";
+      try {
+        const body = (await res.json()) as { message?: string };
+        if (body.message) message = body.message;
+      } catch {
+        // keep the generic message
+      }
+      return { error: message };
+    }
+    const body = (await res.json().catch(() => ({}))) as { name?: string };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { ok: true, name: body.name };
+  } catch {
+    return { error: "Could not reach the server." };
+  }
+}
+
 export async function createClient(input: ClientInput): Promise<ClientFormState> {
   try {
     await api.clients.create(input);

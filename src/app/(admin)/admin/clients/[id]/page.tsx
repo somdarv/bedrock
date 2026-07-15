@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/ui/back-button";
+import { AddContactButton } from "@/components/admin/add-contact-button";
 import { NewPackageButton } from "@/components/admin/new-package-button";
 import { SendDocumentButton } from "@/components/admin/send-document-button";
 import { EmptyState } from "@/components/ui/states";
@@ -42,9 +43,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">
-          {client.type === "organisation" ? "Contacts" : "Contact"}
-        </h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {client.type === "organisation" ? "Contacts" : "Contact"}
+          </h2>
+          <AddContactButton clientId={client.id} />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {client.contacts.map((ct) => (
             <div key={ct.id} className="rounded-lg border bg-surface p-5">

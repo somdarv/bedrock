@@ -83,7 +83,7 @@ export function DeiGratiaFeeSchedule({ record }: { record: DocumentRecord }) {
             <p className="text-base font-semibold uppercase tracking-wider text-gray-500">
               Agreed first payment
             </p>
-            <p className="mt-1 text-6xl font-bold leading-none tabular-nums text-gray-900">
+            <p className="mt-1 whitespace-nowrap text-5xl font-bold leading-none tabular-nums text-gray-900">
               GHS 2,000.00
             </p>
             <p className="mt-3 text-xl font-semibold tabular-nums text-primary">
