@@ -5,6 +5,8 @@ import type {
   ClientActivity,
   ClientAsset,
   HostingServer,
+  InfraCharge,
+  InfraChargesOutstanding,
   InfrastructureOverview,
   ReminderSettings,
   ServerMetrics,
@@ -160,6 +162,25 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    addMilestone: (packageId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/milestones`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateMilestone: (packageId, milestoneId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/milestones/${milestoneId}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeMilestone: (packageId, milestoneId) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/milestones/${milestoneId}`, {
+        method: "DELETE",
+      }),
+    payMilestone: (packageId, milestoneId, method) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/milestones/${milestoneId}/pay`, {
+        method: "POST",
+        body: JSON.stringify({ method }),
+      }),
   },
   infrastructure: {
     listServers: async (clientId) => {
@@ -200,6 +221,27 @@ export const httpApi: BedrockApi = {
     syncAsset: (id) => request<ClientAsset>(`/api/admin/assets/${id}/sync`, { method: "POST" }),
     syncAll: () =>
       request<InfrastructureOverview>(`/api/admin/infrastructure/sync`, { method: "POST" }),
+    listCharges: async (clientId) => {
+      const res = await request<{ charges: InfraCharge[] }>(
+        `/api/admin/clients/${clientId}/infra-charges`,
+      );
+      return res.charges;
+    },
+    createCharge: (clientId, input) =>
+      request<InfraCharge>(`/api/admin/clients/${clientId}/infra-charges`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateCharge: (id, input) =>
+      request<InfraCharge>(`/api/admin/infra-charges/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeCharge: (id) => request<void>(`/api/admin/infra-charges/${id}`, { method: "DELETE" }),
+    payCharge: (id) =>
+      request<InfraCharge>(`/api/admin/infra-charges/${id}/pay`, { method: "POST" }),
+    chargesOutstanding: () =>
+      request<InfraChargesOutstanding>(`/api/admin/infra-charges/outstanding`),
   },
   settings: {
     getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),

@@ -47,7 +47,14 @@ export type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
 
 export type PaymentStatus = "pending" | "success" | "failed";
 
-export type PaymentKind = "deposit" | "final" | "full";
+export type PaymentKind = "deposit" | "final" | "full" | "progress";
+
+/** How a package's value is delivered/gated. gated_files = graphic design (download gate);
+ * milestones = web/systems (handover gate). See docs/RECEIVABLES-MILESTONES.md. */
+export type DeliveryMode = "gated_files" | "milestones";
+
+export type MilestoneKind = "deposit" | "progress" | "final";
+export type MilestoneStatus = "pending" | "paid";
 
 export type ClientType = "organisation" | "individual";
 
@@ -135,9 +142,29 @@ export interface LineItemInput {
   unitPrice: number;
 }
 
+/** One step in a package's payment schedule (the plan for how money comes in). */
+export interface Milestone {
+  id: string;
+  position: number;
+  label: string;
+  amount: number;
+  kind: MilestoneKind;
+  status: MilestoneStatus;
+  paidAt: string | null;
+}
+
+export interface MilestoneInput {
+  label: string;
+  amount: number;
+  kind: MilestoneKind;
+  position?: number;
+}
+
 export interface WorkPackageInput {
   title: string;
   pricingMode: PricingMode;
+  /** Optional on update; when omitted the backend preserves the current mode. */
+  deliveryMode?: DeliveryMode;
   /** Required when pricingMode === "fixed"; ignored otherwise. */
   totalOverride: number | null;
   estimatedDeliveryDate: string | null;
@@ -145,6 +172,8 @@ export interface WorkPackageInput {
 
 export interface Payment {
   id: string;
+  /** The milestone this payment settled, or null for ad-hoc/legacy payments. */
+  milestoneId: string | null;
   amount: number;
   kind: PaymentKind;
   status: PaymentStatus;
@@ -184,10 +213,12 @@ export interface WorkPackage {
   status: WorkPackageStatus;
   publicSlug: string;
   pricingMode: PricingMode;
+  deliveryMode: DeliveryMode;
   /** Set only when pricingMode === "fixed". */
   totalOverride: number | null;
   estimatedDeliveryDate: string | null;
   lineItems: LineItem[];
+  milestones: Milestone[];
   payments: Payment[];
   deliverables: Deliverable[];
   activity: ActivityEntry[];
@@ -375,4 +406,41 @@ export interface AssetOverviewRow extends ClientAsset {
 export interface InfrastructureOverview {
   attention: AssetOverviewRow[];
   all: AssetOverviewRow[];
+}
+
+/* ------------------------------------------------------------ infrastructure charges
+ * Hosting / domain / other fees billed SEPARATELY from project work (their own
+ * Receivables bucket). Mirrors the Laravel model InfraCharge.
+ */
+
+export type InfraChargeStatus = "pending" | "paid";
+
+export interface InfraCharge {
+  id: string;
+  clientId: string;
+  /** Optional link to the monitored asset this fee renews (null = general infra fee). */
+  clientAssetId: string | null;
+  description: string;
+  amount: number;
+  dueDate: string | null;
+  status: InfraChargeStatus;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface InfraChargeInput {
+  clientAssetId: string | null;
+  description: string;
+  amount: number;
+  dueDate: string | null;
+}
+
+/** A pending charge joined with its client's name, for the cross-client dashboard bucket. */
+export interface InfraChargeRow extends InfraCharge {
+  clientName: string | null;
+}
+
+export interface InfraChargesOutstanding {
+  total: number;
+  items: InfraChargeRow[];
 }

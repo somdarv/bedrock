@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { DeliverablesSection } from "@/components/admin/deliverables-section";
+import { MilestonesSection } from "@/components/admin/milestones-section";
 import { PaymentsSection } from "@/components/admin/payments-section";
 import { LineItemModal } from "@/components/admin/line-item-modal";
 import { PackageFormModal } from "@/components/admin/package-form-modal";
@@ -458,6 +459,9 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           </dl>
         </aside>
       </div>
+
+      {/* Payment schedule (milestones) */}
+      <MilestonesSection pkg={pkg} />
 
       {/* Payments & gates */}
       <PaymentsSection pkg={pkg} />

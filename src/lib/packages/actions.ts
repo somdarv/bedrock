@@ -5,8 +5,11 @@ import {
   api,
   ApiError,
   type ClientNotifyEvent,
+  type DeliveryMode,
   effectiveTotal,
   type LineItemInput,
+  type MilestoneInput,
+  type MilestoneKind,
   type PaymentKind,
   type PricingMode,
   type WorkPackageInput,
@@ -122,6 +125,24 @@ export async function setPricingMode(id: string, mode: PricingMode): Promise<Pac
     });
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not change pricing mode." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
+/** Switch a package between gated-files and milestones delivery. */
+export async function setDeliveryMode(id: string, mode: DeliveryMode): Promise<PackageFormState> {
+  try {
+    const pkg = await api.packages.get(id);
+    await api.packages.update(id, {
+      title: pkg.title,
+      pricingMode: pkg.pricingMode,
+      deliveryMode: mode,
+      totalOverride: pkg.totalOverride,
+      estimatedDeliveryDate: pkg.estimatedDeliveryDate,
+    });
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not change delivery mode." };
   }
   revalidatePackage(id);
   return { ok: true };
@@ -346,6 +367,91 @@ export async function deleteLineItem(
     await api.packages.removeLineItem(packageId, itemId);
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not delete line item." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+// ----- Milestones (payment schedule) -----
+
+export interface MilestoneFormState {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: Partial<Record<keyof MilestoneInput, string>>;
+}
+
+function parseMilestone(formData: FormData): {
+  input?: MilestoneInput;
+  fieldErrors?: MilestoneFormState["fieldErrors"];
+} {
+  const label = String(formData.get("label") ?? "").trim();
+  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const kind = String(formData.get("kind") ?? "progress") as MilestoneKind;
+
+  const fieldErrors: MilestoneFormState["fieldErrors"] = {};
+  if (!label) fieldErrors.label = "A label is required.";
+  if (!Number.isFinite(amount) || amount < 0) fieldErrors.amount = "Enter an amount of 0 or more.";
+  if (!["deposit", "progress", "final"].includes(kind)) fieldErrors.kind = "Choose a kind.";
+
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
+  return { input: { label, amount, kind } };
+}
+
+export async function addMilestone(
+  packageId: string,
+  _prev: MilestoneFormState,
+  formData: FormData,
+): Promise<MilestoneFormState> {
+  const { input, fieldErrors } = parseMilestone(formData);
+  if (!input) return { fieldErrors };
+  try {
+    await api.packages.addMilestone(packageId, input);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not add milestone." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+export async function updateMilestone(
+  packageId: string,
+  milestoneId: string,
+  _prev: MilestoneFormState,
+  formData: FormData,
+): Promise<MilestoneFormState> {
+  const { input, fieldErrors } = parseMilestone(formData);
+  if (!input) return { fieldErrors };
+  try {
+    await api.packages.updateMilestone(packageId, milestoneId, input);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not update milestone." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+export async function deleteMilestone(
+  packageId: string,
+  milestoneId: string,
+): Promise<ActionState> {
+  try {
+    await api.packages.removeMilestone(packageId, milestoneId);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not remove milestone." };
+  }
+  revalidatePackage(packageId);
+  return { ok: true };
+}
+
+export async function payMilestone(
+  packageId: string,
+  milestoneId: string,
+  method: string | null,
+): Promise<ActionState> {
+  try {
+    await api.packages.payMilestone(packageId, milestoneId, method);
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not record milestone payment." };
   }
   revalidatePackage(packageId);
   return { ok: true };

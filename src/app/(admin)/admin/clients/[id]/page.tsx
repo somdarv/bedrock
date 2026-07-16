@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/ui/back-button";
 import { AddContactButton } from "@/components/admin/add-contact-button";
+import { InfraChargesSection } from "@/components/admin/infra-charges-section";
 import { NewPackageButton } from "@/components/admin/new-package-button";
 import { SendDocumentButton } from "@/components/admin/send-document-button";
 import { EmptyState } from "@/components/ui/states";
@@ -21,6 +22,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   });
   const packages = await api.packages.list({ clientId: id });
   const assets = await api.infrastructure.listAssets(id).catch(() => []);
+  const charges = await api.infrastructure.listCharges(id).catch(() => []);
   const activity = await api.clients.activity(id).catch(() => ({ messages: [], documents: [] }));
 
   return (
@@ -186,6 +188,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </Table>
         )}
       </div>
+
+      <InfraChargesSection clientId={client.id} charges={charges} />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Activity</h2>

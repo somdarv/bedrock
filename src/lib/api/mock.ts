@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type LineItem, type Payment, type ReminderRule, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -10,6 +10,8 @@ import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
  */
 
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+
+const infraCharges: InfraCharge[] = [];
 
 const clients: Client[] = [
   {
@@ -56,15 +58,18 @@ const packages: WorkPackage[] = [
     status: "in_progress",
     publicSlug: "8f1c2a90-3b6e-4a2d-9c11-7e5d0a2b4c6f",
     pricingMode: "itemized",
+    deliveryMode: "gated_files",
     totalOverride: null,
     estimatedDeliveryDate: "2026-06-28",
     lineItems: [
       { id: "li_1", description: "Logo design", quantity: 1, unitPrice: 1200, done: true },
       { id: "li_2", description: "Business card", quantity: 1, unitPrice: 400, done: false },
     ],
+    milestones: [],
     payments: [
       {
         id: "pm_1",
+        milestoneId: null,
         amount: 640,
         kind: "deposit",
         status: "success",
@@ -263,9 +268,11 @@ export const mockApi: BedrockApi = {
         status: "draft",
         publicSlug: crypto.randomUUID(),
         pricingMode: input.pricingMode,
+        deliveryMode: "gated_files",
         totalOverride: input.pricingMode === "fixed" ? input.totalOverride : null,
         estimatedDeliveryDate: input.estimatedDeliveryDate,
         lineItems: [],
+        milestones: [],
         payments: [],
         deliverables: [],
         activity: [activity],
@@ -282,6 +289,7 @@ export const mockApi: BedrockApi = {
       );
       pkg.title = input.title;
       pkg.pricingMode = input.pricingMode;
+      if (input.deliveryMode) pkg.deliveryMode = input.deliveryMode;
       pkg.totalOverride = input.pricingMode === "fixed" ? input.totalOverride : null;
       pkg.estimatedDeliveryDate = input.estimatedDeliveryDate;
       return pkg;
@@ -453,6 +461,7 @@ export const mockApi: BedrockApi = {
       );
       const payment: Payment = {
         id: `pm_${crypto.randomUUID().slice(0, 8)}`,
+        milestoneId: null,
         amount: input.amount,
         kind: input.kind,
         status: "success",
@@ -475,6 +484,92 @@ export const mockApi: BedrockApi = {
         logActivity(pkg, "payment_complete", "Balance cleared — downloads unlocked, receipt sent.");
       }
 
+      return pkg;
+    },
+    async addMilestone(packageId, input) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const milestone: Milestone = {
+        id: `ms_${crypto.randomUUID().slice(0, 8)}`,
+        position:
+          input.position ??
+          (pkg.milestones.reduce((max, m) => Math.max(max, m.position), -1) + 1),
+        label: input.label,
+        amount: input.amount,
+        kind: input.kind,
+        status: "pending",
+        paidAt: null,
+      };
+      pkg.milestones.push(milestone);
+      logActivity(pkg, "milestone_added", `Milestone "${input.label}" (${formatCedis(input.amount)}) added.`);
+      return pkg;
+    },
+    async updateMilestone(packageId, milestoneId, input) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const milestone = found(
+        pkg.milestones.find((m) => m.id === milestoneId),
+        "Milestone",
+      );
+      milestone.label = input.label;
+      milestone.amount = input.amount;
+      milestone.kind = input.kind;
+      if (input.position !== undefined) milestone.position = input.position;
+      return pkg;
+    },
+    async removeMilestone(packageId, milestoneId) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const idx = pkg.milestones.findIndex((m) => m.id === milestoneId);
+      if (idx === -1) throw new ApiError(404, "Milestone not found");
+      pkg.milestones.splice(idx, 1);
+      return pkg;
+    },
+    async payMilestone(packageId, milestoneId, method) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      const milestone = found(
+        pkg.milestones.find((m) => m.id === milestoneId),
+        "Milestone",
+      );
+      if (milestone.status === "paid") throw new ApiError(409, "That milestone is already paid.");
+
+      pkg.payments.push({
+        id: `pm_${crypto.randomUUID().slice(0, 8)}`,
+        milestoneId: milestone.id,
+        amount: milestone.amount,
+        kind: milestone.kind,
+        status: "success",
+        paystackReference: `ref_${crypto.randomUUID().slice(0, 10)}`,
+        method,
+        paidAt: new Date().toISOString(),
+      });
+      milestone.status = "paid";
+      milestone.paidAt = new Date().toISOString();
+      logActivity(pkg, "milestone_paid", `Milestone "${milestone.label}" paid (${formatCedis(milestone.amount)}).`);
+
+      // Start gate: a deposit payment opens work.
+      if (pkg.status === "sent" || pkg.status === "awaiting_deposit") {
+        pkg.status = "in_progress";
+        logActivity(pkg, "work_started", "Deposit confirmed — work started.");
+      }
+      // Download gate: a zero balance unlocks the clean originals.
+      if (balance(pkg) <= 0) {
+        pkg.deliverables.forEach((d) => (d.locked = false));
+        logActivity(pkg, "payment_complete", "Balance cleared — downloads unlocked, receipt sent.");
+      }
       return pkg;
     },
   },
@@ -670,6 +765,64 @@ export const mockApi: BedrockApi = {
         attention: rows.filter((r) => ["down", "critical", "warn"].includes(r.status)),
         all: rows,
       };
+    },
+    async listCharges(clientId) {
+      await delay();
+      return infraCharges
+        .filter((c) => c.clientId === clientId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    async createCharge(clientId, input) {
+      await delay();
+      const charge: InfraCharge = {
+        id: `ic_${crypto.randomUUID().slice(0, 8)}`,
+        clientId,
+        clientAssetId: input.clientAssetId,
+        description: input.description,
+        amount: input.amount,
+        dueDate: input.dueDate,
+        status: "pending",
+        paidAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      infraCharges.push(charge);
+      return charge;
+    },
+    async updateCharge(id, input) {
+      await delay();
+      const charge = found(
+        infraCharges.find((c) => c.id === id),
+        "Charge",
+      );
+      charge.clientAssetId = input.clientAssetId;
+      charge.description = input.description;
+      charge.amount = input.amount;
+      charge.dueDate = input.dueDate;
+      return charge;
+    },
+    async removeCharge(id) {
+      await delay();
+      const idx = infraCharges.findIndex((c) => c.id === id);
+      if (idx === -1) throw new ApiError(404, "Charge not found");
+      infraCharges.splice(idx, 1);
+    },
+    async payCharge(id) {
+      await delay();
+      const charge = found(
+        infraCharges.find((c) => c.id === id),
+        "Charge",
+      );
+      charge.status = "paid";
+      charge.paidAt = new Date().toISOString();
+      return charge;
+    },
+    async chargesOutstanding() {
+      await delay();
+      const items = infraCharges
+        .filter((c) => c.status === "pending")
+        .map((c) => ({ ...c, clientName: clients.find((cl) => cl.id === c.clientId)?.name ?? null }))
+        .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+      return { total: items.reduce((s, c) => s + c.amount, 0), items };
     },
   },
   settings: {

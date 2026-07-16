@@ -33,6 +33,13 @@ const PackagesIcon = ({ className }: IconProps) => (
     <path d="M12 11.5V21.5" />
   </svg>
 );
+const ReceivablesIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
+    <ellipse cx="12" cy="6" rx="7.5" ry="3" />
+    <path d="M4.5 6v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V6" />
+    <path d="M4.5 12v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-6" />
+  </svg>
+);
 const InfraIcon = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
     <rect x="3" y="4" width="18" height="6" rx="1.5" />
@@ -81,6 +88,7 @@ const NAV: Item[] = [
   { kind: "link", href: "/admin", label: "Dashboard", Icon: DashboardIcon },
   { kind: "link", href: "/admin/clients", label: "Clients", Icon: ClientsIcon },
   { kind: "link", href: "/admin/packages", label: "Work Packages", Icon: PackagesIcon, badge: "attention" },
+  { kind: "link", href: "/admin/receivables", label: "Receivables", Icon: ReceivablesIcon },
   { kind: "link", href: "/admin/infrastructure", label: "Infrastructure", Icon: InfraIcon, badge: "infra" },
   {
     kind: "group",

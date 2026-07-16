@@ -8,8 +8,12 @@ import type {
   ClientNotifyEvent,
   HostingServer,
   HostingServerInput,
+  InfraCharge,
+  InfraChargeInput,
+  InfraChargesOutstanding,
   InfrastructureOverview,
   LineItemInput,
+  MilestoneInput,
   PaymentInput,
   ReminderRuleInput,
   ReminderSettings,
@@ -73,6 +77,12 @@ export interface BedrockApi {
      * driven by the verified Paystack webhook; admin entry covers offline payments.
      */
     recordPayment(packageId: string, input: PaymentInput): Promise<WorkPackage>;
+    /** Add a milestone (a step in the package's payment schedule). */
+    addMilestone(packageId: string, input: MilestoneInput): Promise<WorkPackage>;
+    updateMilestone(packageId: string, milestoneId: string, input: MilestoneInput): Promise<WorkPackage>;
+    removeMilestone(packageId: string, milestoneId: string): Promise<WorkPackage>;
+    /** Record a payment that settles a milestone, mark it paid, then run the gates. */
+    payMilestone(packageId: string, milestoneId: string, method: string | null): Promise<WorkPackage>;
   };
   infrastructure: {
     /** Hosting servers we monitor; optionally scoped to one client (null = Sahara's own). */
@@ -95,6 +105,15 @@ export interface BedrockApi {
     syncAsset(id: string): Promise<ClientAsset>;
     /** Re-check every monitored asset and return the refreshed overview. */
     syncAll(): Promise<InfrastructureOverview>;
+    /** A client's infrastructure charges (hosting/domain/other fees). */
+    listCharges(clientId: string): Promise<InfraCharge[]>;
+    createCharge(clientId: string, input: InfraChargeInput): Promise<InfraCharge>;
+    updateCharge(id: string, input: InfraChargeInput): Promise<InfraCharge>;
+    removeCharge(id: string): Promise<void>;
+    /** Mark an infrastructure charge settled. */
+    payCharge(id: string): Promise<InfraCharge>;
+    /** Cross-client outstanding infrastructure charges (total + items) for the dashboard. */
+    chargesOutstanding(): Promise<InfraChargesOutstanding>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

@@ -6,6 +6,7 @@ import {
   ApiError,
   type ClientAssetInput,
   type HostingServerInput,
+  type InfraChargeInput,
   type TestServerInput,
   type TestServerResult,
 } from "@/lib/api";
@@ -120,5 +121,98 @@ export async function deleteAsset(id: string): Promise<InfraActionState> {
     return fail(e, "Could not remove the asset.");
   }
   revalidatePath("/admin/infrastructure");
+  return { ok: true };
+}
+
+/* ------------------------------------------------- infrastructure charges */
+
+export interface InfraChargeFormState {
+  ok?: boolean;
+  error?: string;
+  fieldErrors?: { description?: string; amount?: string; dueDate?: string };
+}
+
+function revalidateBilling(clientId?: string) {
+  if (clientId) revalidatePath(`/admin/clients/${clientId}`);
+  revalidatePath("/admin/clients", "layout");
+  revalidatePath("/admin/receivables");
+  revalidatePath("/admin/infrastructure");
+}
+
+function parseCharge(formData: FormData): {
+  input?: InfraChargeInput;
+  fieldErrors?: InfraChargeFormState["fieldErrors"];
+} {
+  const description = String(formData.get("description") ?? "").trim();
+  const amount = Number(String(formData.get("amount") ?? "").trim());
+  const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const clientAssetId = String(formData.get("clientAssetId") ?? "").trim();
+
+  const fieldErrors: InfraChargeFormState["fieldErrors"] = {};
+  if (!description) fieldErrors.description = "A description is required.";
+  if (!Number.isFinite(amount) || amount < 0) fieldErrors.amount = "Enter an amount of 0 or more.";
+
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
+  return {
+    input: { description, amount, dueDate: dueDate || null, clientAssetId: clientAssetId || null },
+  };
+}
+
+export async function addInfraCharge(
+  clientId: string,
+  _prev: InfraChargeFormState,
+  formData: FormData,
+): Promise<InfraChargeFormState> {
+  const { input, fieldErrors } = parseCharge(formData);
+  if (!input) return { fieldErrors };
+  try {
+    await api.infrastructure.createCharge(clientId, input);
+  } catch (e) {
+    return fail(e, "Could not add the charge.");
+  }
+  revalidateBilling(clientId);
+  return { ok: true };
+}
+
+export async function updateInfraCharge(
+  chargeId: string,
+  clientId: string,
+  _prev: InfraChargeFormState,
+  formData: FormData,
+): Promise<InfraChargeFormState> {
+  const { input, fieldErrors } = parseCharge(formData);
+  if (!input) return { fieldErrors };
+  try {
+    await api.infrastructure.updateCharge(chargeId, input);
+  } catch (e) {
+    return fail(e, "Could not update the charge.");
+  }
+  revalidateBilling(clientId);
+  return { ok: true };
+}
+
+export async function deleteInfraCharge(
+  chargeId: string,
+  clientId: string,
+): Promise<InfraActionState> {
+  try {
+    await api.infrastructure.removeCharge(chargeId);
+  } catch (e) {
+    return fail(e, "Could not remove the charge.");
+  }
+  revalidateBilling(clientId);
+  return { ok: true };
+}
+
+export async function payInfraCharge(
+  chargeId: string,
+  clientId: string,
+): Promise<InfraActionState> {
+  try {
+    await api.infrastructure.payCharge(chargeId);
+  } catch (e) {
+    return fail(e, "Could not mark the charge paid.");
+  }
+  revalidateBilling(clientId);
   return { ok: true };
 }
