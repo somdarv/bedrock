@@ -7,8 +7,21 @@ import { formatCedis } from "@/lib/utils";
 
 export const metadata = { title: "Your project" };
 
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/**
+ * The portal slug is a UUID. Tolerate a junk prefix on the incoming path — e.g. a WhatsApp
+ * button that renders "/p/{{1}}<uuid>" from a mis-authored dynamic-URL template — by pulling
+ * the embedded UUID out. A clean slug passes straight through.
+ */
+function extractSlug(raw: string): string {
+  const match = raw.match(UUID_RE);
+  return match ? match[0] : raw;
+}
+
 export default async function ClientPortalPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = extractSlug(rawSlug);
 
   const pkg = await api.packages.getBySlug(slug).catch((e) => {
     if (e instanceof ApiError && e.status === 404) notFound();
