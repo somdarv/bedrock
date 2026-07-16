@@ -40,9 +40,11 @@ export default async function ReceivablesPage() {
   const depositTotal = awaitingDeposit.reduce((s, p) => s + pendingDeposit(p), 0);
   const underwayTotal = underway.reduce((s, p) => s + owed(p), 0);
   const finalTotal = awaitingFinal.reduce((s, p) => s + owed(p), 0);
-  // Committed = everything a client has agreed to but not yet fully paid. Deposit + underway
-  // + final are mutually exclusive by status, so they add up cleanly.
-  const committedTotal = depositTotal + underwayTotal + finalTotal;
+  // Total to come in = every unpaid balance across accepted + live jobs (the full project sums
+  // still owed). The "Awaiting deposit" tile is the collect-now slice within this, so the total
+  // is usually larger than it: a deposit-stage job still owes its post-deposit balance too.
+  const committedTotal =
+    awaitingDeposit.reduce((s, p) => s + owed(p), 0) + underwayTotal + finalTotal;
   // Proposals sent but not yet accepted — potential, deliberately kept out of the committed total.
   const proposalTotal = proposals.reduce((s, p) => s + effectiveTotal(p), 0);
 
@@ -50,7 +52,7 @@ export default async function ReceivablesPage() {
     { label: "Awaiting deposit", value: formatCedis(depositTotal), hint: "accepted, not started" },
     { label: "Work underway", value: formatCedis(underwayTotal), hint: "in progress + review" },
     { label: "Awaiting final payment", value: formatCedis(finalTotal), hint: "work done, tail unpaid" },
-    { label: "Total to come in", value: formatCedis(committedTotal), hint: "committed receivables" },
+    { label: "Total to come in", value: formatCedis(committedTotal), hint: "all outstanding, accepted + live" },
   ];
 
   return (

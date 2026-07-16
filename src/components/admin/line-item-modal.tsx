@@ -83,7 +83,7 @@ export function LineItemModal({ open, onClose, packageId, item, fixed = false, o
                   required
                 />
               </Field>
-              <Field label="Unit price (GHS)" htmlFor="unitPrice" required error={state.fieldErrors?.unitPrice}>
+              <Field label="Unit price (₵)" htmlFor="unitPrice" required error={state.fieldErrors?.unitPrice}>
                 <Input
                   id="unitPrice"
                   name="unitPrice"

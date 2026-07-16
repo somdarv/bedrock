@@ -103,7 +103,7 @@ export function DeliverablesSection({ pkg }: { pkg: WorkPackage }) {
 
       <p className="mb-3 text-sm text-muted-foreground">
         Originals are watermarked into previews automatically. Clean files stay locked until the
-        balance reaches GHS&nbsp;0.
+        balance reaches ₵0.
       </p>
 
       {pkg.deliverables.length === 0 ? (

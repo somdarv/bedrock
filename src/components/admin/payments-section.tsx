@@ -197,7 +197,7 @@ function RecordPaymentModal({
       description="Logs a confirmed payment and runs the two-gate logic (start / download)."
     >
       <form action={formAction} className="space-y-4">
-        <Field label="Amount (GHS)" htmlFor="amount" required error={state.fieldErrors?.amount}>
+        <Field label="Amount (₵)" htmlFor="amount" required error={state.fieldErrors?.amount}>
           <Input
             id="amount"
             name="amount"

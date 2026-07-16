@@ -71,7 +71,7 @@ export function PortalPreviews({
               {d.archived ? (
                 <span className="shrink-0 text-xs text-muted-foreground">Archived</span>
               ) : d.locked ? (
-                <span className="shrink-0 text-xs text-muted-foreground">Unlocks at GHS 0</span>
+                <span className="shrink-0 text-xs text-muted-foreground">Unlocks at ₵0</span>
               ) : (
                 <a
                   href={`${apiBase}/api/p/${slug}/deliverables/${d.id}/download`}

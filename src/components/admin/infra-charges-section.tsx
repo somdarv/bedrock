@@ -225,7 +225,7 @@ function ChargeModal({
             required
           />
         </Field>
-        <Field label="Amount (GHS)" htmlFor="amount" required error={state.fieldErrors?.amount}>
+        <Field label="Amount (₵)" htmlFor="amount" required error={state.fieldErrors?.amount}>
           <Input
             id="amount"
             name="amount"

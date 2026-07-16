@@ -107,7 +107,7 @@ export function PackageFormModal({ open, onClose, clients, lockedClient, pkg, on
 
         {pricingMode === "fixed" && (
           <Field
-            label="Fixed total (GHS)"
+            label="Fixed total (₵)"
             htmlFor="totalOverride"
             required
             error={state.fieldErrors?.totalOverride}

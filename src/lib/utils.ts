@@ -7,13 +7,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format an amount of Ghana cedis for display, e.g. "GHS 1,234.56". */
+/** Format an amount of Ghana cedis for display, e.g. "₵1,234.56". */
 export function formatCedis(amount: number) {
   const value = new Intl.NumberFormat("en-GH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
-  return `GHS ${value}`;
+  return `₵${value}`;
 }
 
 /**

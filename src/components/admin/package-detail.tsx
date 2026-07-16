@@ -585,7 +585,7 @@ function FixedTotalForm({ packageId, current }: { packageId: string; current: nu
     >
       <div className="flex-1">
         <label htmlFor="fixed-total" className="block text-sm font-medium">
-          Fixed total (GHS)
+          Fixed total (₵)
         </label>
         <Input
           id="fixed-total"

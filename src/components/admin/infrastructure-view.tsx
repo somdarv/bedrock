@@ -561,7 +561,7 @@ function AssetModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field
-            label="Renewal fee (GHS)"
+            label="Renewal fee (₵)"
             hint="Set to auto-bill this on renewal. Blank = no auto-charge."
           >
             <Input
