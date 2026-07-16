@@ -446,6 +446,8 @@ function AssetModal({
     source: "manual",
     expiryDate: null,
     renewalDate: null,
+    renewalFee: null,
+    renewalLeadDays: 30,
     recommendation: null,
     monitorEnabled: true,
   }));
@@ -553,6 +555,33 @@ function AssetModal({
               type="date"
               value={form.renewalDate ?? ""}
               onChange={(e) => set("renewalDate", e.target.value || null)}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Renewal fee (GHS)"
+            hint="Set to auto-bill this on renewal. Blank = no auto-charge."
+          >
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.renewalFee ?? ""}
+              onChange={(e) => set("renewalFee", e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="e.g. 250"
+            />
+          </Field>
+          <Field label="Bill lead time (days)" hint="Days before expiry to raise the charge.">
+            <Input
+              type="number"
+              min={0}
+              max={365}
+              value={form.renewalLeadDays ?? 30}
+              onChange={(e) =>
+                set("renewalLeadDays", e.target.value === "" ? null : Number(e.target.value))
+              }
             />
           </Field>
         </div>

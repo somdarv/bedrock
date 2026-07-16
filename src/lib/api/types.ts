@@ -335,6 +335,10 @@ export interface ClientAsset {
   status: AssetStatus;
   expiryDate: string | null;
   renewalDate: string | null;
+  /** Fee to auto-bill on renewal (null = not auto-billed). */
+  renewalFee: number | null;
+  /** How many days before expiry the renewal charge is raised. */
+  renewalLeadDays: number;
   daysUntilExpiry: number | null;
   metrics: AssetMetrics | null;
   recommendation: string | null;
@@ -352,6 +356,8 @@ export interface ClientAssetInput {
   source: AssetSource | null;
   expiryDate: string | null;
   renewalDate: string | null;
+  renewalFee: number | null;
+  renewalLeadDays: number | null;
   recommendation: string | null;
   monitorEnabled: boolean;
 }
@@ -423,6 +429,8 @@ export interface InfraCharge {
   description: string;
   amount: number;
   dueDate: string | null;
+  /** The asset expiry this charge renews (set for auto-generated recurring charges). */
+  billedForDate: string | null;
   status: InfraChargeStatus;
   paidAt: string | null;
   createdAt: string;
