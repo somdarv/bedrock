@@ -223,6 +223,8 @@ export interface WorkPackage {
   deliverables: Deliverable[];
   activity: ActivityEntry[];
   createdAt: string;
+  /** Only present on the public portal read (showBySlug): the client's outstanding infra fees. */
+  portalInfraCharges?: InfraCharge[];
 }
 
 export interface SessionUser {

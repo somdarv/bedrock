@@ -22,6 +22,10 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
   const due = Math.max(0, balance(pkg));
   const isFixed = pkg.pricingMode === "fixed";
   const settled = due <= 0;
+  const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
+  const nextDueId = milestones.find((m) => m.status === "pending")?.id ?? null;
+  const infraCharges = pkg.portalInfraCharges ?? [];
+  const infraTotal = infraCharges.reduce((s, c) => s + c.amount, 0);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -120,6 +124,40 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
         </div>
       </section>
 
+      {/* Payment schedule — the client's staged milestones (paid vs due) */}
+      {milestones.length > 0 && (
+        <section>
+          <h2 className="font-display text-lg font-semibold tracking-tight">Payment schedule</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {pkg.deliveryMode === "milestones"
+              ? "Your payments are staged. Each stage moves the project to its next phase."
+              : "How your payments are split."}
+          </p>
+          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border">
+              {milestones.map((m) => (
+                <li key={m.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="text-sm font-medium">{m.label}</span>
+                    {m.id === nextDueId && (
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-warning">
+                        Due next
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm font-medium tabular-nums">{formatCedis(m.amount)}</span>
+                    <Badge variant={m.status === "paid" ? "success" : "warning"}>
+                      {m.status === "paid" ? "Paid" : "Due"}
+                    </Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
       {/* Scope */}
       <section>
         <h2 className="font-display text-lg font-semibold tracking-tight">What&apos;s included</h2>
@@ -147,6 +185,41 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
           </div>
         </div>
       </section>
+
+      {/* Infrastructure fees — the client's outstanding hosting/domain charges */}
+      {infraCharges.length > 0 && (
+        <section>
+          <h2 className="font-display text-lg font-semibold tracking-tight">Infrastructure fees</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Hosting, domain and related fees due, separate from the project above.
+          </p>
+          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border">
+              {infraCharges.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium">{c.description}</span>
+                    {c.dueDate && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        due {new Date(c.dueDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-sm font-medium tabular-nums">
+                    {formatCedis(c.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between border-t border-border bg-muted/40 px-5 py-3.5">
+              <span className="text-sm font-medium">Infrastructure total</span>
+              <span className="font-display text-base font-semibold tabular-nums">
+                {formatCedis(infraTotal)}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Deliverables — watermarked previews; originals unlock at zero balance */}
       {pkg.deliverables.length > 0 && (
