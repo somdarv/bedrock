@@ -2,6 +2,7 @@ import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import type { ClientAsset, ClientType, InfrastructureOverview, WorkPackage } from "@/lib/api";
+import { packageDocumentRefs } from "@/lib/documents/package-refs";
 import { VERIFY_BASE_URL } from "@/lib/documents/registry";
 import { logoDataUri, registerBrandFonts } from "./brand";
 import { InfraReportDocument } from "./infra-report-document";
@@ -15,7 +16,24 @@ export async function renderPackagePdf(
 ): Promise<Buffer> {
   registerBrandFonts();
 
-  return renderToBuffer(<PackageDocument pkg={pkg} variant={variant} logo={logoDataUri()} />);
+  // Scan-to-verify stamp: the QR resolves to /verify/{reference}, which the API answers from
+  // live package data, so a doctored PDF disagrees with the page it points at.
+  const refs = packageDocumentRefs(pkg.publicSlug, variant);
+  const verifyQr = await QRCode.toDataURL(`${VERIFY_BASE_URL}/verify/${refs.reference}`, {
+    margin: 0,
+    width: 220,
+    errorCorrectionLevel: "H",
+    color: { dark: "#0a0a0a", light: "#ffffff" },
+  });
+
+  return renderToBuffer(
+    <PackageDocument
+      pkg={pkg}
+      variant={variant}
+      logo={logoDataUri()}
+      verify={{ ...refs, qr: verifyQr }}
+    />,
+  );
 }
 
 export interface StatementRenderOpts {

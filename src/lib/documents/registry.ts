@@ -47,6 +47,12 @@ export interface DocumentRecord {
   preparedAt: string | null;
   /** True once prepared/issued. */
   prepared: boolean;
+  /**
+   * Human money line for billing documents, e.g. "GHS 8,500.00 outstanding of GHS 10,000.00".
+   * Only invoices/receipts resolved from a work package carry it — it is what lets a reader
+   * catch a doctored total, so it is shown on the verification page when present.
+   */
+  amount?: string | null;
 }
 
 /**

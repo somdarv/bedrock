@@ -62,12 +62,14 @@ export default async function VerifyPage({ params }: { params: Promise<{ ref: st
               <Row label="Project" value={record.project ?? "—"} />
               <Row label="Issue Date" value={record.issueDate} />
               {record.validUntil && <Row label="Valid Until" value={record.validUntil} />}
+              {record.amount && <Row label="Amount" value={record.amount} />}
+              {record.serial && <Row label="Verification Serial" value={record.serial} />}
               <Row label="Status" value={record.status.toUpperCase()} />
             </div>
 
             <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground">
-              Verified against the SaharaBase document registry. For any questions about this document, contact
-              us at contact@saharabasetech.com.
+              Checked against SaharaBase&apos;s live records. If the details above do not match the document in
+              your hands, it has been altered — contact us at contact@saharabasetech.com.
             </p>
           </div>
         ) : (

@@ -1,5 +1,6 @@
 import { Document, Image, Link, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { balance, effectiveTotal, type Milestone, type Payment, type WorkPackage } from "@/lib/api";
+import { VERIFY_BASE_URL } from "@/lib/documents/registry";
 import { publicBaseUrl } from "@/lib/utils";
 import { LOGO_ASPECT, brand, company } from "./brand";
 
@@ -86,6 +87,26 @@ const s = StyleSheet.create({
   cellMid: { width: 128, fontSize: 9.5, color: brand.muted, paddingRight: 14 },
   thMid: { width: 128 },
 
+  // Scan-to-verify stamp. Kept deliberately compact: it sits in flow at the end of the
+  // document, and a taller block would push itself onto a page of its own on longer invoices.
+  verify: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: brand.line,
+    paddingTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+  verifyHead: { fontSize: 9, fontWeight: 600, color: brand.ink, marginBottom: 3 },
+  verifyMeta: { fontSize: 8, color: brand.muted, lineHeight: 1.5 },
+  verifyLead: { fontSize: 8, color: brand.muted, lineHeight: 1.5, maxWidth: 360, marginBottom: 5 },
+  stamp: { alignItems: "center" },
+  qrBox: { width: 50, height: 50, borderWidth: 1, borderColor: brand.line, padding: 3 },
+  qrImg: { width: 42, height: 42 },
+  scan: { marginTop: 3, fontSize: 7, fontWeight: 600, color: brand.muted, textTransform: "uppercase", letterSpacing: 0.8 },
+
   footer: {
     position: "absolute",
     bottom: 34,
@@ -121,12 +142,6 @@ function fmtDate(iso?: string | null) {
 function fmtLongDate(iso?: string | null) {
   const d = iso ? new Date(iso) : new Date();
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-}
-
-/** Invoice number derived from the package's public slug — stable, and readable aloud. */
-function invoiceNo(slug: string) {
-  const hex = slug.replace(/-/g, "").slice(0, 8).toUpperCase().padEnd(8, "0");
-  return `SB-${hex.slice(0, 4)}-${hex.slice(4)}`;
 }
 
 /** Receipt number derived from the settling payment's gateway reference (or its id). */
@@ -170,11 +185,14 @@ export function PackageDocument({
   pkg,
   variant,
   logo,
+  verify,
 }: {
   pkg: WorkPackage;
   variant: "invoice" | "receipt";
   /** SaharaBase wordmark as a data URI (from brand.logoDataUri()). */
   logo: string;
+  /** Verification identity + QR (from packageDocumentRefs, built in render.tsx). */
+  verify: { reference: string; number: string; serial: string; qr: string };
 }) {
   const isReceipt = variant === "receipt";
   const isFixed = pkg.pricingMode === "fixed";
@@ -186,8 +204,9 @@ export function PackageDocument({
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
   const nextStep = milestones.find((m) => m.status === "pending") ?? null;
 
-  const number = invoiceNo(pkg.publicSlug);
-  const base = publicBaseUrl();
+  const number = verify.number;
+  // NEXT_PUBLIC_APP_URL is not set everywhere; the verify origin is the same host and always is.
+  const base = publicBaseUrl() || VERIFY_BASE_URL;
   const portalUrl = base ? `${base}/p/${pkg.publicSlug}` : null;
   const billTo = pkg.billTo;
 
@@ -377,6 +396,33 @@ export function PackageDocument({
             ))}
           </View>
         ) : null}
+
+        {/* Scan-to-verify stamp — the QR resolves to a page built from live package data, so a
+            re-keyed or forged copy of this document contradicts what the reader sees there. */}
+        <View style={s.verify} wrap={false}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.verifyHead}>Verify this {isReceipt ? "receipt" : "invoice"}</Text>
+            <Text style={s.verifyLead}>
+              Scan the code, or enter the reference at{" "}
+              {VERIFY_BASE_URL.replace(/^https?:\/\//, "")}/verify, to confirm this document came
+              from us and still matches our records.
+            </Text>
+            <Text style={s.verifyMeta}>
+              Reference {verify.reference} · Serial {verify.serial}
+            </Text>
+            <Text style={s.verifyMeta}>
+              Issued {fmtDate(isReceipt ? lastPayment?.paidAt : pkg.createdAt)} · Generated on
+              system SAH-HUB-BILL-2026
+            </Text>
+          </View>
+          <View style={s.stamp}>
+            <View style={s.qrBox}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={verify.qr} style={s.qrImg} />
+            </View>
+            <Text style={s.scan}>Scan to verify</Text>
+          </View>
+        </View>
 
         <View style={s.footer} fixed>
           <Text>
