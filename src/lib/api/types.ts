@@ -454,3 +454,49 @@ export interface InfraChargesOutstanding {
   total: number;
   items: InfraChargeRow[];
 }
+
+/* ------------------------------------------------------------------------ vault
+ * The operator's own credential store. Zero knowledge: every shape below is opaque
+ * ciphertext produced in the browser, so nothing here is readable by the API or by
+ * anyone holding the database. The decrypted payload type lives in @/lib/vault/types.
+ * See docs/VAULT.md.
+ */
+
+/** The wrapped data key plus the parameters needed to re-derive the wrapping key. */
+export interface VaultKeyRecord {
+  kdf: "pbkdf2-sha256";
+  iterations: number;
+  salt: string;
+  wrappedKey: string;
+  wrapIv: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VaultKeyInput {
+  kdf: "pbkdf2-sha256";
+  iterations: number;
+  salt: string;
+  wrappedKey: string;
+  wrapIv: string;
+}
+
+/** An encrypted entry exactly as stored. No plaintext metadata, deliberately. */
+export interface VaultEntryRecord {
+  id: string;
+  ciphertext: string;
+  iv: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VaultEntryInput {
+  ciphertext: string;
+  iv: string;
+}
+
+/** The vault's whole server-side state. A null key means it has not been set up yet. */
+export interface VaultState {
+  key: VaultKeyRecord | null;
+  entries: VaultEntryRecord[];
+}

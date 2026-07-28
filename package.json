@@ -10,7 +10,8 @@
     "lint": "next lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:vault": "node scripts/vault-check.mjs && node scripts/totp-check.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

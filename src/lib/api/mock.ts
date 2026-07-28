@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -830,6 +830,56 @@ export const mockApi: BedrockApi = {
       return { total: items.reduce((s, c) => s + c.amount, 0), items };
     },
   },
+  /**
+   * In-memory vault. Real AES-GCM still runs in the browser against this, so the unlock,
+   * rewrap and entry flows are genuinely exercised in dev. State is per server process and
+   * dies with it, which is correct for a mock: nothing pretends to be durable storage.
+   */
+  vault: {
+    async get() {
+      await delay();
+      return { key: vaultKey, entries: [...vaultEntries] };
+    },
+    async createKey(input) {
+      await delay();
+      if (vaultKey) throw new ApiError(409, "This vault is already set up.");
+      const now = new Date().toISOString();
+      vaultKey = { ...input, createdAt: now, updatedAt: now };
+      return vaultKey;
+    },
+    async updateKey(input) {
+      await delay();
+      if (!vaultKey) throw new ApiError(404, "This vault has not been set up yet.");
+      vaultKey = { ...vaultKey, ...input, updatedAt: new Date().toISOString() };
+      return vaultKey;
+    },
+    async createEntry(input) {
+      await delay();
+      if (!vaultKey) throw new ApiError(409, "Set up the vault before adding entries.");
+      const now = new Date().toISOString();
+      const entry = { id: `ve_${crypto.randomUUID().slice(0, 8)}`, ...input, createdAt: now, updatedAt: now };
+      vaultEntries.unshift(entry);
+      return entry;
+    },
+    async updateEntry(id, input) {
+      await delay();
+      const entry = vaultEntries.find((e) => e.id === id);
+      if (!entry) throw new ApiError(404, "That entry no longer exists.");
+      Object.assign(entry, input, { updatedAt: new Date().toISOString() });
+      return entry;
+    },
+    async removeEntry(id) {
+      await delay();
+      const i = vaultEntries.findIndex((e) => e.id === id);
+      if (i >= 0) vaultEntries.splice(i, 1);
+    },
+    async destroy() {
+      await delay();
+      // The mock cannot check an account password, so it accepts and wipes.
+      vaultKey = null;
+      vaultEntries.length = 0;
+    },
+  },
   settings: {
     async getReminders() {
       await delay();
@@ -863,6 +913,9 @@ export const mockApi: BedrockApi = {
     },
   },
 };
+
+let vaultKey: VaultKeyRecord | null = null;
+const vaultEntries: VaultEntryRecord[] = [];
 
 let reminderRules: ReminderRule[] = [
   { id: "rr_seed1", dayOfMonth: 25, event: "payment_reminder", enabled: true },

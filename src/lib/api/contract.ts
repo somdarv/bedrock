@@ -22,6 +22,11 @@ import type {
   TestServerInput,
   TestServerResult,
   TrackResult,
+  VaultEntryInput,
+  VaultEntryRecord,
+  VaultKeyInput,
+  VaultKeyRecord,
+  VaultState,
   WorkPackage,
   WorkPackageInput,
   WorkPackageStatus,
@@ -122,6 +127,24 @@ export interface BedrockApi {
     saveReminders(rules: ReminderRuleInput[]): Promise<ReminderSettings>;
     /** TEST-PHASE: delete all test data (keeps the admin account). */
     wipeTestData(): Promise<{ message: string }>;
+  };
+  /**
+   * The operator's credential vault. Every method moves ciphertext the browser produced and
+   * only the browser can open, so this layer never sees a password. Scoped server-side to the
+   * authenticated user. See docs/VAULT.md.
+   */
+  vault: {
+    /** The wrapped key (null before setup) and every encrypted entry. */
+    get(): Promise<VaultState>;
+    /** First-time setup. Rejected if a key already exists, which would orphan every entry. */
+    createKey(input: VaultKeyInput): Promise<VaultKeyRecord>;
+    /** Passphrase change: the same data key rewrapped. Entries are not re-encrypted. */
+    updateKey(input: VaultKeyInput): Promise<VaultKeyRecord>;
+    createEntry(input: VaultEntryInput): Promise<VaultEntryRecord>;
+    updateEntry(id: string, input: VaultEntryInput): Promise<VaultEntryRecord>;
+    removeEntry(id: string): Promise<void>;
+    /** Destroy the key and every entry. The only exit from a forgotten passphrase. */
+    destroy(password: string): Promise<void>;
   };
   track: {
     /** Issue a one-time code to the phone (if it's on file). Always resolves generically. */

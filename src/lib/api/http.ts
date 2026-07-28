@@ -13,6 +13,9 @@ import type {
   SessionUser,
   TestServerResult,
   TrackResult,
+  VaultEntryRecord,
+  VaultKeyRecord,
+  VaultState,
   WorkPackage,
 } from "./types";
 
@@ -242,6 +245,35 @@ export const httpApi: BedrockApi = {
       request<InfraCharge>(`/api/admin/infra-charges/${id}/pay`, { method: "POST" }),
     chargesOutstanding: () =>
       request<InfraChargesOutstanding>(`/api/admin/infra-charges/outstanding`),
+  },
+  vault: {
+    get: () => request<VaultState>(`/api/admin/vault`),
+    createKey: (input) =>
+      request<VaultKeyRecord>(`/api/admin/vault/key`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateKey: (input) =>
+      request<VaultKeyRecord>(`/api/admin/vault/key`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    createEntry: (input) =>
+      request<VaultEntryRecord>(`/api/admin/vault/entries`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateEntry: (id, input) =>
+      request<VaultEntryRecord>(`/api/admin/vault/entries/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeEntry: (id) => request<void>(`/api/admin/vault/entries/${id}`, { method: "DELETE" }),
+    destroy: (password) =>
+      request<void>(`/api/admin/vault`, {
+        method: "DELETE",
+        body: JSON.stringify({ password }),
+      }),
   },
   settings: {
     getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),

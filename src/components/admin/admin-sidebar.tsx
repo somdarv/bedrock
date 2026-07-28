@@ -54,6 +54,13 @@ const DocumentsIcon = ({ className }: IconProps) => (
     <path d="M9 13h6M9 16.5h6" />
   </svg>
 );
+const VaultIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
+    <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+    <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+    <path d="M12 14.5v2.5" />
+  </svg>
+);
 const SettingsIcon = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
     <circle cx="12" cy="12" r="3" />
@@ -103,7 +110,9 @@ const NAV: Item[] = [
   },
 ];
 
+// Operator tooling rather than client work, so it sits with Settings instead of in Workspace.
 const FOOTER: { href: string; label: string; Icon: React.FC<IconProps> }[] = [
+  { href: "/admin/vault", label: "Vault", Icon: VaultIcon },
   { href: "/admin/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
