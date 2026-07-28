@@ -219,6 +219,14 @@ export interface ActivityEntry {
   createdAt: string;
 }
 
+/** Who an invoice/receipt is addressed to — the client and their primary contact. */
+export interface BillTo {
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface WorkPackage {
   id: string;
   clientId: string;
@@ -238,6 +246,8 @@ export interface WorkPackage {
   createdAt: string;
   /** Only present on the public portal read (showBySlug): the client's outstanding infra fees. */
   portalInfraCharges?: InfraCharge[];
+  /** Only present on the public portal read (showBySlug): the bill-to block for invoices/receipts. */
+  billTo?: BillTo;
 }
 
 export interface SessionUser {

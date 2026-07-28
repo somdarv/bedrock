@@ -13,7 +13,9 @@ export async function renderPackagePdf(
   pkg: WorkPackage,
   variant: "invoice" | "receipt",
 ): Promise<Buffer> {
-  return renderToBuffer(<PackageDocument pkg={pkg} variant={variant} />);
+  registerBrandFonts();
+
+  return renderToBuffer(<PackageDocument pkg={pkg} variant={variant} logo={logoDataUri()} />);
 }
 
 export interface StatementRenderOpts {

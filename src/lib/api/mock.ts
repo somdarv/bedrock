@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type AssetOverviewRow, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -94,6 +94,19 @@ const packages: WorkPackage[] = [
 function found<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new ApiError(404, `${what} not found`);
   return value;
+}
+
+/** Bill-to block for a package's client — mirrors what the API attaches to the portal read. */
+function billToFor(clientId: string): BillTo | undefined {
+  const client = clients.find((c) => c.id === clientId);
+  if (!client) return undefined;
+  const contact = client.contacts.find((c) => c.isPrimary) ?? client.contacts[0];
+  return {
+    name: client.name,
+    contactName: contact?.name ?? null,
+    email: contact?.email ?? null,
+    phone: contact?.phone ?? contact?.whatsapp ?? null,
+  };
 }
 
 function logActivity(pkg: WorkPackage, event: string, message: string) {
@@ -246,7 +259,8 @@ export const mockApi: BedrockApi = {
         "Work package",
       );
       settleDeliverables(pkg);
-      return pkg;
+      // The portal read carries the bill-to block (invoice/receipt PDFs are built from it).
+      return { ...pkg, billTo: billToFor(pkg.clientId) };
     },
     async startPayment(slug) {
       await delay();
