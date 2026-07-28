@@ -23,7 +23,10 @@ import {
   CATEGORY_LABELS,
   displayHost,
   emptySecret,
+  isRecoverable,
   monthsSince,
+  PASSKEY_KIND_LABELS,
+  type PasskeyRecord,
   type VaultItem,
   type VaultSecret,
 } from "@/lib/vault/types";
@@ -316,6 +319,9 @@ export function VaultView({ initial }: { initial: VaultState }) {
                                 CATEGORY_LABELS[item.category]}
                             </span>
                           </span>
+                          {(item.passkeys?.length ?? 0) > 0 && (
+                            <Badge variant="info">Passkey</Badge>
+                          )}
                           {item.totpSecret && <Badge variant="info">2FA</Badge>}
                           {stale && <Badge variant="warning">{age}m</Badge>}
                         </button>
@@ -394,6 +400,11 @@ function VaultDetail({
           </h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <Badge>{CATEGORY_LABELS[item.category]}</Badge>
+            {(item.passkeys?.length ?? 0) > 0 && (
+              <Badge variant="info">
+                {item.passkeys?.length} passkey{item.passkeys?.length === 1 ? "" : "s"}
+              </Badge>
+            )}
             {item.totpSecret && <Badge variant="info">2FA</Badge>}
             {age !== null && (
               <Badge variant={age >= STALE_MONTHS ? "warning" : "default"}>
@@ -425,6 +436,12 @@ function VaultDetail({
         </div>
       )}
 
+      {(item.passkeys?.length ?? 0) > 0 && (
+        <div className="border-border mt-5 rounded-lg border p-4">
+          <Passkeys passkeys={item.passkeys ?? []} />
+        </div>
+      )}
+
       {item.backupCodes.length > 0 && (
         <div className="border-border mt-5 rounded-lg border p-4">
           <BackupCodes
@@ -442,6 +459,61 @@ function VaultDetail({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The passkeys enrolled on this account, and whether any of them survives losing its device.
+ *
+ * Nothing here is secret, so none of it hides behind a reveal: a passkey's private key never
+ * leaves its authenticator, which is exactly why this is a record rather than a copy.
+ */
+function Passkeys({ passkeys }: { passkeys: PasskeyRecord[] }) {
+  const recoverable = passkeys.filter(isRecoverable).length;
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">
+          Passkeys
+          <span className="text-muted-foreground ml-2 text-xs font-normal">
+            {passkeys.length} enrolled
+          </span>
+        </span>
+        {recoverable === 0 && <Badge variant="warning">Device bound</Badge>}
+      </div>
+
+      <ul className="mt-3 space-y-2">
+        {passkeys.map((passkey) => (
+          <li
+            key={passkey.id}
+            className="bg-muted/40 flex items-start justify-between gap-3 rounded-md px-3 py-2"
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-sm">{passkey.authenticator}</span>
+              <span className="text-muted-foreground block truncate text-xs">
+                {PASSKEY_KIND_LABELS[passkey.kind]}
+                {passkey.username && ` · ${passkey.username}`}
+                {passkey.addedAt && ` · added ${passkey.addedAt}`}
+              </span>
+              {passkey.notes && (
+                <span className="text-muted-foreground mt-0.5 block text-xs">{passkey.notes}</span>
+              )}
+            </span>
+            {!isRecoverable(passkey) && (
+              <span className="text-warning shrink-0 text-xs" title="Lost with its device">
+                Not recoverable
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <p className="text-muted-foreground mt-2 text-xs">
+        Recorded here, not stored: passkeys stay inside the device that created them, and this page
+        cannot sign in with one.
+      </p>
+    </>
   );
 }
 

@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 const TONE: Record<IssueKind, "danger" | "warning" | "info"> = {
   reused: "danger",
   weak: "danger",
+  // Being locked out of your own account is as bad as it being taken.
+  "passkey-risk": "danger",
   stale: "warning",
   "codes-low": "info",
 };

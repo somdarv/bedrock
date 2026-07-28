@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { PasswordGenerator } from "./password-generator";
+import { PasskeysField } from "./passkeys-field";
 import { isValidTotpSecret, normaliseTotpInput } from "@/lib/vault/totp";
 import { ratePassword } from "@/lib/vault/generator";
 import {
@@ -91,6 +92,15 @@ export function VaultEntryModal({
       // Drop used marks for codes that are no longer in the list, so replacing the whole set
       // after regenerating them starts clean rather than carrying stale marks forward.
       usedBackupCodes: (form.usedBackupCodes ?? []).filter((c) => backupCodes.includes(c)),
+      // Discard rows left blank rather than saving empty passkeys nobody can identify later.
+      passkeys: (form.passkeys ?? [])
+        .filter((p) => p.authenticator.trim())
+        .map((p) => ({
+          ...p,
+          authenticator: p.authenticator.trim(),
+          username: p.username.trim(),
+          notes: p.notes.trim(),
+        })),
     };
 
     const failure = await onSave(secret, entry?.id ?? null);
@@ -279,6 +289,11 @@ export function VaultEntryModal({
             </Field>
           </div>
         </div>
+
+        <PasskeysField
+          value={form.passkeys ?? []}
+          onChange={(passkeys) => set("passkeys", passkeys)}
+        />
 
         <Field label="Notes" htmlFor="ve-notes">
           <Textarea

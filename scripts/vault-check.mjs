@@ -73,6 +73,16 @@ const secret = {
   totpSecret: "JBSWY3DPEHPK3PXP",
   backupCodes: ["a1b2-c3d4", "e5f6-g7h8"],
   usedBackupCodes: ["a1b2-c3d4"],
+  passkeys: [
+    {
+      id: "pk_abc123",
+      authenticator: "iPhone 15",
+      kind: "synced",
+      username: "me@example.com",
+      addedAt: "2026-07-20",
+      notes: "iCloud Keychain",
+    },
+  ],
   notes: "line one\nline two, with a comma and an accent: café",
   category: "hosting",
   lastChangedAt: "2026-07-28",
@@ -141,6 +151,10 @@ check(
   "backup preserves 2FA seed and codes",
 );
 check(restored[0].notes === secret.notes, "backup preserves non-ASCII notes");
+check(
+  JSON.stringify(restored[0].passkeys) === JSON.stringify(secret.passkeys),
+  "backup preserves passkey records",
+);
 
 for (const [raw, label] of [
   [JSON.stringify(file), "wrong backup passphrase is refused"],
@@ -230,6 +244,75 @@ check(partly.counts["codes-low"] === 2, "audit flags the depleted sets and not t
 check(
   !partly.issues.some((i) => i.kind === "codes-low" && i.item.label === "H"),
   "audit leaves a set with plenty remaining alone",
+);
+
+/* ------------------------------------------------------------------ passkeys */
+
+const passkey = (over) => ({
+  id: `pk_${Math.random().toString(36).slice(2, 8)}`,
+  authenticator: "Device",
+  kind: "synced",
+  username: "",
+  addedAt: "2026-07-20",
+  notes: "",
+  ...over,
+});
+
+// The rule protects against lockout, so it must fire only when nothing else gets you back in.
+const lockout = auditMod.auditVault([
+  // Device-bound passkey, no codes left, no password: the severe case.
+  item({
+    label: "P1",
+    password: "",
+    passkeys: [passkey({ kind: "device-bound", authenticator: "ThinkPad" })],
+    backupCodes: [],
+    usedBackupCodes: [],
+  }),
+  // Same, but a synced passkey means a replacement device restores it.
+  item({
+    label: "P2",
+    password: "",
+    passkeys: [passkey({ kind: "synced" })],
+    backupCodes: [],
+    usedBackupCodes: [],
+  }),
+  // Device-bound, but unused backup codes are a way back in.
+  item({
+    label: "P3",
+    password: "",
+    passkeys: [passkey({ kind: "security-key", authenticator: "YubiKey" })],
+    backupCodes: ["one", "two"],
+    usedBackupCodes: [],
+  }),
+  // No passkeys at all: the rule must not apply.
+  item({ label: "P4", passkeys: [], backupCodes: [], usedBackupCodes: [] }),
+  // Mixed: one device-bound and one synced. The synced one covers it.
+  item({
+    label: "P5",
+    password: "",
+    passkeys: [passkey({ kind: "device-bound" }), passkey({ kind: "synced" })],
+    backupCodes: [],
+    usedBackupCodes: [],
+  }),
+]);
+
+const flagged = lockout.issues.filter((i) => i.kind === "passkey-risk").map((i) => i.item.label);
+check(
+  flagged.length === 1 && flagged[0] === "P1",
+  `passkey lockout risk flags only the unrecoverable entry (flagged: ${flagged.join(", ") || "none"})`,
+);
+check(
+  lockout.issues.some((i) => i.kind === "passkey-risk" && i.detail.includes("ThinkPad")),
+  "lockout detail names the device that holds the passkey",
+);
+
+// Entries written before passkeys existed have no field at all and must still audit cleanly.
+const legacy = { ...item({ label: "Old" }) };
+delete legacy.passkeys;
+const legacyHealth = auditMod.auditVault([legacy]);
+check(
+  legacyHealth.counts["passkey-risk"] === 0,
+  "an entry with no passkeys field audits without error",
 );
 
 console.log(failures === 0 ? "\nAll vault checks passed." : `\n${failures} check(s) FAILED.`);

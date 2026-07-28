@@ -83,11 +83,26 @@ The encrypted payload shape (`VaultSecret` in `src/lib/vault/types.ts`):
   "password": "…",
   "totpSecret": "JBSWY3DPEHPK3PXP",   // base32, optional
   "backupCodes": ["…", "…"],           // optional
+  "usedBackupCodes": ["…"],            // optional, ticked off as they are spent
+  "passkeys": [                        // optional, a record of enrolment, not the passkey
+    {
+      "id": "pk_a1b2c3d4",
+      "authenticator": "iPhone 15",
+      "kind": "synced",                // synced | device-bound | security-key
+      "username": "me@example.com",
+      "addedAt": "2026-07-20",
+      "notes": "iCloud Keychain"
+    }
+  ],
   "notes": "…",
   "category": "hosting",
   "lastChangedAt": "2026-07-28"        // user-owned, set on password change
 }
 ```
+
+Fields added after the first release are optional. The payload is JSON inside the ciphertext, so
+an older entry simply decrypts without them, and no migration is needed or possible (the server
+cannot read the entries to migrate them).
 
 ## 3. Data model (bedrock-api)
 
@@ -146,6 +161,27 @@ refuse the write if the tab has lost focus, which is a browser policy we cannot 
   `lastChangedAt`, encrypted export and import for offline backup.
 - **Later.** Browser extension or autofill is explicitly not planned: it would need the data key
   available outside a deliberate unlock, which is the property the whole design rests on.
+
+### On passkeys
+
+Entries can record the passkeys enrolled on an account: where each one lives, whether it is
+synced or bound to that one device, which account identifier it is registered against, and when
+it was added.
+
+**These are records, not passkeys.** A passkey's private key is generated inside its
+authenticator and, for the device-bound kinds, cannot be extracted at all. Even where a provider
+can export one, this page could not use it: the WebAuthn API is origin-bound, so
+`hub.saharabasetech.com` may only exercise passkeys belonging to `hub.saharabasetech.com`, never
+one belonging to Namecheap. Signing in elsewhere with a stored passkey requires a browser
+extension or an OS credential provider, which is out of scope for the same reason autofill is
+(§5): both need the data key available outside a deliberate unlock.
+
+So the value here is not authentication, it is the failure mode passkeys quietly introduce. A
+device-bound passkey on an account that has dropped its password is one lost laptop away from a
+permanent lockout, and nothing about the account looks wrong until that day. The `passkey-risk`
+audit rule watches exactly that: passkeys enrolled, none of them synced, and no unused backup
+codes left. A synced passkey clears the flag, because a replacement device restores it, and so do
+unused backup codes, because they are a way back in.
 
 ### On TOTP seeds living beside the password
 
@@ -212,3 +248,9 @@ is visible in the imports.
   left, or at least one used and two or fewer remaining) rather than scarcity, because a warning
   that is always on is a warning nobody reads.
 - **2026-07-28.** Phases 1 to 3 deployed to production.
+- **2026-07-28.** Passkey records added to entries, plus the `passkey-risk` audit rule. Kept
+  deliberately as an inventory: see "On passkeys" above for why a web page cannot be a passkey
+  provider for other sites. The next thing worth building here is passkey *unlock* for the vault
+  itself, via the WebAuthn PRF extension, which is same-origin and so genuinely possible: the PRF
+  output becomes a second wrapping of the existing data key, sitting alongside the passphrase one,
+  giving Touch ID or Windows Hello as an unlock path with no loss of zero knowledge.

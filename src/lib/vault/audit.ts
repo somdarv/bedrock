@@ -6,12 +6,12 @@
  */
 
 import { ratePassword } from "./generator";
-import { monthsSince, type VaultItem } from "./types";
+import { isRecoverable, monthsSince, type VaultItem } from "./types";
 
 /** A password unchanged this long gets flagged. Twelve months is a calm, defensible default. */
 export const STALE_MONTHS = 12;
 
-export type IssueKind = "reused" | "weak" | "stale" | "codes-low";
+export type IssueKind = "reused" | "weak" | "stale" | "codes-low" | "passkey-risk";
 
 export interface VaultIssue {
   kind: IssueKind;
@@ -31,6 +31,7 @@ const EMPTY_COUNTS: Record<IssueKind, number> = {
   weak: 0,
   stale: 0,
   "codes-low": 0,
+  "passkey-risk": 0,
 };
 
 export function auditVault(items: VaultItem[]): VaultHealth {
@@ -95,6 +96,24 @@ export function auditVault(items: VaultItem[]): VaultHealth {
         });
       }
     }
+
+    // The lockout passkeys quietly introduce: a device-bound passkey does not leave the hardware,
+    // so if the hardware goes and nothing else gets you in, the account is gone. A synced passkey
+    // is fine (a replacement device restores it), and so are unused backup codes.
+    const passkeys = item.passkeys ?? [];
+    if (passkeys.length > 0 && !passkeys.some(isRecoverable)) {
+      const codesLeft = item.backupCodes.length - (item.usedBackupCodes?.length ?? 0);
+      if (codesLeft <= 0) {
+        const where = passkeys.map((p) => p.authenticator).join(", ");
+        issues.push({
+          kind: "passkey-risk",
+          item,
+          detail: item.password
+            ? `Passkeys are tied to ${where} with no backup codes left. If the account stops accepting the password, losing that device locks you out.`
+            : `Passkeys are tied to ${where}, with no password and no backup codes. Losing that device locks you out for good.`,
+        });
+      }
+    }
   }
 
   const counts = { ...EMPTY_COUNTS };
@@ -110,4 +129,5 @@ export const ISSUE_LABELS: Record<IssueKind, string> = {
   weak: "Weak",
   stale: "Stale",
   "codes-low": "Backup codes low",
+  "passkey-risk": "Lockout risk",
 };
