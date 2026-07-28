@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/states";
 import { checkPassphrase, createVaultKey, unlockVault, VaultUnlockError } from "@/lib/vault/crypto";
 import { createVaultKeyAction } from "@/lib/vault/actions";
 import type { VaultKeyRecord } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, onEnter } from "@/lib/utils";
 
 const LockIcon = ({ className }: { className?: string }) => (
   <svg
@@ -62,8 +62,7 @@ export function VaultUnlock({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function attempt() {
     if (!passphrase || busy) return;
 
     setBusy(true);
@@ -89,7 +88,13 @@ export function VaultUnlock({
       title="Vault locked"
       description="Enter your master passphrase. It is checked here in your browser, never sent to the server."
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void attempt();
+        }}
+        className="space-y-4"
+      >
         <Field label="Master passphrase" htmlFor="vault-passphrase" error={error ?? undefined}>
           <Input
             id="vault-passphrase"
@@ -98,6 +103,7 @@ export function VaultUnlock({
             autoComplete="off"
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
+            onKeyDown={onEnter(attempt)}
             placeholder="Your passphrase"
           />
         </Field>
@@ -140,8 +146,7 @@ export function VaultSetup({
   const ready =
     strength.score >= 2 && passphrase === confirm && confirm.length > 0 && acknowledged && !busy;
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function attempt() {
     if (!ready) return;
 
     setBusy(true);
@@ -168,7 +173,13 @@ export function VaultSetup({
       title="Set up your vault"
       description="Choose a master passphrase. It encrypts everything you store here, in your browser, before anything reaches the server."
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void attempt();
+        }}
+        className="space-y-4"
+      >
         <Field
           label="Master passphrase"
           htmlFor="vault-new"
@@ -182,6 +193,7 @@ export function VaultSetup({
             autoComplete="new-password"
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
+            onKeyDown={onEnter(attempt)}
             placeholder="Four unrelated words works well"
           />
           {passphrase.length > 0 && <StrengthMeter score={strength.score} label={strength.label} />}
@@ -198,6 +210,7 @@ export function VaultSetup({
             autoComplete="new-password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
+            onKeyDown={onEnter(attempt)}
           />
         </Field>
 

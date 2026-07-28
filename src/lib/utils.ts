@@ -1,10 +1,28 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { KeyboardEvent } from "react";
 import type { DeliverableType } from "@/lib/api/types";
 
 /** Merge conditional class names, resolving Tailwind conflicts. */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Run an action when Enter is pressed in a field.
+ *
+ * A field inside a real form with a submit button should already do this by itself. It is not
+ * dependable on `type="password"`: a browser password manager showing its own dropdown can
+ * swallow the keypress before the form sees it. Calling preventDefault first means the manual
+ * path and the implicit one can never both fire, so this is safe to add to a field that already
+ * submits.
+ */
+export function onEnter(action: () => void) {
+  return (e: KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    action();
+  };
 }
 
 /** Format an amount of Ghana cedis for display, e.g. "₵1,234.56". */
@@ -22,8 +40,7 @@ export function formatCedis(amount: number) {
  */
 export function publicBaseUrl() {
   return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "")
+    process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "")
   );
 }
 

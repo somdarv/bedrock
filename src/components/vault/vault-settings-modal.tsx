@@ -12,6 +12,7 @@ import { checkPassphrase, rewrapVaultKey } from "@/lib/vault/crypto";
 import { destroyVaultAction, updateVaultKeyAction } from "@/lib/vault/actions";
 import { AUTO_LOCK_CHOICES, writeAutoLockPreference } from "@/lib/vault/use-auto-lock";
 import { VaultBackup } from "./vault-backup";
+import { onEnter } from "@/lib/utils";
 import type { VaultItem, VaultSecret } from "@/lib/vault/types";
 
 /**
@@ -63,8 +64,7 @@ export function VaultSettingsModal({
   const strength = checkPassphrase(next);
   const canChange = strength.score >= 2 && next === confirm && next.length > 0 && !busy;
 
-  async function changePassphrase(e: React.FormEvent) {
-    e.preventDefault();
+  async function changePassphrase() {
     if (!canChange) return;
 
     setBusy(true);
@@ -134,7 +134,13 @@ export function VaultSettingsModal({
             are. Only the key protecting them is rewrapped, so this is quick and safe.
           </p>
 
-          <form onSubmit={changePassphrase} className="mt-3 space-y-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void changePassphrase();
+            }}
+            className="mt-3 space-y-3"
+          >
             <Field label="New passphrase" htmlFor="vs-new" hint={strength.hint ?? undefined}>
               <Input
                 id="vs-new"
@@ -142,6 +148,7 @@ export function VaultSettingsModal({
                 autoComplete="new-password"
                 value={next}
                 onChange={(e) => setNext(e.target.value)}
+                onKeyDown={onEnter(changePassphrase)}
               />
             </Field>
             <Field
@@ -155,6 +162,7 @@ export function VaultSettingsModal({
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
+                onKeyDown={onEnter(changePassphrase)}
               />
             </Field>
 
@@ -197,7 +205,14 @@ export function VaultSettingsModal({
                 label="Confirm with your account password"
                 htmlFor="vs-account"
                 error={resetError ?? undefined}
+                hint="Click the button to confirm. Enter will not do it."
               >
+                {/*
+                  Deliberately not a form, and deliberately no Enter handling. Every other field
+                  in the vault submits on Enter, but this one destroys the vault with no way back,
+                  and hitting Enter out of habit after typing a password is exactly how that
+                  happens by accident. The click is the point.
+                */}
                 <Input
                   id="vs-account"
                   type="password"

@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { buildExport, downloadExport, readExport, VaultImportError } from "@/lib/vault/export";
 import { checkPassphrase } from "@/lib/vault/crypto";
+import { onEnter } from "@/lib/utils";
 import type { VaultItem, VaultSecret } from "@/lib/vault/types";
 
 /**
@@ -108,6 +109,7 @@ export function VaultBackup({
               autoComplete="new-password"
               value={exportPass}
               onChange={(e) => setExportPass(e.target.value)}
+              onKeyDown={onEnter(runExport)}
             />
           </Field>
           <Field
@@ -125,6 +127,7 @@ export function VaultBackup({
               autoComplete="new-password"
               value={exportConfirm}
               onChange={(e) => setExportConfirm(e.target.value)}
+              onKeyDown={onEnter(runExport)}
             />
           </Field>
 
@@ -169,6 +172,7 @@ export function VaultBackup({
               autoComplete="off"
               value={importPass}
               onChange={(e) => setImportPass(e.target.value)}
+              onKeyDown={onEnter(runImport)}
             />
           </Field>
 
