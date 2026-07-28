@@ -217,10 +217,7 @@ export function PackageDocument({
               <MetaRow label="Date paid" value={fmtDate(lastPayment.paidAt)} />
             ) : null
           ) : (
-            <>
-              <MetaRow label="Date of issue" value={fmtDate(pkg.createdAt)} />
-              <MetaRow label="Date due" value={due > 0 ? "On receipt" : "Settled"} />
-            </>
+            <MetaRow label="Date of issue" value={fmtDate(pkg.createdAt)} />
           )}
           <MetaRow label="Project" value={pkg.title} />
           {pkg.estimatedDeliveryDate ? (
