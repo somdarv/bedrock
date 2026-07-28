@@ -248,6 +248,16 @@ export const mockApi: BedrockApi = {
       settleDeliverables(pkg);
       return pkg;
     },
+    async startPayment(slug) {
+      await delay();
+      found(
+        packages.find((p) => p.publicSlug === slug),
+        "Work package",
+      );
+      // There is no gateway behind the mock, so refuse rather than hand back a checkout that
+      // goes nowhere. Point NEXT_PUBLIC_API_LIVE at "packages" to exercise the real flow.
+      throw new ApiError(503, "Online payment is not available in mock mode.");
+    },
     async create(clientId, input) {
       await delay();
       found(

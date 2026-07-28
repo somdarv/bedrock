@@ -188,6 +188,19 @@ export interface PaymentInput {
   method: string | null;
 }
 
+/**
+ * A checkout the gateway has opened for a portal visitor. Confirms nothing: the payment only
+ * becomes real when Paystack's webhook reaches the API and is verified there.
+ */
+export interface PaymentSession {
+  reference: string;
+  accessCode: string;
+  /** Paystack's hosted checkout page. Where we send the payer. */
+  authorizationUrl: string;
+  publicKey: string | null;
+  amount: number;
+}
+
 export interface Deliverable {
   id: string;
   type: DeliverableType;

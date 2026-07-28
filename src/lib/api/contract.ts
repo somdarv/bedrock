@@ -15,6 +15,7 @@ import type {
   LineItemInput,
   MilestoneInput,
   PaymentInput,
+  PaymentSession,
   ReminderRuleInput,
   ReminderSettings,
   ServerMetrics,
@@ -58,6 +59,12 @@ export interface BedrockApi {
     get(id: string): Promise<WorkPackage>;
     /** Public portal read by unguessable UUID slug. */
     getBySlug(slug: string): Promise<WorkPackage>;
+    /**
+     * Public portal: open a Paystack checkout for the outstanding balance, or for one
+     * milestone when `milestoneId` is given. Records nothing as paid — the money only
+     * counts once the verified webhook reaches the API.
+     */
+    startPayment(slug: string, milestoneId?: string | null): Promise<PaymentSession>;
     create(clientId: string, input: WorkPackageInput): Promise<WorkPackage>;
     update(id: string, input: WorkPackageInput): Promise<WorkPackage>;
     remove(id: string): Promise<void>;

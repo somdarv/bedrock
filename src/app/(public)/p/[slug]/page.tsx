@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { PortalPayButton } from "@/components/portal/portal-pay-button";
 import { PortalPreviews } from "@/components/portal/portal-previews";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
@@ -36,7 +37,10 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
   const isFixed = pkg.pricingMode === "fixed";
   const settled = due <= 0;
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
-  const nextDueId = milestones.find((m) => m.status === "pending")?.id ?? null;
+  // With a schedule in place the client pays the next step, not the whole outstanding sum.
+  const nextDue = milestones.find((m) => m.status === "pending") ?? null;
+  const nextDueId = nextDue?.id ?? null;
+  const payable = nextDue ? nextDue.amount : due;
   const infraCharges = pkg.portalInfraCharges ?? [];
   const infraTotal = infraCharges.reduce((s, c) => s + c.amount, 0);
 
@@ -93,15 +97,21 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
             </p>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <p className="text-sm text-muted-foreground">
-                {formatCedis(due)} due to {pkg.status === "draft" || pkg.status === "sent" ? "start work" : "unlock your files"}.
-              </p>
-              <button
-                type="button"
-                className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
-              >
-                Pay {formatCedis(due)}
-              </button>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {nextDue
+                    ? `${formatCedis(nextDue.amount)} due now for ${nextDue.label}.`
+                    : `${formatCedis(due)} due to ${pkg.status === "draft" || pkg.status === "sent" ? "start work" : "unlock your files"}.`}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pay by card, MTN MoMo, Telecel Cash, AirtelTigo Money or bank transfer.
+                </p>
+              </div>
+              <PortalPayButton
+                slug={slug}
+                milestoneId={nextDueId}
+                label={`Pay ${formatCedis(payable)}`}
+              />
             </div>
           )}
         </div>
@@ -163,6 +173,9 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
                     <Badge variant={m.status === "paid" ? "success" : "warning"}>
                       {m.status === "paid" ? "Paid" : "Due"}
                     </Badge>
+                    {m.id === nextDueId && (
+                      <PortalPayButton slug={slug} milestoneId={m.id} label="Pay" variant="quiet" />
+                    )}
                   </div>
                 </li>
               ))}

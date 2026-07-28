@@ -8,6 +8,7 @@ import type {
   InfraCharge,
   InfraChargesOutstanding,
   InfrastructureOverview,
+  PaymentSession,
   ReminderSettings,
   ServerMetrics,
   SessionUser,
@@ -98,6 +99,11 @@ export const httpApi: BedrockApi = {
     },
     get: (id) => request<WorkPackage>(`/api/admin/packages/${id}`),
     getBySlug: (slug) => request<WorkPackage>(`/api/p/${slug}`),
+    startPayment: (slug, milestoneId) =>
+      request<PaymentSession>(`/api/p/${slug}/pay`, {
+        method: "POST",
+        body: JSON.stringify({ milestoneId: milestoneId ?? null }),
+      }),
     create: (clientId, input) =>
       request<WorkPackage>(`/api/admin/clients/${clientId}/packages`, {
         method: "POST",
