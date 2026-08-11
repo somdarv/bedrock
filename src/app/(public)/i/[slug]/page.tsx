@@ -103,7 +103,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
                 <path d="M20 6 9 17l-5-5" />
               </svg>
-              Paid in full — thank you.
+              Paid in full. Thank you.
             </p>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -216,7 +216,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
               <span className="font-medium text-foreground">
                 That is higher than the rate you will find online, and here is why.
               </span>{" "}
-              The figure quoted by Google or XE is the interbank mid-market rate — the price banks
+              The figure quoted by Google or XE is the interbank mid-market rate: the price banks
               trade dollars with each other at, in very large amounts. No card, bank or forex
               bureau converts money at it. If you paid a dollar bill with your own Ghanaian card
               today, your bank would apply a gap of its own in exactly the same way.
@@ -225,9 +225,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
               Our settlement rate is what it actually costs to pay a dollar bill from Ghana, with
               every bank and card charge already inside it.{" "}
               <span className="font-medium text-foreground">
-                There are no separate transaction fees, handling fees or card charges added on top
+                There are no separate transaction fees, handling fees or card charges added on top.
               </span>{" "}
-              — the cedi figure above is the whole amount.
+              The cedi figure above is the whole amount.
             </p>
             <p>
               Because it follows the market, the cedi amount is confirmed at the moment you pay,

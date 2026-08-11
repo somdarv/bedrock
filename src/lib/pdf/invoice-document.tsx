@@ -60,16 +60,14 @@ function fxNoteFor(invoice: Invoice, due: number): string | null {
   if (invoice.currency !== "USD" || !invoice.fxRateIndicative) return null;
 
   const rate = invoice.fxRateIndicative;
-  const asOf = invoice.fxRateIndicativeAt ? fmtLongDate(invoice.fxRateIndicativeAt) : null;
+  const asOf = invoice.fxRateIndicativeAt ? fmtDate(invoice.fxRateIndicativeAt) : null;
   const ghs = nf2.format(Math.round(due * rate * 100) / 100);
 
   return (
-    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} comes to about ` +
-    `GHS ${ghs} at our settlement rate of ${rateFmt.format(rate)}${asOf ? `, as at ${asOf}` : ""}. ` +
-    `This sits above the rate you will see quoted online: that figure is the interbank ` +
-    `mid-market rate, which no card, bank or forex bureau actually converts at. Our settlement ` +
-    `rate is what it costs to pay a dollar bill from Ghana, with every bank and card charge ` +
-    `already included — nothing is added on top. The cedi amount is confirmed when you pay.`
+    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} is about GHS ${ghs} ` +
+    `at our settlement rate of ${rateFmt.format(rate)}${asOf ? ` (${asOf})` : ""}. ` +
+    `Rates quoted online are interbank figures no card or bank converts at. ` +
+    `Ours includes all bank and card charges, nothing added. Confirmed when you pay.`
   );
 }
 

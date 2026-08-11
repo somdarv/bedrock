@@ -36,7 +36,7 @@ export default async function InvoicesPage() {
           <div className="eyebrow">Billing</div>
           <h1 className="mt-2 font-display text-2xl font-semibold tracking-tightest">Invoices</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Bill a client directly — infrastructure renewals, retainers, anything that does not run
+            Bill a client directly for infrastructure renewals, retainers, or anything that does not run
             through a work package. Issue it to mint its verifiable reference, send it, and the
             receipt is minted the moment it is settled.
           </p>

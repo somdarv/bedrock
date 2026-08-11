@@ -135,7 +135,7 @@ export function FxSettings({ state }: { state: FxState }) {
 
         <p className="text-xs text-muted-foreground">
           The margin is one figure covering what your card actually costs to settle a dollar bill
-          from Ghana — the issuer&apos;s FX markup, the international transaction fee and the
+          from Ghana: the issuer&apos;s FX markup, the international transaction fee and the
           spread. Do not add a separate card fee on top of it: that bills the same cost twice, and
           the invoice tells clients there are no extra charges.
         </p>

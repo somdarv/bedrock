@@ -73,7 +73,7 @@ export function InvoiceDetail({
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="eyebrow">Invoice {invoice.reference ?? "— draft"}</div>
+          <div className="eyebrow">Invoice {invoice.reference ?? "(draft)"}</div>
           <h1 className="mt-2 font-display text-2xl font-semibold tracking-tightest">
             {invoice.title}
           </h1>
@@ -566,7 +566,7 @@ function PaymentModal({
           <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
             Settles <span className="font-semibold">{formatMoney(settlesUsd, "USD")}</span> of the{" "}
             {formatMoney(invoice.balance, "USD")} outstanding
-            {settlesUsd >= invoice.balance ? " — this clears the invoice." : "."}
+            {settlesUsd >= invoice.balance ? ". This clears the invoice." : "."}
           </p>
         )}
 

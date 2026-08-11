@@ -23,7 +23,7 @@ const invoices: Invoice[] = [
     clientId: "cl_1",
     clientName: "Ama Boateng",
     publicSlug: "3f2b91c4-7d6e-4a15-9b28-c50e7f14a2d3",
-    title: "Infrastructure renewal — 2026/27",
+    title: "Infrastructure renewal 2026/27",
     memo: "Payable on receipt. Renewing now keeps your site and email online without interruption.",
     // Priced in dollars, as infrastructure actually is: the client pays the cedi equivalent at
     // the rate on the day they pay.
@@ -45,8 +45,8 @@ const invoices: Invoice[] = [
     paidAt: null,
     createdAt: "2026-08-11T09:00:00Z",
     items: [
-      { id: "ii_s1", position: 0, description: "Domain renewal — amaboateng.com (12 months)", quantity: 1, unitPrice: 18, amount: 18 },
-      { id: "ii_s2", position: 1, description: "Web hosting — Starter plan (12 months)", quantity: 1, unitPrice: 120, amount: 120 },
+      { id: "ii_s1", position: 0, description: "Domain renewal for amaboateng.com (12 months)", quantity: 1, unitPrice: 18, amount: 18 },
+      { id: "ii_s2", position: 1, description: "Web hosting, Starter plan (12 months)", quantity: 1, unitPrice: 120, amount: 120 },
       { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 8, amount: 16 },
     ],
     payments: [],
