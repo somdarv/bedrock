@@ -42,12 +42,19 @@ const nf2 = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFr
 const rateFmt = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 
 /**
- * The exchange note on a dollar-denominated invoice.
+ * The settlement note on a dollar-denominated invoice.
  *
- * Says the three things a client actually needs: roughly what to send in cedis, the rate and date
- * that figure came from, and that the final figure is settled when they pay. Stating the rate is
- * what keeps the document honest — without it, a cedi number that later turns out different looks
- * like a moved goalpost rather than a moved currency.
+ * This block exists to answer one question before the reader asks it: *the rate online says 11.60,
+ * so how is this 13?* A client who finds that gap themselves reads it as a markup slipped past
+ * them; a client who is told about it first reads it as a price. So the note names the gap, says
+ * where it comes from, and says there is nothing added on top of it.
+ *
+ * Deliberately NOT called an "exchange rate" — that word invites a comparison with the published
+ * mid-market figure, which is an interbank midpoint nobody can actually transact at. "Settlement
+ * rate" describes what it really is: the rate at which we can settle a dollar bill from Ghana.
+ *
+ * The mid-market figure itself is never printed. Publishing it would turn the margin into the
+ * thing clients negotiate, and it goes stale the moment the document is filed.
  */
 function fxNoteFor(invoice: Invoice, due: number): string | null {
   if (invoice.currency !== "USD" || !invoice.fxRateIndicative) return null;
@@ -57,10 +64,12 @@ function fxNoteFor(invoice: Invoice, due: number): string | null {
   const ghs = nf2.format(Math.round(due * rate * 100) / 100);
 
   return (
-    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} is about GHS ${ghs} ` +
-    `at ${rateFmt.format(rate)} to the dollar${asOf ? `, as at ${asOf}` : ""}. ` +
-    `That cedi figure moves with the exchange rate and is confirmed when you pay — ` +
-    `open this invoice online for today's amount.`
+    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} comes to about ` +
+    `GHS ${ghs} at our settlement rate of ${rateFmt.format(rate)}${asOf ? `, as at ${asOf}` : ""}. ` +
+    `This sits above the rate you will see quoted online: that figure is the interbank ` +
+    `mid-market rate, which no card, bank or forex bureau actually converts at. Our settlement ` +
+    `rate is what it costs to pay a dollar bill from Ghana, with every bank and card charge ` +
+    `already included — nothing is added on top. The cedi amount is confirmed when you pay.`
   );
 }
 

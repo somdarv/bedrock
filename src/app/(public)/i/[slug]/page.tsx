@@ -115,8 +115,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
                 </p>
                 {isUsd && invoice.quote && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    At ₵{formatRate(invoice.quote.rate)} to the dollar. This invoice is priced in
-                    dollars, so the cedi amount moves with the exchange rate until you pay.
+                    At our settlement rate of ₵{formatRate(invoice.quote.rate)} to the dollar, all
+                    charges included. The cedi amount moves with the market until you pay.
                   </p>
                 )}
                 {isUsd && !invoice.quote && (
@@ -193,6 +193,50 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
         </div>
         {invoice.memo && <p className="mt-4 text-sm text-muted-foreground">{invoice.memo}</p>}
       </section>
+
+      {/* Answers the question a client asks the moment they compare our figure to Google's:
+          "the rate says 11.60, so how is this 13?" Being asked that is a bad position; saying it
+          first is not. The mid-market figure itself is never quoted back — it would turn the
+          margin into the thing being negotiated, and it is stale by the time anyone reads it. */}
+      {isUsd && invoice.quote && (
+        <section className="rounded-xl border border-border bg-muted/30 p-6">
+          <h2 className="font-display text-lg font-semibold tracking-tight">
+            About the rate
+          </h2>
+          <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              Your hosting, domain and certificates are bought in US dollars, so this invoice is
+              priced in dollars and converted for you at{" "}
+              <span className="font-medium text-foreground">
+                ₵{formatRate(invoice.quote.rate)} to the dollar
+              </span>
+              .
+            </p>
+            <p>
+              <span className="font-medium text-foreground">
+                That is higher than the rate you will find online, and here is why.
+              </span>{" "}
+              The figure quoted by Google or XE is the interbank mid-market rate — the price banks
+              trade dollars with each other at, in very large amounts. No card, bank or forex
+              bureau converts money at it. If you paid a dollar bill with your own Ghanaian card
+              today, your bank would apply a gap of its own in exactly the same way.
+            </p>
+            <p>
+              Our settlement rate is what it actually costs to pay a dollar bill from Ghana, with
+              every bank and card charge already inside it.{" "}
+              <span className="font-medium text-foreground">
+                There are no separate transaction fees, handling fees or card charges added on top
+              </span>{" "}
+              — the cedi figure above is the whole amount.
+            </p>
+            <p>
+              Because it follows the market, the cedi amount is confirmed at the moment you pay,
+              not when the invoice was issued. If you would rather pay another way, reply to the
+              message this invoice came with and we will send you the details.
+            </p>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

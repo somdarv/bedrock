@@ -49,7 +49,7 @@ export function FxSettings({ state }: { state: FxState }) {
       const res = await saveFxSettings({ marginPercent: marginValue, manualRate: manualValue });
       if (res.error) setError(res.error);
       else {
-        toast("Exchange rate settings saved.", "success");
+        toast("Settlement rate saved.", "success");
         router.refresh();
       }
     });
@@ -57,10 +57,12 @@ export function FxSettings({ state }: { state: FxState }) {
 
   return (
     <section className="rounded-xl border border-border bg-surface p-6">
-      <h2 className="text-lg font-semibold tracking-tight">Exchange rate</h2>
+      <h2 className="text-lg font-semibold tracking-tight">Settlement rate</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
         Used by invoices priced in US dollars. The client is charged in cedis at this rate on the
-        day they pay, not the day the invoice was issued.
+        day they pay, not the day the invoice was issued. Clients see it called a settlement rate,
+        never an exchange rate, and the invoice explains up front why it sits above the mid-market
+        figure they will find online.
       </p>
 
       {state.error && (
@@ -134,7 +136,13 @@ export function FxSettings({ state }: { state: FxState }) {
         <p className="text-xs text-muted-foreground">
           The margin is one figure covering what your card actually costs to settle a dollar bill
           from Ghana — the issuer&apos;s FX markup, the international transaction fee and the
-          spread. Do not add a separate card fee on top of it: that bills the same cost twice.
+          spread. Do not add a separate card fee on top of it: that bills the same cost twice, and
+          the invoice tells clients there are no extra charges.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Worth keeping in mind when you set it: a client who checks with their own bank is
+          comparing against what a Ghanaian card costs them, not against the mid-market rate. The
+          further above that this sits, the harder the conversation.
         </p>
 
         {preview !== null && (
