@@ -4,6 +4,7 @@ import type {
   Client,
   ClientActivity,
   ClientAsset,
+  FxState,
   HostingServer,
   InfraCharge,
   InfraChargesOutstanding,
@@ -283,6 +284,9 @@ export const httpApi: BedrockApi = {
     outstanding: () => request<InvoicesOutstanding>(`/api/admin/invoices/outstanding`),
     getBySlug: (slug) => request<PublicInvoice>(`/api/i/${slug}`),
     startPayment: (slug) => request<PaymentSession>(`/api/i/${slug}/pay`, { method: "POST" }),
+    fx: () => request<FxState>(`/api/admin/fx`),
+    saveFx: (input) =>
+      request<FxState>(`/api/admin/fx`, { method: "PUT", body: JSON.stringify(input) }),
   },
   vault: {
     get: () => request<VaultState>(`/api/admin/vault`),

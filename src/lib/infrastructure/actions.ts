@@ -153,8 +153,18 @@ function parseCharge(formData: FormData): {
   if (!Number.isFinite(amount) || amount < 0) fieldErrors.amount = "Enter an amount of 0 or more.";
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
+  // Hosting and domains are bought in dollars, so a charge can be recorded in either currency.
+  // It can then only be billed on an invoice of that same currency.
+  const currency = String(formData.get("currency") ?? "GHS") === "USD" ? "USD" : "GHS";
+
   return {
-    input: { description, amount, dueDate: dueDate || null, clientAssetId: clientAssetId || null },
+    input: {
+      description,
+      amount,
+      currency,
+      dueDate: dueDate || null,
+      clientAssetId: clientAssetId || null,
+    },
   };
 }
 

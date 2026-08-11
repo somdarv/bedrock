@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { InvoicePayButton } from "@/components/portal/invoice-pay-button";
 import { api, ApiError } from "@/lib/api";
-import { formatCedis } from "@/lib/utils";
+import { formatCedis, formatMoney, formatRate } from "@/lib/utils";
 
 export const metadata = { title: "Your invoice" };
 
@@ -43,6 +43,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
     throw e;
   });
 
+  const isUsd = invoice.currency === "USD";
+  // What they will actually be charged today. On a dollar invoice this is the whole point of
+  // the page: the PDF is a snapshot, this is the live figure.
+  const payable = invoice.quote?.amountGhs ?? null;
   const settled = invoice.balance <= 0;
   const voided = invoice.status === "void";
   const dueDate = fmtDate(invoice.dueDate);
@@ -70,13 +74,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
           <div>
             <div className="eyebrow">Total</div>
             <div className="mt-2 font-display text-xl font-semibold tracking-tight">
-              {formatCedis(invoice.total)}
+              {formatMoney(invoice.total, invoice.currency)}
             </div>
           </div>
           <div>
             <div className="eyebrow">Paid</div>
             <div className="mt-2 font-display text-xl font-semibold tracking-tight text-success">
-              {formatCedis(invoice.paid)}
+              {formatMoney(invoice.paid, invoice.currency)}
             </div>
           </div>
           <div>
@@ -84,7 +88,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
             <div
               className={`mt-2 font-display text-xl font-semibold tracking-tight ${settled ? "text-success" : "text-warning"}`}
             >
-              {formatCedis(invoice.balance)}
+              {formatMoney(invoice.balance, invoice.currency)}
             </div>
           </div>
         </div>
@@ -105,14 +109,32 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {formatCedis(invoice.balance)} due{" "}
-                  {dueDate ? (overdue ? `since ${dueDate}` : `by ${dueDate}`) : "on receipt"}.
+                  {formatMoney(invoice.balance, invoice.currency)} due{" "}
+                  {dueDate ? (overdue ? `since ${dueDate}` : `by ${dueDate}`) : "on receipt"}
+                  {isUsd && payable !== null ? `, payable today as ${formatCedis(payable)}` : ""}.
                 </p>
+                {isUsd && invoice.quote && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    At ₵{formatRate(invoice.quote.rate)} to the dollar. This invoice is priced in
+                    dollars, so the cedi amount moves with the exchange rate until you pay.
+                  </p>
+                )}
+                {isUsd && !invoice.quote && (
+                  <p className="mt-1 text-xs text-warning">
+                    We could not confirm today&apos;s exchange rate. Please try again shortly, or
+                    contact us to pay another way.
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   Pay by card, MTN MoMo, Telecel Cash, AirtelTigo Money or bank transfer.
                 </p>
               </div>
-              <InvoicePayButton slug={slug} label={`Pay ${formatCedis(invoice.balance)}`} />
+              {(!isUsd || payable !== null) && (
+                <InvoicePayButton
+                  slug={slug}
+                  label={`Pay ${formatCedis(isUsd ? (payable as number) : invoice.balance)}`}
+                />
+              )}
             </div>
           )}
         </div>
@@ -163,7 +185,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
                 <tr key={item.id} className="border-t border-border">
                   <td className="px-4 py-3">{item.description}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground">{item.quantity}</td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCedis(item.amount)}</td>
+                  <td className="px-4 py-3 text-right font-medium">{formatMoney(item.amount, invoice.currency)}</td>
                 </tr>
               ))}
             </tbody>

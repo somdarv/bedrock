@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
@@ -19,7 +20,7 @@ import {
   payInfraCharge,
   updateInfraCharge,
 } from "@/lib/infrastructure/actions";
-import { formatCedis } from "@/lib/utils";
+import { formatCedis, formatMoney } from "@/lib/utils";
 
 export function InfraChargesSection({
   clientId,
@@ -39,9 +40,16 @@ export function InfraChargesSection({
   const [payingId, setPayingId] = React.useState<string | null>(null);
 
   const rows = [...charges].sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
-  const outstanding = rows
-    .filter((c) => c.status === "pending")
+  const pending = rows.filter((c) => c.status === "pending");
+  // Charges can be recorded in either currency, so the two are summed separately rather than
+  // added together — a single figure mixing cedis and dollars would be meaningless.
+  const outstandingGhs = pending
+    .filter((c) => (c.currency ?? "GHS") === "GHS")
     .reduce((s, c) => s + c.amount, 0);
+  const outstandingUsd = pending
+    .filter((c) => c.currency === "USD")
+    .reduce((s, c) => s + c.amount, 0);
+  const outstanding = outstandingGhs + outstandingUsd;
 
   function afterMutation(message: string) {
     setAdding(false);
@@ -84,7 +92,15 @@ export function InfraChargesSection({
         <div className="flex items-center gap-4">
           {outstanding > 0 && (
             <span className="text-sm text-muted-foreground">
-              Outstanding <span className="font-semibold text-foreground">{formatCedis(outstanding)}</span>
+              Outstanding{" "}
+              <span className="font-semibold text-foreground">
+                {[
+                  outstandingGhs > 0 ? formatCedis(outstandingGhs) : null,
+                  outstandingUsd > 0 ? formatMoney(outstandingUsd, "USD") : null,
+                ]
+                  .filter(Boolean)
+                  .join(" + ")}
+              </span>
             </span>
           )}
           {outstanding > 0 && (
@@ -123,7 +139,7 @@ export function InfraChargesSection({
             {rows.map((c) => (
               <TR key={c.id}>
                 <TD className="font-medium">{c.description}</TD>
-                <TD className="text-right">{formatCedis(c.amount)}</TD>
+                <TD className="text-right">{formatMoney(c.amount, c.currency)}</TD>
                 <TD className="text-muted-foreground">
                   {c.dueDate ? new Date(c.dueDate).toLocaleDateString() : "—"}
                 </TD>
@@ -231,17 +247,27 @@ function ChargeModal({
             required
           />
         </Field>
-        <Field label="Amount (₵)" htmlFor="amount" required error={state.fieldErrors?.amount}>
-          <Input
-            id="amount"
-            name="amount"
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={charge?.amount ?? ""}
-            required
-          />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Amount" htmlFor="amount" required error={state.fieldErrors?.amount}>
+            <Input
+              id="amount"
+              name="amount"
+              type="number"
+              min={0}
+              step="0.01"
+              defaultValue={charge?.amount ?? ""}
+              required
+            />
+          </Field>
+          {/* Hosting and domains are bought in dollars. Recording a charge in the currency it is
+              actually incurred in is what lets it be billed on a dollar invoice untouched. */}
+          <Field label="Currency" htmlFor="currency">
+            <Select id="currency" name="currency" defaultValue={charge?.currency ?? "GHS"}>
+              <option value="GHS">Ghana cedis (₵)</option>
+              <option value="USD">US dollars ($)</option>
+            </Select>
+          </Field>
+        </div>
         <Field label="Due date" htmlFor="dueDate" error={state.fieldErrors?.dueDate}>
           <Input id="dueDate" name="dueDate" type="date" defaultValue={charge?.dueDate ?? ""} />
         </Field>

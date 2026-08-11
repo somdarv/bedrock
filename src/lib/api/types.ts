@@ -174,7 +174,12 @@ export interface Payment {
   id: string;
   /** The milestone this payment settled, or null for ad-hoc/legacy payments. */
   milestoneId: string | null;
+  /** Always the cedis that moved. On a dollar invoice, `amountUsd` is what they bought. */
   amount: number;
+  /** Dollar invoices only: the rate this payment was credited at. */
+  fxRate?: number | null;
+  /** Dollar invoices only: the dollars these cedis settled. */
+  amountUsd?: number | null;
   kind: PaymentKind;
   status: PaymentStatus;
   paystackReference: string | null;
@@ -198,7 +203,11 @@ export interface PaymentSession {
   /** Paystack's hosted checkout page. Where we send the payer. */
   authorizationUrl: string;
   publicKey: string | null;
+  /** Always cedis — that is what the gateway charges in. */
   amount: number;
+  /** Dollar invoices only: the dollars this charge settles, and the rate it was converted at. */
+  amountUsd?: number | null;
+  fxRate?: number | null;
 }
 
 export interface Deliverable {
@@ -455,6 +464,12 @@ export interface InfraCharge {
   invoiceId: string | null;
   description: string;
   amount: number;
+  /**
+   * What the fee is denominated in. Hosting and domains are bought in dollars, so a charge can
+   * be recorded in USD and billed on a USD invoice with no conversion. A charge can only go on
+   * an invoice of the same currency — mixing them would misread the amount by ~13x.
+   */
+  currency: "GHS" | "USD";
   dueDate: string | null;
   /** The asset expiry this charge renews (set for auto-generated recurring charges). */
   billedForDate: string | null;
@@ -467,6 +482,7 @@ export interface InfraChargeInput {
   clientAssetId: string | null;
   description: string;
   amount: number;
+  currency: "GHS" | "USD";
   dueDate: string | null;
 }
 
@@ -509,6 +525,19 @@ export interface Invoice {
   publicSlug: string;
   title: string;
   memo: string | null;
+  /**
+   * What the line items are priced in. "USD" means the dollar total is the binding amount and
+   * the client pays the cedi equivalent at the rate on the day they pay — infrastructure is
+   * bought in dollars, so a fixed cedi quote loses money as the cedi moves. See docs/INVOICES.md.
+   */
+  currency: "GHS" | "USD";
+  /** The margin over mid-market in force at issue, kept so an old invoice can be explained. */
+  fxMarginPercent: number | null;
+  /** The rate printed on the PDF as indicative. NOT what the client is charged. */
+  fxRateIndicative: number | null;
+  fxRateIndicativeAt: string | null;
+  /** Cedis actually received, whatever the invoice is denominated in. */
+  receivedGhs: number;
   /** Verification identity, minted at issue. Null while the invoice is a draft. */
   documentId: string | null;
   /** Short reference printed in the letterhead, e.g. "INV-GIGCOT-07". */
@@ -539,6 +568,7 @@ export interface InvoiceItemInput {
 export interface InvoiceInput {
   title: string;
   memo: string | null;
+  currency: "GHS" | "USD";
   issueDate: string | null;
   dueDate: string | null;
   items: InvoiceItemInput[];
@@ -548,10 +578,41 @@ export interface InvoiceInput {
 
 /** A payment taken outside the gateway (bank transfer, cash, direct mobile money). */
 export interface InvoicePaymentInput {
+  /** Always the cedis that actually arrived, whatever the invoice is denominated in. */
   amount: number;
   method: string;
   paidAt: string | null;
   reference: string | null;
+  /** Dollar invoices: the rate to credit at. Omitted uses today's billing rate. */
+  fxRate?: number | null;
+}
+
+/**
+ * The USD → GHS rate dollar invoices are billed at.
+ *
+ * `marginPercent` covers what settling a dollar bill from Ghana actually costs us — the card
+ * issuer's FX markup, international transaction fees and spread, measured at 11-12%. It is
+ * deliberately ONE number: that card cost *is* the gap between mid-market and what we get, so
+ * charging an FX margin and a card fee separately would bill the same cost twice.
+ */
+export interface FxState {
+  /** Live mid-market rate, or the manual override when one is set. Null if unavailable. */
+  midRate: number | null;
+  marginPercent: number;
+  /** midRate x (1 + margin). What clients are actually charged at. */
+  effectiveRate: number | null;
+  /** Set when the operator has pinned a rate instead of using the feed. */
+  manualRate: number | null;
+  ratedAt: string | null;
+  /** The cached rate is old enough to be worth flagging, though it is still used. */
+  stale: boolean;
+  /** Populated only when no rate could be obtained at all. */
+  error: string | null;
+}
+
+export interface FxInput {
+  marginPercent: number;
+  manualRate: number | null;
 }
 
 export interface InvoicesOutstanding {
@@ -566,6 +627,12 @@ export interface InvoicesOutstanding {
  */
 export interface PublicInvoice extends Invoice {
   billTo: BillTo;
+  /**
+   * Dollar invoices only: what the outstanding balance comes to in cedis right now. This is the
+   * figure the client is about to be charged, which is why the page exists rather than the PDF
+   * being the last word. Null when settled, or when no rate could be obtained.
+   */
+  quote: { rate: number; amountGhs: number; quotedAt: string } | null;
 }
 
 /* ------------------------------------------------------------------------ vault

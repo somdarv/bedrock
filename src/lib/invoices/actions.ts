@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import {
   api,
   ApiError,
+  type FxInput,
   type Invoice,
   type InvoiceInput,
   type InvoicePaymentInput,
@@ -34,6 +35,24 @@ function revalidateInvoices(clientId?: string, invoiceId?: string) {
   revalidatePath("/admin/invoices");
   revalidatePath("/admin/receivables");
   revalidatePath("/admin/infrastructure");
+}
+
+/**
+ * Save the USD → GHS billing rate settings.
+ *
+ * The margin is one number covering what settling a dollar bill from Ghana actually costs us
+ * (card issuer FX markup + international fees + spread). It is deliberately not split into an
+ * FX margin and a separate card fee: that would bill the same cost twice.
+ */
+export async function saveFxSettings(input: FxInput): Promise<InvoiceActionState> {
+  try {
+    await api.invoices.saveFx(input);
+  } catch (e) {
+    return fail(e, "Could not save the exchange rate settings.");
+  }
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/invoices");
+  return { ok: true };
 }
 
 export async function createInvoice(

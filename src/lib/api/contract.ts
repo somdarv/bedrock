@@ -6,6 +6,8 @@ import type {
   ClientAssetInput,
   ClientInput,
   ClientNotifyEvent,
+  FxInput,
+  FxState,
   HostingServer,
   HostingServerInput,
   InfraCharge,
@@ -159,6 +161,9 @@ export interface BedrockApi {
      * verified webhook turns this into money received.
      */
     startPayment(slug: string): Promise<PaymentSession>;
+    /** The USD to GHS rate and margin dollar invoices are billed at. */
+    fx(): Promise<FxState>;
+    saveFx(input: FxInput): Promise<FxState>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

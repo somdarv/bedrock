@@ -35,6 +35,27 @@ export function formatCedis(amount: number) {
 }
 
 /**
+ * Money in whichever currency it is actually denominated in. Invoices can be priced in dollars
+ * (infrastructure is bought in dollars) while still being paid in cedis, so a figure shown
+ * without its currency is genuinely ambiguous — and wrong by roughly thirteen times.
+ */
+export function formatMoney(amount: number, currency: "GHS" | "USD" = "GHS") {
+  const value = new Intl.NumberFormat("en-GH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return currency === "USD" ? `$${value}` : `₵${value}`;
+}
+
+/** An exchange rate, e.g. "13.1198". */
+export function formatRate(rate: number) {
+  return new Intl.NumberFormat("en-GH", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(rate);
+}
+
+/**
  * Base origin for public, client-facing links (the portal). Uses the configured
  * production URL when set, otherwise the current origin in the browser.
  */

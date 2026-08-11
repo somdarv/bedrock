@@ -22,7 +22,7 @@ import {
   voidInvoice,
 } from "@/lib/invoices/actions";
 import { invoiceStatusMeta } from "@/lib/invoices/display";
-import { formatCedis } from "@/lib/utils";
+import { formatCedis, formatMoney, formatRate } from "@/lib/utils";
 
 const METHODS = ["bank transfer", "mobile money", "cash", "cheque", "card"];
 
@@ -54,6 +54,9 @@ export function InvoiceDetail({
   const isDraft = invoice.status === "draft";
   const isVoid = invoice.status === "void";
   const settled = invoice.balance <= 0 && invoice.total > 0;
+  // Priced in dollars: the client pays cedis at the rate on the day, so "paid" and "received"
+  // are two different figures and both matter.
+  const isUsd = invoice.currency === "USD";
 
   function run(fn: () => Promise<{ ok?: boolean; error?: string }>, success: string) {
     startTransition(async () => {
@@ -135,19 +138,24 @@ export function InvoiceDetail({
           <div>
             <div className="eyebrow">Total</div>
             <div className="mt-2 font-display text-xl font-semibold tracking-tight">
-              {formatCedis(invoice.total)}
+              {formatMoney(invoice.total, invoice.currency)}
             </div>
           </div>
           <div>
-            <div className="eyebrow">Paid</div>
+            <div className="eyebrow">{isUsd ? "Settled" : "Paid"}</div>
             <div className="mt-2 font-display text-xl font-semibold tracking-tight text-success">
-              {formatCedis(invoice.paid)}
+              {formatMoney(invoice.paid, invoice.currency)}
             </div>
+            {isUsd && invoice.receivedGhs > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {formatCedis(invoice.receivedGhs)} received
+              </div>
+            )}
           </div>
           <div>
             <div className="eyebrow">Balance</div>
             <div className={`mt-2 font-display text-xl font-semibold tracking-tight ${settled ? "text-success" : "text-warning"}`}>
-              {formatCedis(invoice.balance)}
+              {formatMoney(invoice.balance, invoice.currency)}
             </div>
           </div>
         </div>
@@ -173,6 +181,17 @@ export function InvoiceDetail({
                   <dd className="font-mono text-xs">{invoice.receiptSerial}</dd>
                 </div>
               </>
+            )}
+            {isUsd && invoice.fxRateIndicative && (
+              <div className="flex justify-between gap-4 sm:col-span-2">
+                <dt className="text-muted-foreground">Rate printed on the invoice</dt>
+                <dd>
+                  ₵{formatRate(invoice.fxRateIndicative)} / $1
+                  {invoice.fxMarginPercent !== null && ` · ${invoice.fxMarginPercent}% over mid-market`}
+                  {invoice.fxRateIndicativeAt &&
+                    ` · as at ${new Date(invoice.fxRateIndicativeAt).toLocaleDateString()}`}
+                </dd>
+              </div>
             )}
             <div className="flex justify-between gap-4 sm:col-span-2">
               <dt className="text-muted-foreground">Client pay page</dt>
@@ -202,8 +221,8 @@ export function InvoiceDetail({
               <TR key={item.id}>
                 <TD>{item.description}</TD>
                 <TD className="text-right text-muted-foreground">{item.quantity}</TD>
-                <TD className="text-right text-muted-foreground">{formatCedis(item.unitPrice)}</TD>
-                <TD className="text-right font-medium">{formatCedis(item.amount)}</TD>
+                <TD className="text-right text-muted-foreground">{formatMoney(item.unitPrice, invoice.currency)}</TD>
+                <TD className="text-right font-medium">{formatMoney(item.amount, invoice.currency)}</TD>
               </TR>
             ))}
           </TBody>
@@ -220,7 +239,8 @@ export function InvoiceDetail({
                 <TH>Reference</TH>
                 <TH>Date</TH>
                 <TH>Status</TH>
-                <TH className="text-right">Amount</TH>
+                <TH className="text-right">Received</TH>
+                {isUsd && <TH className="text-right">Settled</TH>}
               </TR>
             </THead>
             <TBody>
@@ -238,7 +258,18 @@ export function InvoiceDetail({
                       {p.status}
                     </Badge>
                   </TD>
+                  {/* `amount` is always the cedis that moved, whatever the invoice is priced in. */}
                   <TD className="text-right font-medium">{formatCedis(p.amount)}</TD>
+                  {isUsd && (
+                    <TD className="text-right font-medium">
+                      {p.amountUsd != null ? formatMoney(p.amountUsd, "USD") : "—"}
+                      {p.fxRate ? (
+                        <div className="text-xs font-normal text-muted-foreground">
+                          at ₵{formatRate(p.fxRate)}
+                        </div>
+                      ) : null}
+                    </TD>
+                  )}
                 </TR>
               ))}
             </TBody>
@@ -434,18 +465,34 @@ function PaymentModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [amount, setAmount] = React.useState(String(invoice.balance));
+  const isUsd = invoice.currency === "USD";
+  // On a dollar invoice the operator enters the cedis that arrived; the rate turns that into the
+  // dollars it settles. Defaulted to the invoice's own rate so the common case needs no thought,
+  // but editable — the bank's actual rate on the day is what really applied.
+  const defaultRate = invoice.fxRateIndicative ?? 0;
+
+  const [rate, setRate] = React.useState(isUsd ? String(defaultRate || "") : "");
+  const [amount, setAmount] = React.useState(
+    String(isUsd ? Math.round(invoice.balance * (defaultRate || 0) * 100) / 100 : invoice.balance),
+  );
   const [method, setMethod] = React.useState(METHODS[0]);
   const [paidAt, setPaidAt] = React.useState(new Date().toISOString().slice(0, 10));
   const [reference, setReference] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
 
+  const rateValue = Number(rate);
+  const settlesUsd =
+    isUsd && rateValue > 0 ? Math.round((Number(amount) / rateValue) * 100) / 100 : null;
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) return setError("Enter the amount received.");
+    if (isUsd && (!Number.isFinite(rateValue) || rateValue <= 0)) {
+      return setError("Enter the exchange rate this payment was made at.");
+    }
 
     startTransition(async () => {
       const res = await recordInvoicePayment(invoice.id, invoice.clientId, {
@@ -453,6 +500,7 @@ function PaymentModal({
         method,
         paidAt: paidAt || null,
         reference: reference.trim() || null,
+        fxRate: isUsd ? rateValue : null,
       });
       if (res.error) setError(res.error);
       else onDone();
@@ -468,7 +516,7 @@ function PaymentModal({
     >
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Amount received (₵)" htmlFor="amount" required>
+          <Field label="Cedis received (₵)" htmlFor="amount" required>
             <Input
               id="amount"
               type="number"
@@ -478,6 +526,18 @@ function PaymentModal({
               onChange={(e) => setAmount(e.target.value)}
             />
           </Field>
+          {isUsd && (
+            <Field label="Rate applied (₵ per $1)" htmlFor="fxRate" required>
+              <Input
+                id="fxRate"
+                type="number"
+                min={0}
+                step="0.0001"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+              />
+            </Field>
+          )}
           <Field label="How it arrived" htmlFor="method">
             <Select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
               {METHODS.map((m) => (
@@ -499,6 +559,16 @@ function PaymentModal({
             />
           </Field>
         </div>
+
+        {/* Say plainly what this settles before it is written — on a dollar invoice the number
+            the operator typed is not the number that moves the balance. */}
+        {settlesUsd !== null && (
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+            Settles <span className="font-semibold">{formatMoney(settlesUsd, "USD")}</span> of the{" "}
+            {formatMoney(invoice.balance, "USD")} outstanding
+            {settlesUsd >= invoice.balance ? " — this clears the invoice." : "."}
+          </p>
+        )}
 
         {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
 

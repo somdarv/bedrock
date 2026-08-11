@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import type { Client, InfraChargeRow, Invoice, InvoiceInput } from "@/lib/api";
 import { createInvoice, updateInvoice } from "@/lib/invoices/actions";
-import { formatCedis } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 
 interface DraftLine {
   key: string;
@@ -70,6 +70,7 @@ export function InvoiceComposer({
   const [clientId, setClientId] = React.useState(
     invoice?.clientId ?? initialClientId ?? clients[0]?.id ?? "",
   );
+  const [currency, setCurrency] = React.useState<"GHS" | "USD">(invoice?.currency ?? "GHS");
   const [title, setTitle] = React.useState(invoice?.title ?? "");
   const [memo, setMemo] = React.useState(invoice?.memo ?? "");
   const [issueDate, setIssueDate] = React.useState(invoice?.issueDate ?? "");
@@ -82,11 +83,21 @@ export function InvoiceComposer({
   );
   const [error, setError] = React.useState<string | null>(null);
 
-  // Only this client's charges are billable on this invoice, and only ones no other invoice
-  // has already claimed.
+  // Only this client's charges are billable on this invoice: ones no other invoice has claimed,
+  // and only ones in the same currency — a cedi charge appended to a dollar invoice would read
+  // as dollars, which is a thirteenfold overcharge rather than a rounding difference.
   const available = charges.filter(
-    (c) => c.clientId === clientId && (!c.invoiceId || c.invoiceId === invoice?.id),
+    (c) =>
+      c.clientId === clientId &&
+      (!c.invoiceId || c.invoiceId === invoice?.id) &&
+      (c.currency ?? "GHS") === currency,
   );
+  const otherCurrencyCount = charges.filter(
+    (c) =>
+      c.clientId === clientId &&
+      (!c.invoiceId || c.invoiceId === invoice?.id) &&
+      (c.currency ?? "GHS") !== currency,
+  ).length;
 
   const lineTotal = lines.reduce(
     (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
@@ -131,10 +142,12 @@ export function InvoiceComposer({
     const input: InvoiceInput = {
       title: title.trim(),
       memo: memo.trim() || null,
+      currency,
       issueDate: issueDate || null,
       dueDate: dueDate || null,
       items,
-      chargeIds: [...checked],
+      // Only charges still visible in the current currency — switching currency unticks the rest.
+      chargeIds: [...checked].filter((id) => available.some((c) => c.id === id)),
     };
 
     startTransition(async () => {
@@ -177,6 +190,16 @@ export function InvoiceComposer({
               placeholder="e.g. Infrastructure renewal 2026/27"
             />
           </Field>
+          <Field label="Price in" htmlFor="currency">
+            <Select
+              id="currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as "GHS" | "USD")}
+            >
+              <option value="GHS">Ghana cedis (₵)</option>
+              <option value="USD">US dollars ($)</option>
+            </Select>
+          </Field>
           <Field label="Issue date" htmlFor="issueDate">
             <Input
               id="issueDate"
@@ -196,13 +219,22 @@ export function InvoiceComposer({
         </div>
       </section>
 
-      {available.length > 0 && (
+      {(available.length > 0 || otherCurrencyCount > 0) && (
         <section className="rounded-xl border border-border bg-surface p-6">
-          <h2 className="text-sm font-semibold">Outstanding infrastructure charges</h2>
+          <h2 className="text-sm font-semibold">
+            Outstanding infrastructure charges in {currency === "USD" ? "dollars" : "cedis"}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Tick what this invoice bills. Paying it closes these charges, so they stop showing as
             outstanding on Receivables.
           </p>
+          {otherCurrencyCount > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {otherCurrencyCount} more {otherCurrencyCount === 1 ? "charge is" : "charges are"}{" "}
+              recorded in {currency === "USD" ? "cedis" : "dollars"} and cannot go on this invoice.
+              Bill {otherCurrencyCount === 1 ? "it" : "them"} separately.
+            </p>
+          )}
           <ul className="mt-4 space-y-2">
             {available.map((charge) => (
               <li key={charge.id}>
@@ -219,7 +251,7 @@ export function InvoiceComposer({
                       due {new Date(charge.dueDate).toLocaleDateString()}
                     </span>
                   )}
-                  <span className="font-medium">{formatCedis(charge.amount)}</span>
+                  <span className="font-medium">{formatMoney(charge.amount, currency)}</span>
                 </label>
               </li>
             ))}
@@ -238,7 +270,7 @@ export function InvoiceComposer({
         <div className="mt-4 space-y-3">
           {lines.map((line) => (
             <div key={line.key} className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[220px] flex-1">
+              <div className="min-w-55 flex-1">
                 <label className="mb-1 block text-xs text-muted-foreground">Description</label>
                 <Input
                   value={line.description}
@@ -257,7 +289,9 @@ export function InvoiceComposer({
                 />
               </div>
               <div className="w-32">
-                <label className="mb-1 block text-xs text-muted-foreground">Unit price (₵)</label>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  Unit price ({currency === "USD" ? "$" : "₵"})
+                </label>
                 <Input
                   type="number"
                   min={0}
@@ -269,7 +303,7 @@ export function InvoiceComposer({
               <div className="w-24 text-right text-sm">
                 <div className="mb-1 text-xs text-muted-foreground">Amount</div>
                 <div className="h-10 leading-10">
-                  {formatCedis((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0))}
+                  {formatMoney((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), currency)}
                 </div>
               </div>
               <Button
@@ -301,7 +335,7 @@ export function InvoiceComposer({
         <div>
           <div className="eyebrow">Invoice total</div>
           <div className="mt-1 font-display text-2xl font-semibold tracking-tight">
-            {formatCedis(total)}
+            {formatMoney(total, currency)}
           </div>
         </div>
         <div className="flex items-center gap-2">

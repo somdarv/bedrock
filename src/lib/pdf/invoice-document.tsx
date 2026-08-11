@@ -25,17 +25,43 @@ function methodLabel(p: Payment) {
 }
 
 /** Overdue is worth saying plainly — it is the whole reason a second copy gets sent. */
-function dueLine(dueDate: string | null, due: number): string {
+function dueLine(dueDate: string | null, due: number, code: string): string {
   if (due <= 0) return "";
-  if (!dueDate) return `${money(due)} due on receipt`;
+  if (!dueDate) return `${money(due, code)} due on receipt`;
 
   const deadline = new Date(dueDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return deadline < today
-    ? `${money(due)} overdue since ${fmtLongDate(dueDate)}`
-    : `${money(due)} due by ${fmtLongDate(dueDate)}`;
+    ? `${money(due, code)} overdue since ${fmtLongDate(dueDate)}`
+    : `${money(due, code)} due by ${fmtLongDate(dueDate)}`;
+}
+
+const nf2 = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rateFmt = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+
+/**
+ * The exchange note on a dollar-denominated invoice.
+ *
+ * Says the three things a client actually needs: roughly what to send in cedis, the rate and date
+ * that figure came from, and that the final figure is settled when they pay. Stating the rate is
+ * what keeps the document honest — without it, a cedi number that later turns out different looks
+ * like a moved goalpost rather than a moved currency.
+ */
+function fxNoteFor(invoice: Invoice, due: number): string | null {
+  if (invoice.currency !== "USD" || !invoice.fxRateIndicative) return null;
+
+  const rate = invoice.fxRateIndicative;
+  const asOf = invoice.fxRateIndicativeAt ? fmtLongDate(invoice.fxRateIndicativeAt) : null;
+  const ghs = nf2.format(Math.round(due * rate * 100) / 100);
+
+  return (
+    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} is about GHS ${ghs} ` +
+    `at ${rateFmt.format(rate)} to the dollar${asOf ? `, as at ${asOf}` : ""}. ` +
+    `That cedi figure moves with the exchange rate and is confirmed when you pay — ` +
+    `open this invoice online for today's amount.`
+  );
 }
 
 export function invoiceBillingModel({
@@ -53,6 +79,8 @@ export function invoiceBillingModel({
   verify: { reference: string; serial: string; qr: string };
 }): BillingModel {
   const isReceipt = variant === "receipt";
+  const code = invoice.currency ?? "GHS";
+  const isUsd = code === "USD";
   const settledPayments = invoice.payments.filter((p) => p.status === "success");
   const lastPayment = settledPayments[settledPayments.length - 1];
   const due = Math.max(0, invoice.balance);
@@ -81,23 +109,34 @@ export function invoiceBillingModel({
     amount: item.amount,
   }));
 
+  // On a dollar invoice the history is stated in dollars settled (matching the totals ladder),
+  // with the cedis actually sent and the rate applied on the line beneath — the client needs to
+  // recognise the figure that left their account.
   const subTable: BillingModel["subTable"] =
     isReceipt && settledPayments.length > 0
       ? {
           heading: "Payment history",
-          columns: ["Payment method", "Date", "Amount paid"],
+          columns: ["Payment method", "Date", isUsd ? "Settled (USD)" : "Amount paid"],
           rows: settledPayments.map<BillingSubRow>((p) => ({
             id: p.id,
             label: methodLabel(p),
-            sub: p.paystackReference ? `Reference ${p.paystackReference}` : null,
+            sub: isUsd
+              ? `GHS ${nf2.format(p.amount)} received${p.fxRate ? ` at ${rateFmt.format(p.fxRate)}` : ""}`
+              : p.paystackReference
+                ? `Reference ${p.paystackReference}`
+                : null,
             middle: fmtDate(p.paidAt),
-            amount: p.amount,
+            amount: isUsd ? (p.amountUsd ?? 0) : p.amount,
           })),
         }
       : null;
 
+  const receivedGhs = settledPayments.reduce((sum, p) => sum + p.amount, 0);
+
   const memo = isReceipt
-    ? "Thank you. This receipt confirms the payments listed below, and settles the invoice it refers to in full."
+    ? isUsd
+      ? `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(invoice.paid, "USD")} on this invoice in full.`
+      : "Thank you. This receipt confirms the payments listed below, and settles the invoice it refers to in full."
     : due > 0
       ? invoice.memo?.trim() ||
         "Pay by card or mobile money using the button above. If you would rather pay another way, reply to this message and we will send you the details."
@@ -106,15 +145,17 @@ export function invoiceBillingModel({
   return {
     variant,
     number,
+    currency: code,
+    fxNote: isReceipt ? null : fxNoteFor(invoice, due),
     meta,
     billTo: billTo ?? null,
     headline: isReceipt
       ? settledPayments.length === 0
         ? "No payments recorded yet"
-        : `${money(invoice.paid)} paid on ${fmtLongDate(lastPayment.paidAt)}`
+        : `${money(invoice.paid, code)} paid on ${fmtLongDate(lastPayment.paidAt)}`
       : due <= 0
-        ? `${money(invoice.total)} paid in full`
-        : dueLine(invoice.dueDate, due),
+        ? `${money(invoice.total, code)} paid in full`
+        : dueLine(invoice.dueDate, due, code),
     headlineSub: !isReceipt && due > 0 ? invoice.title : null,
     memo,
     // Only a live, unsettled invoice gets a button. A receipt or a settled copy must not

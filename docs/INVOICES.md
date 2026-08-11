@@ -30,14 +30,76 @@ draft  ──issue──▶  issued  ──payment clears──▶  paid
 - **void** — revoked. The registry row follows, so the QR now reads "void", and any charges it
   claimed go back to outstanding.
 
+## Pricing in dollars
+
+Infrastructure is bought in dollars (registrars, hosting, certificates) but clients pay in cedis,
+and the cedi moves daily. A fixed cedi quote means the gap between invoicing and payment comes out
+of our margin. So an invoice can be **denominated in USD**: the dollar total is the binding amount,
+and the cedi figure is worked out at the rate on the day the client actually pays.
+
+### The rate
+
+```
+billed rate = live mid-market rate x (1 + margin%)
+```
+
+The margin defaults to **11.5%** and covers what settling a dollar bill from Ghana actually costs
+us: our card issuer's FX markup, the international transaction fee, and the spread.
+
+**That margin is ONE number, deliberately.** The card cost *is* the gap between mid-market and what
+we really get. Charging an FX margin and a separate card fee would bill the same cost twice and put
+roughly 24% on a client's invoice instead of 11.5%. It is not a surcharge on how the client pays —
+they may pay by bank transfer and we still have to buy the dollars.
+
+Mid-market comes from a free, key-less daily feed (`open.er-api.com`; the ECB feeds do not carry
+GHS). It is cached on every successful fetch, and **the cache is used indefinitely when the feed is
+unreachable** — a rate a few days stale beats a checkout that will not open. A manual override is
+available in Settings for when the feed is wrong or a bank rate is preferred.
+
+### Where the rate is applied
+
+| Moment | Rate | Stored as |
+|---|---|---|
+| Issue | today's | `invoices.fx_rate_indicative` — what the PDF prints as indicative |
+| Viewing the pay page | today's | not stored; recomputed on every read |
+| Opening checkout | today's | `payments.fx_rate` + `payments.amount_usd` on the pending row |
+| Webhook credits | the one quoted at checkout | unchanged unless the payment came up short |
+| Manual payment | operator's, defaulting to today's | `payments.fx_rate` |
+
+### Money on a USD invoice
+
+`payments.amount` is **always the cedis that moved**. `amount_usd` is what those cedis bought.
+
+`balance()` works in dollars: `total() - sum(amount_usd)`. Summing cedis against a dollar total
+would compare two different things, and a client who paid in full when the cedi was strong would
+still look like a debtor. `receivedGhs()` reports the cedis for the record.
+
+This is what makes a part payment across a moving rate come out right: pay $50 worth at 13.00 and
+the remaining $88 at 20.00, and the invoice settles exactly, having received GHS 2,415.99.
+
+### Charges carry a currency too
+
+`infra_charges.currency` exists because a charge is billed by becoming an invoice line. A charge
+recorded as "GHS 600" appended to a USD invoice would read as "USD 600" — a thirteenfold overcharge,
+silently. A charge can only be billed on an invoice of the same currency; the API refuses the rest
+rather than converting behind the operator's back.
+
 ## Data model (bedrock-api)
 
 ```
+settings
+  key                  string pk            -- fx.margin_percent, fx.manual_rate, fx.last_mid_rate
+  value                json
+
 invoices
   id                   ulid pk
   client_id            ulid fk -> clients (cascade)
   public_slug          uuid unique          -- the capability URL: /i/{slug}
   title, memo
+  currency             string default 'GHS' -- GHS | USD
+  fx_margin_percent    decimal null         -- snapshot at issue
+  fx_rate_indicative   decimal null         -- printed on the PDF; not what is charged
+  fx_rate_indicative_at timestamp null
   document_id          string unique null   -- SAH-FIN-20260811-INV-GIGCOT-07
   reference            string null          -- INV-GIGCOT-07 (printed in the letterhead)
   serial               string null          -- G-1CBA-C796 (per generation run)
@@ -49,9 +111,12 @@ invoice_items
 
 infra_charges
   + invoice_id   ulid fk -> invoices nullable   -- the charges this invoice bills
+  + currency     string default 'GHS'           -- must match the invoice billing it
 
 payments
   + invoice_id       ulid fk -> invoices nullable
+  + fx_rate          decimal null   -- the rate this payment was credited at
+  + amount_usd       decimal null   -- the dollars `amount` cedis bought
   ~ work_package_id  now nullable
 ```
 

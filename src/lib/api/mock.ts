@@ -25,6 +25,13 @@ const invoices: Invoice[] = [
     publicSlug: "3f2b91c4-7d6e-4a15-9b28-c50e7f14a2d3",
     title: "Infrastructure renewal — 2026/27",
     memo: "Payable on receipt. Renewing now keeps your site and email online without interruption.",
+    // Priced in dollars, as infrastructure actually is: the client pays the cedi equivalent at
+    // the rate on the day they pay.
+    currency: "USD",
+    fxMarginPercent: 11.5,
+    fxRateIndicative: 13.119816,
+    fxRateIndicativeAt: "2026-08-11T09:00:00Z",
+    receivedGhs: 0,
     documentId: "SAH-FIN-20260811-INV-AMABOA-01",
     reference: "INV-AMABOA-01",
     serial: "G-4C1A-9E77",
@@ -38,9 +45,9 @@ const invoices: Invoice[] = [
     paidAt: null,
     createdAt: "2026-08-11T09:00:00Z",
     items: [
-      { id: "ii_s1", position: 0, description: "Domain renewal — amaboateng.com (12 months)", quantity: 1, unitPrice: 220, amount: 220 },
-      { id: "ii_s2", position: 1, description: "Web hosting — Starter plan (12 months)", quantity: 1, unitPrice: 1450, amount: 1450 },
-      { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 90, amount: 180 },
+      { id: "ii_s1", position: 0, description: "Domain renewal — amaboateng.com (12 months)", quantity: 1, unitPrice: 18, amount: 18 },
+      { id: "ii_s2", position: 1, description: "Web hosting — Starter plan (12 months)", quantity: 1, unitPrice: 120, amount: 120 },
+      { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 8, amount: 16 },
     ],
     payments: [],
     total: 0,
@@ -49,16 +56,36 @@ const invoices: Invoice[] = [
   },
 ];
 
-/** Money on an invoice is derived, never stored — same rule the API follows. */
-function hydrateInvoice(invoice: Invoice): Invoice {
-  const total = round2(invoice.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
-  const paid = round2(
-    invoice.payments.filter((p) => p.status === "success").reduce((sum, p) => sum + p.amount, 0),
-  );
-  return { ...invoice, total, paid, balance: round2(total - paid) };
-}
+/**
+ * Mock FX, mirroring App\Services\FxRates: one margin over a mid-market rate, covering what
+ * settling a dollar bill from Ghana costs us. Fixed mid rate here — the point is to exercise
+ * the arithmetic, not the feed.
+ */
+const fxState = { midRate: 11.7667, marginPercent: 11.5, manualRate: null as number | null };
+
+const effectiveRate = () =>
+  round6((fxState.manualRate ?? fxState.midRate) * (1 + fxState.marginPercent / 100));
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/**
+ * Money on an invoice is derived, never stored — same rule the API follows.
+ *
+ * On a dollar invoice `paid` is the DOLLARS those cedis bought, not the cedis themselves:
+ * summing cedis against a dollar total compares two different things.
+ */
+function hydrateInvoice(invoice: Invoice): Invoice {
+  const total = round2(invoice.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
+  const settled = invoice.payments.filter((p) => p.status === "success");
+  const paid = round2(
+    invoice.currency === "USD"
+      ? settled.reduce((sum, p) => sum + (p.amountUsd ?? 0), 0)
+      : settled.reduce((sum, p) => sum + p.amount, 0),
+  );
+  const receivedGhs = round2(settled.reduce((sum, p) => sum + p.amount, 0));
+  return { ...invoice, total, paid, balance: round2(total - paid), receivedGhs };
+}
 
 /** Stand-in for the API's client code segment, e.g. "Ama Boateng" → "AMABOA". */
 function mockClientCode(clientId: string): string {
@@ -868,6 +895,7 @@ export const mockApi: BedrockApi = {
         invoiceId: null,
         description: input.description,
         amount: input.amount,
+        currency: input.currency ?? "GHS",
         dueDate: input.dueDate,
         billedForDate: null,
         status: "pending",
@@ -956,6 +984,11 @@ export const mockApi: BedrockApi = {
         publicSlug: crypto.randomUUID(),
         title: input.title,
         memo: input.memo,
+        currency: input.currency ?? "GHS",
+        fxMarginPercent: null,
+        fxRateIndicative: null,
+        fxRateIndicativeAt: null,
+        receivedGhs: 0,
         documentId: null,
         reference: null,
         serial: null,
@@ -1002,6 +1035,7 @@ export const mockApi: BedrockApi = {
       );
       invoice.title = input.title;
       invoice.memo = input.memo;
+      invoice.currency = input.currency ?? invoice.currency;
       invoice.issueDate = input.issueDate;
       invoice.dueDate = input.dueDate;
       invoice.items = [
@@ -1045,6 +1079,12 @@ export const mockApi: BedrockApi = {
       invoice.status = "issued";
       invoice.issueDate ??= new Date().toISOString().slice(0, 10);
       invoice.issuedAt = new Date().toISOString();
+      // Stamp the rate a dollar invoice's PDF prints as indicative.
+      if (invoice.currency === "USD") {
+        invoice.fxMarginPercent = fxState.marginPercent;
+        invoice.fxRateIndicative = effectiveRate();
+        invoice.fxRateIndicativeAt = new Date().toISOString();
+      }
       return hydrateInvoice(invoice);
     },
     async recordPayment(id, input) {
@@ -1054,10 +1094,15 @@ export const mockApi: BedrockApi = {
       if (invoice.status === "draft") throw new ApiError(409, "Issue the invoice first.");
       if (invoice.status === "void") throw new ApiError(409, "That invoice has been voided.");
 
+      // `amount` is always the cedis that arrived; on a dollar invoice work out what they bought.
+      const rate = invoice.currency === "USD" ? (input.fxRate ?? effectiveRate()) : null;
+
       invoice.payments.push({
         id: `pm_${crypto.randomUUID().slice(0, 8)}`,
         milestoneId: null,
         amount: input.amount,
+        fxRate: rate,
+        amountUsd: rate ? round2(input.amount / rate) : null,
         kind: "full",
         status: "success",
         paystackReference: input.reference,
@@ -1110,30 +1155,65 @@ export const mockApi: BedrockApi = {
       if (!invoice || invoice.status === "draft") throw new ApiError(404, "Invoice not found");
       const client = clients.find((c) => c.id === invoice.clientId);
       const contact = client?.contacts[0];
+      const hydrated = hydrateInvoice(invoice);
+      const rate = effectiveRate();
       return {
-        ...hydrateInvoice(invoice),
+        ...hydrated,
         billTo: {
           name: client?.name ?? "",
           contactName: contact?.name ?? null,
           email: contact?.email ?? null,
           phone: contact?.phone ?? contact?.whatsapp ?? null,
         },
+        // What the outstanding dollars come to in cedis right now — the figure they will be
+        // charged, recomputed on every read rather than frozen at issue.
+        quote:
+          hydrated.currency === "USD" && hydrated.balance > 0
+            ? {
+                rate,
+                amountGhs: round2(hydrated.balance * rate),
+                quotedAt: new Date().toISOString(),
+              }
+            : null,
       };
     },
     async startPayment(slug) {
       await delay();
       const invoice = invoices.find((i) => i.publicSlug === slug);
       if (!invoice) throw new ApiError(404, "Invoice not found");
-      const { balance: due } = hydrateInvoice(invoice);
+      const hydrated = hydrateInvoice(invoice);
+      const due = hydrated.balance;
       if (due <= 0) throw new ApiError(409, "This invoice is already settled. Thank you.");
+      // Paystack charges cedis, so a dollar balance is converted at today's rate here.
+      const rate = hydrated.currency === "USD" ? effectiveRate() : null;
       // No gateway in the mock: hand back the invoice page so the flow is still clickable.
       return {
         reference: `sbt-mock-${crypto.randomUUID().slice(0, 8)}`,
         accessCode: "mock",
         authorizationUrl: `/i/${slug}?mock-checkout=1`,
         publicKey: null,
-        amount: due,
+        amount: rate ? round2(due * rate) : due,
+        amountUsd: rate ? due : null,
+        fxRate: rate,
       };
+    },
+    async fx() {
+      await delay();
+      return {
+        midRate: fxState.midRate,
+        marginPercent: fxState.marginPercent,
+        effectiveRate: effectiveRate(),
+        manualRate: fxState.manualRate,
+        ratedAt: new Date().toISOString(),
+        stale: false,
+        error: null,
+      };
+    },
+    async saveFx(input) {
+      await delay();
+      fxState.marginPercent = input.marginPercent;
+      fxState.manualRate = input.manualRate;
+      return mockApi.invoices.fx();
     },
   },
   /**

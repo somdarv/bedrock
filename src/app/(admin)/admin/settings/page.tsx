@@ -1,9 +1,24 @@
+import { FxSettings } from "@/components/admin/fx-settings";
 import { ReminderCalendar } from "@/components/admin/reminder-calendar";
 import { WipeTestData } from "@/components/admin/wipe-test-data";
-import { api } from "@/lib/api";
+import { api, type FxState } from "@/lib/api";
 
 export default async function SettingsPage() {
-  const reminders = await api.settings.getReminders();
+  const [reminders, fx] = await Promise.all([
+    api.settings.getReminders(),
+    // A rate outage must not take the whole settings page down with it.
+    api.invoices.fx().catch(
+      (): FxState => ({
+        midRate: null,
+        marginPercent: 11.5,
+        effectiveRate: null,
+        manualRate: null,
+        ratedAt: null,
+        stale: true,
+        error: "The exchange rate could not be read.",
+      }),
+    ),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -17,6 +32,7 @@ export default async function SettingsPage() {
         </p>
       </header>
 
+      <FxSettings state={fx} />
       <ReminderCalendar initial={reminders} />
       <WipeTestData />
     </div>

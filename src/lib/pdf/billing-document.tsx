@@ -96,6 +96,20 @@ const s = StyleSheet.create({
   settledLabel: { fontSize: 10, fontWeight: 600, color: brand.ink },
   settledValue: { fontFamily: "Sora", fontSize: 11, fontWeight: 600, color: brand.ink },
   currencyNote: { marginTop: 10, marginLeft: "auto", fontSize: 8, color: brand.faint },
+  // Exchange note on a dollar-denominated document. Bordered and full width rather than tucked
+  // under the totals: a client who misses it has no idea what to actually send.
+  fxNote: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: brand.line,
+    backgroundColor: brand.panel,
+    borderRadius: 3,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    fontSize: 8,
+    color: brand.body,
+    lineHeight: 1.5,
+  },
 
   // secondary sections (schedule / payment history)
   section: { marginTop: 32 },
@@ -146,9 +160,15 @@ export function amount(n: number) {
   return nf.format(n);
 }
 
-/** Figure with the currency spelled out, for the headline and the settled row. */
-export function money(n: number) {
-  return `GHS ${nf.format(n)}`;
+/**
+ * Figure with the currency spelled out, for the headline and the settled row.
+ *
+ * The code is always spelled out rather than shown as a symbol: General Sans carries no cedi
+ * glyph (U+20B5), so a ₵ comes out as a blank box — and on a document that may quote two
+ * currencies, "GHS"/"USD" removes any doubt about which one a number is in.
+ */
+export function money(n: number, code = "GHS") {
+  return `${code} ${nf.format(n)}`;
 }
 
 export function fmtDate(iso?: string | null) {
@@ -192,6 +212,14 @@ export interface BillingModel {
   variant: "invoice" | "receipt";
   /** Printed document number, e.g. "SB-8F1C-2A90" or "INV-GIGCOT-07". */
   number: string;
+  /** What the figures below are denominated in. "GHS" unless the invoice is priced in dollars. */
+  currency?: string;
+  /**
+   * The exchange note printed under the totals on a dollar-denominated document: what the
+   * dollar total came to in cedis, at what rate, on what date, and that the rate is confirmed
+   * when they pay. Without it a client holding a USD invoice has no idea what to send.
+   */
+  fxNote?: string | null;
   /** Label/value rows printed under the title. */
   meta: { label: string; value: string }[];
   billTo?: BillingParty | null;
@@ -234,6 +262,7 @@ function TotalRow({ label, value }: { label: string; value: string }) {
 export function BillingDocument({ model, logo }: { model: BillingModel; logo: string }) {
   const isReceipt = model.variant === "receipt";
   const { number, verify } = model;
+  const code = model.currency ?? "GHS";
 
   return (
     <Document title={`${isReceipt ? "Receipt" : "Invoice"} ${number}`}>
@@ -332,7 +361,7 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
               {model.due > 0 ? <TotalRow label="Balance remaining" value={amount(model.due)} /> : null}
               <View style={s.settledRow}>
                 <Text style={s.settledLabel}>Amount paid</Text>
-                <Text style={s.settledValue}>{money(model.paid)}</Text>
+                <Text style={s.settledValue}>{money(model.paid, code)}</Text>
               </View>
             </>
           ) : (
@@ -340,12 +369,24 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
               {model.paid > 0 ? <TotalRow label="Amount paid" value={amount(model.paid)} /> : null}
               <View style={s.settledRow}>
                 <Text style={s.settledLabel}>Amount due</Text>
-                <Text style={s.settledValue}>{money(model.due)}</Text>
+                <Text style={s.settledValue}>{money(model.due, code)}</Text>
               </View>
             </>
           )}
         </View>
-        <Text style={s.currencyNote}>All amounts in Ghana cedis (GHS).</Text>
+        {/* The exchange note names the currency itself, so the standalone note would only repeat
+            it — and a line saved here is what keeps a short invoice on one page. */}
+        {model.fxNote ? null : (
+          <Text style={s.currencyNote}>
+            {code === "USD"
+              ? "All amounts in US dollars (USD)."
+              : "All amounts in Ghana cedis (GHS)."}
+          </Text>
+        )}
+
+        {/* What the dollar total comes to in cedis, and the honest caveat that the figure moves.
+            The document is a snapshot; the invoice's own page is the live record. */}
+        {model.fxNote ? <Text style={s.fxNote}>{model.fxNote}</Text> : null}
 
         {/* A short schedule/history moves to the next page whole rather than leaving a widow
             row behind its heading; a long one is allowed to wrap so it can't overflow a page. */}
