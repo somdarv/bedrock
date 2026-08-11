@@ -152,6 +152,8 @@ export interface BedrockApi {
     /** Record a payment taken outside the gateway; a cleared balance settles and mints a receipt. */
     recordPayment(id: string, input: InvoicePaymentInput): Promise<Invoice>;
     void(id: string): Promise<Invoice>;
+    /** Re-lock a dollar invoice at today's rate and reopen its validity window. */
+    refreshRate(id: string): Promise<Invoice>;
     /** Issued invoices still owed, for the Receivables dashboard. */
     outstanding(): Promise<InvoicesOutstanding>;
     /** PUBLIC (unguessable slug): the client-facing read behind the Pay button. */

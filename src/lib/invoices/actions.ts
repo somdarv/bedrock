@@ -110,6 +110,24 @@ export async function issueInvoice(
   return { ok: true };
 }
 
+/**
+ * Re-lock a dollar invoice at today's rate and reopen its validity window. For when a client
+ * comes back after the printed cedi figure has expired: the reference and history survive, only
+ * the amount moves. Re-send the invoice afterwards so they have the new figure.
+ */
+export async function refreshInvoiceRate(
+  invoiceId: string,
+  clientId: string,
+): Promise<InvoiceActionState> {
+  try {
+    await api.invoices.refreshRate(invoiceId);
+  } catch (e) {
+    return fail(e, "Could not refresh the rate.");
+  }
+  revalidateInvoices(clientId, invoiceId);
+  return { ok: true };
+}
+
 export async function voidInvoice(
   invoiceId: string,
   clientId: string,

@@ -281,6 +281,8 @@ export const httpApi: BedrockApi = {
         body: JSON.stringify(input),
       }),
     void: (id) => request<Invoice>(`/api/admin/invoices/${id}/void`, { method: "POST" }),
+    refreshRate: (id) =>
+      request<Invoice>(`/api/admin/invoices/${id}/refresh-rate`, { method: "POST" }),
     outstanding: () => request<InvoicesOutstanding>(`/api/admin/invoices/outstanding`),
     getBySlug: (slug) => request<PublicInvoice>(`/api/i/${slug}`),
     startPayment: (slug) => request<PaymentSession>(`/api/i/${slug}/pay`, { method: "POST" }),

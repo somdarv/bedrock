@@ -18,6 +18,7 @@ import {
   deleteInvoice,
   issueInvoice,
   recordInvoicePayment,
+  refreshInvoiceRate,
   sendInvoice,
   voidInvoice,
 } from "@/lib/invoices/actions";
@@ -113,6 +114,21 @@ export function InvoiceDetail({
               <Button variant="outline" size="sm" onClick={() => setSending("invoice")}>
                 Send invoice
               </Button>
+              {!settled && isUsd && invoice.fxExpired && (
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    run(
+                      () => refreshInvoiceRate(invoice.id, invoice.clientId),
+                      "Rate refreshed. Send the invoice again so they have the new amount.",
+                    )
+                  }
+                  disabled={pending}
+                >
+                  {pending ? <Spinner /> : null}
+                  Refresh rate
+                </Button>
+              )}
               {!settled && (
                 <Button size="sm" onClick={() => setPaying(true)}>
                   Record payment
@@ -182,16 +198,27 @@ export function InvoiceDetail({
                 </div>
               </>
             )}
-            {isUsd && invoice.fxRateIndicative && (
-              <div className="flex justify-between gap-4 sm:col-span-2">
-                <dt className="text-muted-foreground">Rate printed on the invoice</dt>
-                <dd>
-                  ₵{formatRate(invoice.fxRateIndicative)} / $1
-                  {invoice.fxMarginPercent !== null && ` · ${invoice.fxMarginPercent}% over mid-market`}
-                  {invoice.fxRateIndicativeAt &&
-                    ` · as at ${new Date(invoice.fxRateIndicativeAt).toLocaleDateString()}`}
-                </dd>
-              </div>
+            {isUsd && invoice.fxRateLocked && (
+              <>
+                <div className="flex justify-between gap-4 sm:col-span-2">
+                  <dt className="text-muted-foreground">Locked rate</dt>
+                  <dd>
+                    ₵{formatRate(invoice.fxRateLocked)} / $1
+                    {invoice.fxMarginPercent !== null &&
+                      ` · ${invoice.fxMarginPercent}% over mid-market`}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4 sm:col-span-2">
+                  <dt className="text-muted-foreground">Client pays</dt>
+                  <dd className={invoice.fxExpired ? "text-danger" : undefined}>
+                    {invoice.balanceGhs !== null ? formatCedis(invoice.balanceGhs) : "—"}
+                    {invoice.fxValidUntil &&
+                      (invoice.fxExpired
+                        ? ` · expired ${new Date(invoice.fxValidUntil).toLocaleDateString()}`
+                        : ` · until ${new Date(invoice.fxValidUntil).toLocaleDateString()}`)}
+                  </dd>
+                </div>
+              </>
             )}
             <div className="flex justify-between gap-4 sm:col-span-2">
               <dt className="text-muted-foreground">Client pay page</dt>
@@ -469,7 +496,7 @@ function PaymentModal({
   // On a dollar invoice the operator enters the cedis that arrived; the rate turns that into the
   // dollars it settles. Defaulted to the invoice's own rate so the common case needs no thought,
   // but editable — the bank's actual rate on the day is what really applied.
-  const defaultRate = invoice.fxRateIndicative ?? 0;
+  const defaultRate = invoice.fxRateLocked ?? 0;
 
   const [rate, setRate] = React.useState(isUsd ? String(defaultRate || "") : "");
   const [amount, setAmount] = React.useState(

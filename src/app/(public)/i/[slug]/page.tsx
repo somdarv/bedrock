@@ -44,9 +44,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
   });
 
   const isUsd = invoice.currency === "USD";
-  // What they will actually be charged today. On a dollar invoice this is the whole point of
-  // the page: the PDF is a snapshot, this is the live figure.
+  // The cedi figure was locked when the invoice was issued, so this page restates the number on
+  // the PDF rather than quoting a fresh one. A page disagreeing with the document in their hand
+  // would be worse than no page at all.
   const payable = invoice.quote?.amountGhs ?? null;
+  const rateExpired = invoice.quote?.expired ?? false;
   const settled = invoice.balance <= 0;
   const voided = invoice.status === "void";
   const dueDate = fmtDate(invoice.dueDate);
@@ -113,23 +115,24 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
                   {dueDate ? (overdue ? `since ${dueDate}` : `by ${dueDate}`) : "on receipt"}
                   {isUsd && payable !== null ? `, payable today as ${formatCedis(payable)}` : ""}.
                 </p>
-                {isUsd && invoice.quote && (
+                {isUsd && invoice.quote && !rateExpired && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    At our settlement rate of ₵{formatRate(invoice.quote.rate)} to the dollar, all
-                    charges included. The cedi amount moves with the market until you pay.
+                    At the settlement rate of ₵{formatRate(invoice.quote.rate)} to the dollar.
+                    {invoice.quote.validUntil &&
+                      ` This amount holds until ${fmtDate(invoice.quote.validUntil)}.`}
                   </p>
                 )}
-                {isUsd && !invoice.quote && (
+                {isUsd && rateExpired && (
                   <p className="mt-1 text-xs text-warning">
-                    We could not confirm today&apos;s exchange rate. Please try again shortly, or
-                    contact us to pay another way.
+                    This amount was valid until {fmtDate(invoice.quote?.validUntil ?? null)}. Please
+                    contact us and we will send you an up to date invoice.
                   </p>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">
                   Pay by card, MTN MoMo, Telecel Cash, AirtelTigo Money or bank transfer.
                 </p>
               </div>
-              {(!isUsd || payable !== null) && (
+              {(!isUsd || payable !== null) && !rateExpired && (
                 <InvoicePayButton
                   slug={slug}
                   label={`Pay ${formatCedis(isUsd ? (payable as number) : invoice.balance)}`}
@@ -222,17 +225,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
               today, your bank would apply a gap of its own in exactly the same way.
             </p>
             <p>
-              Our settlement rate is what it actually costs to pay a dollar bill from Ghana, with
-              every bank and card charge already inside it.{" "}
               <span className="font-medium text-foreground">
-                There are no separate transaction fees, handling fees or card charges added on top.
+                The cedi figure above is the whole amount.
               </span>{" "}
-              The cedi figure above is the whole amount.
-            </p>
-            <p>
-              Because it follows the market, the cedi amount is confirmed at the moment you pay,
-              not when the invoice was issued. If you would rather pay another way, reply to the
-              message this invoice came with and we will send you the details.
+              It is fixed{invoice.quote?.validUntil ? ` until ${fmtDate(invoice.quote.validUntil)}` : ""},
+              so you can send exactly that by mobile money, bank transfer or card and it will
+              settle the invoice in full. After that date, ask us for an updated invoice and we
+              will send a fresh one.
             </p>
           </div>
         </section>

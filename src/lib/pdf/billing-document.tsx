@@ -95,6 +95,8 @@ const s = StyleSheet.create({
   settledRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: brand.ink, paddingTop: 7, marginTop: 1 },
   settledLabel: { fontSize: 10, fontWeight: 600, color: brand.ink },
   settledValue: { fontFamily: "Sora", fontSize: 11, fontWeight: 600, color: brand.ink },
+  settledSubRow: { flexDirection: "row", justifyContent: "flex-end", paddingTop: 3 },
+  settledSub: { fontFamily: "Sora", fontSize: 11, fontWeight: 600, color: brand.ink },
   currencyNote: { marginTop: 10, marginLeft: "auto", fontSize: 8, color: brand.faint },
   // Exchange note on a dollar-denominated document. Bordered and full width rather than tucked
   // under the totals: a client who misses it has no idea what to actually send.
@@ -215,11 +217,16 @@ export interface BillingModel {
   /** What the figures below are denominated in. "GHS" unless the invoice is priced in dollars. */
   currency?: string;
   /**
-   * The exchange note printed under the totals on a dollar-denominated document: what the
-   * dollar total came to in cedis, at what rate, on what date, and that the rate is confirmed
-   * when they pay. Without it a client holding a USD invoice has no idea what to send.
+   * The exchange note printed under the totals on a dollar-denominated document: the cedi figure
+   * to pay, the rate behind it, and how long it holds. Without it a client holding a USD invoice
+   * has no idea what to send.
    */
   fxNote?: string | null;
+  /**
+   * Second line under the headline total, e.g. the cedi equivalent on a dollar invoice. The
+   * client pays this figure, so it belongs beside the total rather than only in the note.
+   */
+  settledSub?: string | null;
   /** Label/value rows printed under the title. */
   meta: { label: string; value: string }[];
   billTo?: BillingParty | null;
@@ -371,6 +378,12 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
                 <Text style={s.settledLabel}>Amount due</Text>
                 <Text style={s.settledValue}>{money(model.due, code)}</Text>
               </View>
+              {/* The figure the client actually sends, when that is not the one above. */}
+              {model.settledSub ? (
+                <View style={s.settledSubRow}>
+                  <Text style={s.settledSub}>{model.settledSub}</Text>
+                </View>
+              ) : null}
             </>
           )}
         </View>

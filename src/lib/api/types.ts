@@ -533,9 +533,18 @@ export interface Invoice {
   currency: "GHS" | "USD";
   /** The margin over mid-market in force at issue, kept so an old invoice can be explained. */
   fxMarginPercent: number | null;
-  /** The rate printed on the PDF as indicative. NOT what the client is charged. */
-  fxRateIndicative: number | null;
-  fxRateIndicativeAt: string | null;
+  /**
+   * The rate LOCKED when the invoice was issued. Binding, not indicative: the printed cedi
+   * figure is what a client sends by mobile money or bank transfer, so it must not move
+   * underneath them while the invoice is still valid.
+   */
+  fxRateLocked: number | null;
+  fxRateLockedAt: string | null;
+  /** Last day the printed cedi amount can be paid. Past it, the rate must be refreshed. */
+  fxValidUntil: string | null;
+  fxExpired: boolean;
+  /** Outstanding balance in cedis at the locked rate. Null on cedi invoices. */
+  balanceGhs: number | null;
   /** Cedis actually received, whatever the invoice is denominated in. */
   receivedGhs: number;
   /** Verification identity, minted at issue. Null while the invoice is a draft. */
@@ -599,6 +608,8 @@ export interface FxState {
   /** Live mid-market rate, or the manual override when one is set. Null if unavailable. */
   midRate: number | null;
   marginPercent: number;
+  /** How many days a locked cedi figure stays payable. */
+  validityDays: number;
   /** midRate x (1 + margin). What clients are actually charged at. */
   effectiveRate: number | null;
   /** Set when the operator has pinned a rate instead of using the feed. */
@@ -613,6 +624,7 @@ export interface FxState {
 export interface FxInput {
   marginPercent: number;
   manualRate: number | null;
+  validityDays?: number;
 }
 
 export interface InvoicesOutstanding {
@@ -628,11 +640,11 @@ export interface InvoicesOutstanding {
 export interface PublicInvoice extends Invoice {
   billTo: BillTo;
   /**
-   * Dollar invoices only: what the outstanding balance comes to in cedis right now. This is the
-   * figure the client is about to be charged, which is why the page exists rather than the PDF
-   * being the last word. Null when settled, or when no rate could be obtained.
+   * Dollar invoices only: the cedi figure locked at issue, restated. The page must agree with
+   * the PDF the client is holding, so this is the same number, not a fresh quote. Null when
+   * settled or when no rate was ever locked.
    */
-  quote: { rate: number; amountGhs: number; quotedAt: string } | null;
+  quote: { rate: number; amountGhs: number; validUntil: string | null; expired: boolean } | null;
 }
 
 /* ------------------------------------------------------------------------ vault

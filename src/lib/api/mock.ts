@@ -29,8 +29,11 @@ const invoices: Invoice[] = [
     // the rate on the day they pay.
     currency: "USD",
     fxMarginPercent: 11.5,
-    fxRateIndicative: 13.119816,
-    fxRateIndicativeAt: "2026-08-11T09:00:00Z",
+    fxRateLocked: 13.119816,
+    fxRateLockedAt: "2026-08-11T09:00:00Z",
+    fxValidUntil: "2026-08-18",
+    fxExpired: false,
+    balanceGhs: null,
     receivedGhs: 0,
     documentId: "SAH-FIN-20260811-INV-AMABOA-01",
     reference: "INV-AMABOA-01",
@@ -61,7 +64,12 @@ const invoices: Invoice[] = [
  * settling a dollar bill from Ghana costs us. Fixed mid rate here — the point is to exercise
  * the arithmetic, not the feed.
  */
-const fxState = { midRate: 11.7667, marginPercent: 11.5, manualRate: null as number | null };
+const fxState = {
+  midRate: 11.7667,
+  marginPercent: 11.5,
+  manualRate: null as number | null,
+  validityDays: 7,
+};
 
 const effectiveRate = () =>
   round6((fxState.manualRate ?? fxState.midRate) * (1 + fxState.marginPercent / 100));
@@ -84,7 +92,23 @@ function hydrateInvoice(invoice: Invoice): Invoice {
       : settled.reduce((sum, p) => sum + p.amount, 0),
   );
   const receivedGhs = round2(settled.reduce((sum, p) => sum + p.amount, 0));
-  return { ...invoice, total, paid, balance: round2(total - paid), receivedGhs };
+  const balance = round2(total - paid);
+  return {
+    ...invoice,
+    total,
+    paid,
+    balance,
+    receivedGhs,
+    balanceGhs:
+      invoice.currency === "USD" && invoice.fxRateLocked
+        ? round2(balance * invoice.fxRateLocked)
+        : null,
+    fxExpired: Boolean(
+      invoice.currency === "USD" &&
+        invoice.fxValidUntil &&
+        new Date(`${invoice.fxValidUntil}T23:59:59`) < new Date(),
+    ),
+  };
 }
 
 /** Stand-in for the API's client code segment, e.g. "Ama Boateng" → "AMABOA". */
@@ -986,8 +1010,11 @@ export const mockApi: BedrockApi = {
         memo: input.memo,
         currency: input.currency ?? "GHS",
         fxMarginPercent: null,
-        fxRateIndicative: null,
-        fxRateIndicativeAt: null,
+        fxRateLocked: null,
+        fxRateLockedAt: null,
+        fxValidUntil: null,
+        fxExpired: false,
+        balanceGhs: null,
         receivedGhs: 0,
         documentId: null,
         reference: null,
@@ -1082,8 +1109,11 @@ export const mockApi: BedrockApi = {
       // Stamp the rate a dollar invoice's PDF prints as indicative.
       if (invoice.currency === "USD") {
         invoice.fxMarginPercent = fxState.marginPercent;
-        invoice.fxRateIndicative = effectiveRate();
-        invoice.fxRateIndicativeAt = new Date().toISOString();
+        invoice.fxRateLocked = effectiveRate();
+        invoice.fxRateLockedAt = new Date().toISOString();
+        const until = new Date();
+        until.setDate(until.getDate() + fxState.validityDays);
+        invoice.fxValidUntil = until.toISOString().slice(0, 10);
       }
       return hydrateInvoice(invoice);
     },
@@ -1095,7 +1125,10 @@ export const mockApi: BedrockApi = {
       if (invoice.status === "void") throw new ApiError(409, "That invoice has been voided.");
 
       // `amount` is always the cedis that arrived; on a dollar invoice work out what they bought.
-      const rate = invoice.currency === "USD" ? (input.fxRate ?? effectiveRate()) : null;
+      const rate =
+        invoice.currency === "USD"
+          ? (input.fxRate ?? invoice.fxRateLocked ?? effectiveRate())
+          : null;
 
       invoice.payments.push({
         id: `pm_${crypto.randomUUID().slice(0, 8)}`,
@@ -1140,6 +1173,20 @@ export const mockApi: BedrockApi = {
       });
       return hydrateInvoice(invoice);
     },
+    async refreshRate(id) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (invoice.currency !== "USD") throw new ApiError(422, "Only a dollar invoice has a rate.");
+      if (invoice.status !== "issued") throw new ApiError(409, "Only a live, unpaid invoice.");
+      invoice.fxMarginPercent = fxState.marginPercent;
+      invoice.fxRateLocked = effectiveRate();
+      invoice.fxRateLockedAt = new Date().toISOString();
+      const until = new Date();
+      until.setDate(until.getDate() + fxState.validityDays);
+      invoice.fxValidUntil = until.toISOString().slice(0, 10);
+      return hydrateInvoice(invoice);
+    },
     async outstanding() {
       await delay();
       const items = invoices
@@ -1156,7 +1203,6 @@ export const mockApi: BedrockApi = {
       const client = clients.find((c) => c.id === invoice.clientId);
       const contact = client?.contacts[0];
       const hydrated = hydrateInvoice(invoice);
-      const rate = effectiveRate();
       return {
         ...hydrated,
         billTo: {
@@ -1168,11 +1214,12 @@ export const mockApi: BedrockApi = {
         // What the outstanding dollars come to in cedis right now — the figure they will be
         // charged, recomputed on every read rather than frozen at issue.
         quote:
-          hydrated.currency === "USD" && hydrated.balance > 0
+          hydrated.currency === "USD" && hydrated.balance > 0 && hydrated.fxRateLocked
             ? {
-                rate,
-                amountGhs: round2(hydrated.balance * rate),
-                quotedAt: new Date().toISOString(),
+                rate: hydrated.fxRateLocked,
+                amountGhs: hydrated.balanceGhs ?? 0,
+                validUntil: hydrated.fxValidUntil,
+                expired: hydrated.fxExpired,
               }
             : null,
       };
@@ -1185,14 +1232,17 @@ export const mockApi: BedrockApi = {
       const due = hydrated.balance;
       if (due <= 0) throw new ApiError(409, "This invoice is already settled. Thank you.");
       // Paystack charges cedis, so a dollar balance is converted at today's rate here.
-      const rate = hydrated.currency === "USD" ? effectiveRate() : null;
+      if (hydrated.fxExpired) {
+        throw new ApiError(409, "The amount on this invoice has expired. Please contact us.");
+      }
+      const rate = hydrated.currency === "USD" ? hydrated.fxRateLocked : null;
       // No gateway in the mock: hand back the invoice page so the flow is still clickable.
       return {
         reference: `sbt-mock-${crypto.randomUUID().slice(0, 8)}`,
         accessCode: "mock",
         authorizationUrl: `/i/${slug}?mock-checkout=1`,
         publicKey: null,
-        amount: rate ? round2(due * rate) : due,
+        amount: rate ? (hydrated.balanceGhs ?? round2(due * rate)) : due,
         amountUsd: rate ? due : null,
         fxRate: rate,
       };
@@ -1204,6 +1254,7 @@ export const mockApi: BedrockApi = {
         marginPercent: fxState.marginPercent,
         effectiveRate: effectiveRate(),
         manualRate: fxState.manualRate,
+        validityDays: fxState.validityDays,
         ratedAt: new Date().toISOString(),
         stale: false,
         error: null,
@@ -1213,6 +1264,7 @@ export const mockApi: BedrockApi = {
       await delay();
       fxState.marginPercent = input.marginPercent;
       fxState.manualRate = input.manualRate;
+      if (input.validityDays) fxState.validityDays = input.validityDays;
       return mockApi.invoices.fx();
     },
   },

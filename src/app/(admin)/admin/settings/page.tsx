@@ -11,6 +11,7 @@ export default async function SettingsPage() {
       (): FxState => ({
         midRate: null,
         marginPercent: 11.5,
+        validityDays: 7,
         effectiveRate: null,
         manualRate: null,
         ratedAt: null,

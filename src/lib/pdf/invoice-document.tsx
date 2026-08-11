@@ -44,30 +44,36 @@ const rateFmt = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 4, maxim
 /**
  * The settlement note on a dollar-denominated invoice.
  *
- * This block exists to answer one question before the reader asks it: *the rate online says 11.60,
- * so how is this 13?* A client who finds that gap themselves reads it as a markup slipped past
- * them; a client who is told about it first reads it as a price. So the note names the gap, says
- * where it comes from, and says there is nothing added on top of it.
+ * It has to give a client a number they can act on. Most pay by mobile money or bank transfer,
+ * and "the amount is confirmed when you pay" gives them nothing to type into a MoMo prompt — so
+ * the cedi figure is fixed at issue and printed here with the date it holds until.
  *
- * Deliberately NOT called an "exchange rate" — that word invites a comparison with the published
- * mid-market figure, which is an interbank midpoint nobody can actually transact at. "Settlement
- * rate" describes what it really is: the rate at which we can settle a dollar bill from Ghana.
+ * It also answers, before the reader asks it, why the rate is 13 when the internet says 11.60.
+ * A client who finds that gap themselves reads it as a markup slipped past them; a client told
+ * about it up front reads it as a price.
+ *
+ * Deliberately "the settlement rate", not "our" — this is what converting a dollar bill from
+ * Ghana costs through the banks, not a number we invented. And deliberately not an "exchange
+ * rate": that word invites comparison with the published mid-market figure, which is an
+ * interbank midpoint nobody actually transacts at.
  *
  * The mid-market figure itself is never printed. Publishing it would turn the margin into the
  * thing clients negotiate, and it goes stale the moment the document is filed.
  */
 function fxNoteFor(invoice: Invoice, due: number): string | null {
-  if (invoice.currency !== "USD" || !invoice.fxRateIndicative) return null;
+  if (invoice.currency !== "USD" || !invoice.fxRateLocked) return null;
 
-  const rate = invoice.fxRateIndicative;
-  const asOf = invoice.fxRateIndicativeAt ? fmtDate(invoice.fxRateIndicativeAt) : null;
+  const rate = invoice.fxRateLocked;
   const ghs = nf2.format(Math.round(due * rate * 100) / 100);
+  const until = invoice.fxValidUntil ? fmtDate(invoice.fxValidUntil) : null;
 
   return (
-    `Priced in US dollars, payable in Ghana cedis. ${money(due, "USD")} is about GHS ${ghs} ` +
-    `at our settlement rate of ${rateFmt.format(rate)}${asOf ? ` (${asOf})` : ""}. ` +
-    `Rates quoted online are interbank figures no card or bank converts at. ` +
-    `Ours includes all bank and card charges, nothing added. Confirmed when you pay.`
+    `Priced in US dollars, payable in Ghana cedis. Pay GHS ${ghs} at the settlement rate of ` +
+    `${rateFmt.format(rate)}. Rates quoted online are interbank figures no card or bank ` +
+    `converts at. ` +
+    (until
+      ? `This cedi amount holds until ${until}; after that please ask us for an updated invoice.`
+      : `The cedi amount is confirmed when you pay.`)
   );
 }
 
@@ -154,6 +160,12 @@ export function invoiceBillingModel({
     number,
     currency: code,
     fxNote: isReceipt ? null : fxNoteFor(invoice, due),
+    // The cedi figure sits directly under the dollar total, because that is the number the
+    // client types into a MoMo prompt or hands to a bank teller.
+    settledSub:
+      !isReceipt && isUsd && due > 0 && invoice.fxRateLocked
+        ? `GHS ${nf2.format(Math.round(due * invoice.fxRateLocked * 100) / 100)}`
+        : null,
     meta,
     billTo: billTo ?? null,
     headline: isReceipt

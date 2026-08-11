@@ -26,6 +26,21 @@ const blankLine = (): DraftLine => ({
   unitPrice: "",
 });
 
+/**
+ * Lines that look like a hand-added bank or card fee.
+ *
+ * The settlement rate on a dollar invoice already contains that cost, so adding it again as a
+ * line charges it twice: a 12% line on top of an 11.5% rate bills roughly 24% over mid-market,
+ * not 12%. This has happened in practice, which is why the composer says something.
+ */
+const FEE_LINE = /\b(bank|visa|mastercard|card|forex|fx|exchange|processing|transaction|transfer|charge|charges|fee|fees)\b/i;
+
+function feeLikeLines(lines: DraftLine[]): string[] {
+  return lines
+    .map((l) => l.description.trim())
+    .filter((d) => d.length > 0 && FEE_LINE.test(d));
+}
+
 function linesFrom(invoice: Invoice, chargeDescriptions: Set<string>): DraftLine[] {
   // Charge-backed lines are rebuilt from the ticked charges on save, so they are not offered
   // as free-text rows here — editing them would silently diverge from the charge behind them.
@@ -107,6 +122,10 @@ export function InvoiceComposer({
     .filter((c) => checked.has(c.id))
     .reduce((sum, c) => sum + c.amount, 0);
   const total = lineTotal + chargeTotal;
+
+  // Only a warning on dollar invoices: on a cedi invoice there is no settlement rate to
+  // double up with, so a "bank charges" line may be perfectly legitimate.
+  const feeLines = currency === "USD" ? feeLikeLines(lines) : [];
 
   function setLine(key: string, patch: Partial<DraftLine>) {
     setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -317,6 +336,26 @@ export function InvoiceComposer({
           ))}
         </div>
       </section>
+
+      {/* The double-charge guard. The settlement rate already contains the bank and card cost,
+          so a fee line on a dollar invoice bills it a second time. Warn, do not block: there may
+          be a legitimate line that happens to match. */}
+      {feeLines.length > 0 && (
+        <section className="rounded-xl border border-warning/40 bg-warning-soft p-5">
+          <h2 className="text-sm font-semibold text-warning">
+            Check this is not being charged twice
+          </h2>
+          <p className="mt-2 text-sm text-warning">
+            {feeLines.length === 1 ? "This line looks" : "These lines look"} like a bank or card
+            charge: <span className="font-medium">{feeLines.join(", ")}</span>. On a dollar invoice
+            the settlement rate already includes those costs, so adding them as a line charges them
+            again. A 12% line on top of an 11.5% rate bills roughly 24%, not 12%.
+          </p>
+          <p className="mt-2 text-sm text-warning">
+            If this line is something else, carry on and save.
+          </p>
+        </section>
+      )}
 
       <section className="rounded-xl border border-border bg-surface p-6">
         <Field label="Note to the client" htmlFor="memo">
