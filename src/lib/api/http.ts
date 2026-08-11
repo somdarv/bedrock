@@ -8,7 +8,10 @@ import type {
   InfraCharge,
   InfraChargesOutstanding,
   InfrastructureOverview,
+  Invoice,
+  InvoicesOutstanding,
   PaymentSession,
+  PublicInvoice,
   ReminderSettings,
   ServerMetrics,
   SessionUser,
@@ -251,6 +254,35 @@ export const httpApi: BedrockApi = {
       request<InfraCharge>(`/api/admin/infra-charges/${id}/pay`, { method: "POST" }),
     chargesOutstanding: () =>
       request<InfraChargesOutstanding>(`/api/admin/infra-charges/outstanding`),
+  },
+  invoices: {
+    list: async (clientId) => {
+      const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
+      const res = await request<{ invoices: Invoice[] }>(`/api/admin/invoices${qs}`);
+      return res.invoices;
+    },
+    get: (id) => request<Invoice>(`/api/admin/invoices/${id}`),
+    create: (clientId, input) =>
+      request<Invoice>(`/api/admin/clients/${clientId}/invoices`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id, input) =>
+      request<Invoice>(`/api/admin/invoices/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    remove: (id) => request<void>(`/api/admin/invoices/${id}`, { method: "DELETE" }),
+    issue: (id) => request<Invoice>(`/api/admin/invoices/${id}/issue`, { method: "POST" }),
+    recordPayment: (id, input) =>
+      request<Invoice>(`/api/admin/invoices/${id}/payments`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    void: (id) => request<Invoice>(`/api/admin/invoices/${id}/void`, { method: "POST" }),
+    outstanding: () => request<InvoicesOutstanding>(`/api/admin/invoices/outstanding`),
+    getBySlug: (slug) => request<PublicInvoice>(`/api/i/${slug}`),
+    startPayment: (slug) => request<PaymentSession>(`/api/i/${slug}/pay`, { method: "POST" }),
   },
   vault: {
     get: () => request<VaultState>(`/api/admin/vault`),

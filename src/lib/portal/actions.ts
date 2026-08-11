@@ -17,11 +17,26 @@ export async function startPortalPayment(
     const session = await api.packages.startPayment(slug, milestoneId);
     return { url: session.authorizationUrl };
   } catch (e) {
-    return {
-      error:
-        e instanceof ApiError
-          ? e.message
-          : "We could not start that payment. Please try again in a moment.",
-    };
+    return { error: payError(e) };
   }
+}
+
+/**
+ * The same, for a standalone invoice — the Pay button printed on the invoice PDF lands the
+ * client on /i/{slug}, which calls this.
+ */
+export async function startInvoicePayment(slug: string): Promise<{ url?: string; error?: string }> {
+  try {
+    const session = await api.invoices.startPayment(slug);
+    return { url: session.authorizationUrl };
+  } catch (e) {
+    return { error: payError(e) };
+  }
+}
+
+/** Show the API's own refusal (already settled, gateway down) but never a raw stack. */
+function payError(e: unknown): string {
+  return e instanceof ApiError
+    ? e.message
+    : "We could not start that payment. Please try again in a moment.";
 }

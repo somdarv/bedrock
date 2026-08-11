@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type Invoice, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -12,6 +12,65 @@ import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
 const infraCharges: InfraCharge[] = [];
+
+/**
+ * One issued, unpaid invoice so the invoice screens, the public pay page and both PDF routes
+ * have something real to render in dev. Money fields are recomputed by hydrateInvoice.
+ */
+const invoices: Invoice[] = [
+  {
+    id: "in_seed001",
+    clientId: "cl_1",
+    clientName: "Ama Boateng",
+    publicSlug: "3f2b91c4-7d6e-4a15-9b28-c50e7f14a2d3",
+    title: "Infrastructure renewal — 2026/27",
+    memo: "Payable on receipt. Renewing now keeps your site and email online without interruption.",
+    documentId: "SAH-FIN-20260811-INV-AMABOA-01",
+    reference: "INV-AMABOA-01",
+    serial: "G-4C1A-9E77",
+    receiptDocumentId: null,
+    receiptReference: null,
+    receiptSerial: null,
+    issueDate: "2026-08-11",
+    dueDate: "2026-08-25",
+    status: "issued",
+    issuedAt: "2026-08-11T09:00:00Z",
+    paidAt: null,
+    createdAt: "2026-08-11T09:00:00Z",
+    items: [
+      { id: "ii_s1", position: 0, description: "Domain renewal — amaboateng.com (12 months)", quantity: 1, unitPrice: 220, amount: 220 },
+      { id: "ii_s2", position: 1, description: "Web hosting — Starter plan (12 months)", quantity: 1, unitPrice: 1450, amount: 1450 },
+      { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 90, amount: 180 },
+    ],
+    payments: [],
+    total: 0,
+    paid: 0,
+    balance: 0,
+  },
+];
+
+/** Money on an invoice is derived, never stored — same rule the API follows. */
+function hydrateInvoice(invoice: Invoice): Invoice {
+  const total = round2(invoice.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
+  const paid = round2(
+    invoice.payments.filter((p) => p.status === "success").reduce((sum, p) => sum + p.amount, 0),
+  );
+  return { ...invoice, total, paid, balance: round2(total - paid) };
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Stand-in for the API's client code segment, e.g. "Ama Boateng" → "AMABOA". */
+function mockClientCode(clientId: string): string {
+  const name = clients.find((c) => c.id === clientId)?.name ?? "CLIENT";
+  return name.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase() || "CLIENT";
+}
+
+/** Per-generation verification serial: G-XXXX-XXXX (docs/DOCUMENT-CODES.md §4). */
+function mockSerial(): string {
+  const hex = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+  return `G-${hex.slice(0, 4)}-${hex.slice(4)}`;
+}
 
 const clients: Client[] = [
   {
@@ -806,6 +865,7 @@ export const mockApi: BedrockApi = {
         id: `ic_${crypto.randomUUID().slice(0, 8)}`,
         clientId,
         clientAssetId: input.clientAssetId,
+        invoiceId: null,
         description: input.description,
         amount: input.amount,
         dueDate: input.dueDate,
@@ -852,6 +912,228 @@ export const mockApi: BedrockApi = {
         .map((c) => ({ ...c, clientName: clients.find((cl) => cl.id === c.clientId)?.name ?? null }))
         .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
       return { total: items.reduce((s, c) => s + c.amount, 0), items };
+    },
+  },
+  /**
+   * In-memory standalone invoices. The money rules are the real ones (totals derived from the
+   * lines, a cleared balance settles the invoice, closes the charges it bills and mints the
+   * receipt) so the admin screens are exercised properly without the Laravel API running.
+   */
+  invoices: {
+    async list(clientId) {
+      await delay();
+      return invoices
+        .filter((i) => !clientId || i.clientId === clientId)
+        .map(hydrateInvoice)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    async get(id) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      return hydrateInvoice(invoice);
+    },
+    async create(clientId, input) {
+      await delay();
+      const charges = infraCharges.filter(
+        (c) => input.chargeIds.includes(c.id) && c.clientId === clientId && c.status === "pending",
+      );
+      const items = [
+        ...input.items.map((item, i) => ({ ...item, position: i })),
+        ...charges.map((c, i) => ({
+          description: c.description,
+          quantity: 1,
+          unitPrice: c.amount,
+          position: input.items.length + i,
+        })),
+      ];
+      if (items.length === 0) throw new ApiError(422, "An invoice needs at least one line item.");
+
+      const invoice: Invoice = {
+        id: `in_${crypto.randomUUID().slice(0, 8)}`,
+        clientId,
+        clientName: clients.find((c) => c.id === clientId)?.name ?? null,
+        publicSlug: crypto.randomUUID(),
+        title: input.title,
+        memo: input.memo,
+        documentId: null,
+        reference: null,
+        serial: null,
+        receiptDocumentId: null,
+        receiptReference: null,
+        receiptSerial: null,
+        issueDate: input.issueDate,
+        dueDate: input.dueDate,
+        status: "draft",
+        issuedAt: null,
+        paidAt: null,
+        createdAt: new Date().toISOString(),
+        items: items.map((item) => ({
+          id: `ii_${crypto.randomUUID().slice(0, 8)}`,
+          position: item.position,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.quantity * item.unitPrice,
+        })),
+        payments: [],
+        total: 0,
+        paid: 0,
+        balance: 0,
+      };
+      invoices.push(invoice);
+      charges.forEach((c) => {
+        c.invoiceId = invoice.id;
+      });
+      return hydrateInvoice(invoice);
+    },
+    async update(id, input) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (invoice.status !== "draft") {
+        throw new ApiError(409, "This invoice has been issued. Void it and raise a new one.");
+      }
+      infraCharges.forEach((c) => {
+        if (c.invoiceId === id) c.invoiceId = null;
+      });
+      const charges = infraCharges.filter(
+        (c) => input.chargeIds.includes(c.id) && c.clientId === invoice.clientId && c.status === "pending",
+      );
+      invoice.title = input.title;
+      invoice.memo = input.memo;
+      invoice.issueDate = input.issueDate;
+      invoice.dueDate = input.dueDate;
+      invoice.items = [
+        ...input.items,
+        ...charges.map((c) => ({ description: c.description, quantity: 1, unitPrice: c.amount })),
+      ].map((item, i) => ({
+        id: `ii_${crypto.randomUUID().slice(0, 8)}`,
+        position: i,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        amount: item.quantity * item.unitPrice,
+      }));
+      charges.forEach((c) => {
+        c.invoiceId = invoice.id;
+      });
+      return hydrateInvoice(invoice);
+    },
+    async remove(id) {
+      await delay();
+      const at = invoices.findIndex((i) => i.id === id);
+      if (at >= 0) {
+        infraCharges.forEach((c) => {
+          if (c.invoiceId === id) c.invoiceId = null;
+        });
+        invoices.splice(at, 1);
+      }
+    },
+    async issue(id) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (invoice.documentId) return hydrateInvoice(invoice);
+
+      const code = mockClientCode(invoice.clientId);
+      const seq = String(invoices.filter((i) => i.documentId).length + 1).padStart(2, "0");
+      const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      invoice.reference = `INV-${code}-${seq}`;
+      invoice.documentId = `SAH-FIN-${ymd}-${invoice.reference}`;
+      invoice.serial = mockSerial();
+      invoice.status = "issued";
+      invoice.issueDate ??= new Date().toISOString().slice(0, 10);
+      invoice.issuedAt = new Date().toISOString();
+      return hydrateInvoice(invoice);
+    },
+    async recordPayment(id, input) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (invoice.status === "draft") throw new ApiError(409, "Issue the invoice first.");
+      if (invoice.status === "void") throw new ApiError(409, "That invoice has been voided.");
+
+      invoice.payments.push({
+        id: `pm_${crypto.randomUUID().slice(0, 8)}`,
+        milestoneId: null,
+        amount: input.amount,
+        kind: "full",
+        status: "success",
+        paystackReference: input.reference,
+        method: input.method,
+        paidAt: input.paidAt ?? new Date().toISOString(),
+      });
+
+      const hydrated = hydrateInvoice(invoice);
+      if (hydrated.balance <= 0 && hydrated.total > 0) {
+        const code = mockClientCode(invoice.clientId);
+        const seq = String(invoices.filter((i) => i.receiptDocumentId).length + 1).padStart(2, "0");
+        const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        invoice.status = "paid";
+        invoice.paidAt = new Date().toISOString();
+        invoice.receiptReference = `RCP-${code}-${seq}`;
+        invoice.receiptDocumentId = `SAH-FIN-${ymd}-${invoice.receiptReference}`;
+        invoice.receiptSerial = mockSerial();
+        infraCharges.forEach((c) => {
+          if (c.invoiceId === invoice.id && c.status === "pending") {
+            c.status = "paid";
+            c.paidAt = invoice.paidAt;
+          }
+        });
+      }
+      return hydrateInvoice(invoice);
+    },
+    async void(id) {
+      await delay();
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      if (invoice.status === "paid") throw new ApiError(409, "That invoice is already settled.");
+      invoice.status = "void";
+      infraCharges.forEach((c) => {
+        if (c.invoiceId === id) c.invoiceId = null;
+      });
+      return hydrateInvoice(invoice);
+    },
+    async outstanding() {
+      await delay();
+      const items = invoices
+        .filter((i) => i.status === "issued")
+        .map(hydrateInvoice)
+        .filter((i) => i.balance > 0)
+        .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+      return { total: items.reduce((s, i) => s + i.balance, 0), items };
+    },
+    async getBySlug(slug) {
+      await delay();
+      const invoice = invoices.find((i) => i.publicSlug === slug);
+      if (!invoice || invoice.status === "draft") throw new ApiError(404, "Invoice not found");
+      const client = clients.find((c) => c.id === invoice.clientId);
+      const contact = client?.contacts[0];
+      return {
+        ...hydrateInvoice(invoice),
+        billTo: {
+          name: client?.name ?? "",
+          contactName: contact?.name ?? null,
+          email: contact?.email ?? null,
+          phone: contact?.phone ?? contact?.whatsapp ?? null,
+        },
+      };
+    },
+    async startPayment(slug) {
+      await delay();
+      const invoice = invoices.find((i) => i.publicSlug === slug);
+      if (!invoice) throw new ApiError(404, "Invoice not found");
+      const { balance: due } = hydrateInvoice(invoice);
+      if (due <= 0) throw new ApiError(409, "This invoice is already settled. Thank you.");
+      // No gateway in the mock: hand back the invoice page so the flow is still clickable.
+      return {
+        reference: `sbt-mock-${crypto.randomUUID().slice(0, 8)}`,
+        accessCode: "mock",
+        authorizationUrl: `/i/${slug}?mock-checkout=1`,
+        publicKey: null,
+        amount: due,
+      };
     },
   },
   /**

@@ -25,10 +25,13 @@ const pendingDeposit = (p: WorkPackage) => {
 const hasDepositSchedule = (p: WorkPackage) => p.milestones.some((m) => m.kind === "deposit");
 
 export default async function ReceivablesPage() {
-  const [packages, clients, infra] = await Promise.all([
+  const [packages, clients, infra, billed] = await Promise.all([
     api.packages.list(),
     api.clients.list(),
     api.infrastructure.chargesOutstanding().catch(() => ({ total: 0, items: [] })),
+    // Issued invoices still owed. A charge billed on one drops out of `infra` above and shows
+    // up here instead, so the same money is never counted in both.
+    api.invoices.outstanding().catch(() => ({ total: 0, items: [] })),
   ]);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
 
@@ -157,7 +160,8 @@ export default async function ReceivablesPage() {
 
         <p className="mt-2 max-w-2xl text-xs leading-relaxed text-subtle">
           Hosting, domain and other fees, billed separately from project work. Add or clear these on
-          each client&apos;s page.
+          each client&apos;s page. Once a charge is billed on an invoice it moves to the Invoices
+          section below.
         </p>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
@@ -183,6 +187,67 @@ export default async function ReceivablesPage() {
                     <div className="shrink-0 text-right">
                       <div className="font-display text-sm font-semibold tracking-tight">
                         {formatCedis(c.amount)}
+                      </div>
+                      <div className="text-[11px] text-subtle">owed</div>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Standalone invoices — billing raised outside the work-package flow. */}
+      <section>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="eyebrow">Invoices</div>
+            <h2 className="mt-2 font-display text-xl font-semibold tracking-tight">
+              Issued &amp; unpaid
+            </h2>
+          </div>
+          <div className="text-right">
+            <div className="font-display text-xl font-semibold tracking-tight">
+              {formatCedis(billed.total)}
+            </div>
+            <div className="text-[11px] text-subtle">
+              {billed.items.length} {billed.items.length === 1 ? "invoice" : "invoices"}
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-subtle">
+          Invoices raised directly against a client, outside the work-package flow. The client can
+          pay these online from the invoice itself.
+        </p>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
+          {billed.items.length === 0 ? (
+            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+              No invoices outstanding.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {billed.items.map((invoice) => (
+                <li key={invoice.id}>
+                  <Link
+                    href={`/admin/invoices/${invoice.id}`}
+                    className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 md:px-6"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{invoice.title}</div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {invoice.clientName ?? "Unknown client"}
+                        {invoice.reference ? ` · ${invoice.reference}` : ""}
+                        {invoice.dueDate
+                          ? ` · due ${new Date(invoice.dueDate).toLocaleDateString()}`
+                          : ""}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-display text-sm font-semibold tracking-tight">
+                        {formatCedis(invoice.balance)}
                       </div>
                       <div className="text-[11px] text-subtle">owed</div>
                     </div>

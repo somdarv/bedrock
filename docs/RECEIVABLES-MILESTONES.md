@@ -83,7 +83,10 @@ project). That is a later phase; see [INFRASTRUCTURE-MODULE.md](../../bedrock-ap
    *(in progress)*
 3. **Dashboard upgrade** — buckets read unpaid milestones: exact deposit bucket, per-stage breakdown.
 4. **Package UI** — manage the schedule on the package page; set `delivery_mode`; pay a milestone.
-5. **Separate infrastructure billing** — charges on `ClientAsset`, its own dashboard bucket.
+5. **Separate infrastructure billing** — charges on `ClientAsset`, its own dashboard bucket. *(shipped)*
+6. **Standalone invoices** — shipped. Charges were a ledger with no document; an operator could see
+   GHS 600 owed for hosting but had no way to *ask* for it outside a work package. See
+   [INVOICES.md](./INVOICES.md).
 
 ## Decisions (from the operator)
 

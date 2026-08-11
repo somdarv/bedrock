@@ -12,7 +12,12 @@ import type {
   InfraChargeInput,
   InfraChargesOutstanding,
   InfrastructureOverview,
+  Invoice,
+  InvoiceInput,
+  InvoicePaymentInput,
+  InvoicesOutstanding,
   LineItemInput,
+  PublicInvoice,
   MilestoneInput,
   PaymentInput,
   PaymentSession,
@@ -126,6 +131,34 @@ export interface BedrockApi {
     payCharge(id: string): Promise<InfraCharge>;
     /** Cross-client outstanding infrastructure charges (total + items) for the dashboard. */
     chargesOutstanding(): Promise<InfraChargesOutstanding>;
+  };
+  /**
+   * Standalone invoices — billing raised directly against a client, outside the work-package
+   * flow. A draft is editable; `issue` mints the verifiable Document ID printed on the PDF and
+   * freezes the lines. See docs/DOCUMENT-CODES.md.
+   */
+  invoices: {
+    /** Every invoice, newest first; optionally narrowed to one client. */
+    list(clientId?: string): Promise<Invoice[]>;
+    get(id: string): Promise<Invoice>;
+    create(clientId: string, input: InvoiceInput): Promise<Invoice>;
+    /** Drafts only — an issued invoice is a document the client is already holding. */
+    update(id: string, input: InvoiceInput): Promise<Invoice>;
+    remove(id: string): Promise<void>;
+    /** Mint the verification identity and move the invoice to `issued`. */
+    issue(id: string): Promise<Invoice>;
+    /** Record a payment taken outside the gateway; a cleared balance settles and mints a receipt. */
+    recordPayment(id: string, input: InvoicePaymentInput): Promise<Invoice>;
+    void(id: string): Promise<Invoice>;
+    /** Issued invoices still owed, for the Receivables dashboard. */
+    outstanding(): Promise<InvoicesOutstanding>;
+    /** PUBLIC (unguessable slug): the client-facing read behind the Pay button. */
+    getBySlug(slug: string): Promise<PublicInvoice>;
+    /**
+     * PUBLIC: open a gateway checkout for the outstanding balance. Confirms nothing — only the
+     * verified webhook turns this into money received.
+     */
+    startPayment(slug: string): Promise<PaymentSession>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

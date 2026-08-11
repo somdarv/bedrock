@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,11 @@ export function InfraChargesSection({
             <span className="text-sm text-muted-foreground">
               Outstanding <span className="font-semibold text-foreground">{formatCedis(outstanding)}</span>
             </span>
+          )}
+          {outstanding > 0 && (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/admin/invoices/new?clientId=${clientId}`}>Invoice these</Link>
+            </Button>
           )}
           <Button size="sm" onClick={() => setAdding(true)}>
             Add charge

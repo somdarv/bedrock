@@ -451,6 +451,8 @@ export interface InfraCharge {
   clientId: string;
   /** Optional link to the monitored asset this fee renews (null = general infra fee). */
   clientAssetId: string | null;
+  /** The standalone invoice billing this charge, once one has been raised for it. */
+  invoiceId: string | null;
   description: string;
   amount: number;
   dueDate: string | null;
@@ -476,6 +478,94 @@ export interface InfraChargeRow extends InfraCharge {
 export interface InfraChargesOutstanding {
   total: number;
   items: InfraChargeRow[];
+}
+
+/* ------------------------------------------------------------------- invoices
+ * Standalone invoices: billing raised directly against a client, outside the work-package
+ * flow (infrastructure renewals above all). Mirrors the Laravel model Invoice.
+ *
+ * A draft is editable. Issuing mints the verifiable Document ID printed on the PDF, after
+ * which the lines are frozen and the only ways out are payment or a void. See
+ * docs/DOCUMENT-CODES.md and docs/RECEIVABLES-MILESTONES.md (Phase 5).
+ */
+
+export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
+
+export interface InvoiceItem {
+  id: string;
+  position: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+export interface Invoice {
+  id: string;
+  clientId: string;
+  /** Present on list reads (the API eager-loads the client); null on some nested reads. */
+  clientName: string | null;
+  /** Unguessable public slug — the pay page and the PDF's Pay button are keyed on it. */
+  publicSlug: string;
+  title: string;
+  memo: string | null;
+  /** Verification identity, minted at issue. Null while the invoice is a draft. */
+  documentId: string | null;
+  /** Short reference printed in the letterhead, e.g. "INV-GIGCOT-07". */
+  reference: string | null;
+  serial: string | null;
+  receiptDocumentId: string | null;
+  receiptReference: string | null;
+  receiptSerial: string | null;
+  issueDate: string | null;
+  dueDate: string | null;
+  status: InvoiceStatus;
+  issuedAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  items: InvoiceItem[];
+  payments: Payment[];
+  total: number;
+  paid: number;
+  balance: number;
+}
+
+export interface InvoiceItemInput {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface InvoiceInput {
+  title: string;
+  memo: string | null;
+  issueDate: string | null;
+  dueDate: string | null;
+  items: InvoiceItemInput[];
+  /** Outstanding infrastructure charges to bill on this invoice; appended as lines. */
+  chargeIds: string[];
+}
+
+/** A payment taken outside the gateway (bank transfer, cash, direct mobile money). */
+export interface InvoicePaymentInput {
+  amount: number;
+  method: string;
+  paidAt: string | null;
+  reference: string | null;
+}
+
+export interface InvoicesOutstanding {
+  total: number;
+  items: Invoice[];
+}
+
+/**
+ * The client-facing read behind the Pay button. The same invoice shape with the bill-to block
+ * attached — mirroring the work-package portal, so the public PDF routes can render straight
+ * from it without a second, privileged fetch.
+ */
+export interface PublicInvoice extends Invoice {
+  billTo: BillTo;
 }
 
 /* ------------------------------------------------------------------------ vault

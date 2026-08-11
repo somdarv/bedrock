@@ -1,13 +1,31 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
-import type { ClientAsset, ClientType, InfrastructureOverview, WorkPackage } from "@/lib/api";
+import type {
+  BillTo,
+  ClientAsset,
+  ClientType,
+  InfrastructureOverview,
+  Invoice,
+  WorkPackage,
+} from "@/lib/api";
 import { packageDocumentRefs } from "@/lib/documents/package-refs";
 import { VERIFY_BASE_URL } from "@/lib/documents/registry";
 import { logoDataUri, registerBrandFonts } from "./brand";
 import { InfraReportDocument } from "./infra-report-document";
+import { InvoiceDocument } from "./invoice-document";
 import { PackageDocument } from "./package-document";
 import { StatementDocument } from "./statement-document";
+
+/** The scan-to-verify stamp's QR: always /verify/{reference} on the public verify host. */
+async function verifyQrFor(reference: string): Promise<string> {
+  return QRCode.toDataURL(`${VERIFY_BASE_URL}/verify/${reference}`, {
+    margin: 0,
+    width: 220,
+    errorCorrectionLevel: "H",
+    color: { dark: "#0a0a0a", light: "#ffffff" },
+  });
+}
 
 /** Render a package invoice/receipt to a PDF buffer (Node only — no headless browser). */
 export async function renderPackagePdf(
@@ -19,12 +37,7 @@ export async function renderPackagePdf(
   // Scan-to-verify stamp: the QR resolves to /verify/{reference}, which the API answers from
   // live package data, so a doctored PDF disagrees with the page it points at.
   const refs = packageDocumentRefs(pkg.publicSlug, variant);
-  const verifyQr = await QRCode.toDataURL(`${VERIFY_BASE_URL}/verify/${refs.reference}`, {
-    margin: 0,
-    width: 220,
-    errorCorrectionLevel: "H",
-    color: { dark: "#0a0a0a", light: "#ffffff" },
-  });
+  const verifyQr = await verifyQrFor(refs.reference);
 
   return renderToBuffer(
     <PackageDocument
@@ -32,6 +45,36 @@ export async function renderPackagePdf(
       variant={variant}
       logo={logoDataUri()}
       verify={{ ...refs, qr: verifyQr }}
+    />,
+  );
+}
+
+/**
+ * Render a standalone invoice or its receipt to a PDF buffer.
+ *
+ * Unlike a package document, the verification identity is not derived here — the API mints it
+ * when the invoice is issued and registers it in the `documents` table, so this renders whatever
+ * the invoice is actually carrying. A draft has none, which is why it cannot be sent.
+ */
+export async function renderInvoicePdf(
+  invoice: Invoice,
+  variant: "invoice" | "receipt",
+  opts: { billTo?: BillTo | null; payUrl?: string | null } = {},
+): Promise<Buffer> {
+  registerBrandFonts();
+
+  const reference = (variant === "receipt" ? invoice.receiptDocumentId : invoice.documentId) ?? "";
+  const serial = (variant === "receipt" ? invoice.receiptSerial : invoice.serial) ?? "Pending issue";
+  const verifyQr = await verifyQrFor(reference);
+
+  return renderToBuffer(
+    <InvoiceDocument
+      invoice={invoice}
+      variant={variant}
+      billTo={opts.billTo}
+      payUrl={opts.payUrl}
+      logo={logoDataUri()}
+      verify={{ reference: reference || "Pending issue", serial, qr: verifyQr }}
     />,
   );
 }
@@ -58,13 +101,7 @@ export async function renderStatementPdf(
 ): Promise<Buffer> {
   registerBrandFonts();
 
-  const verifyUrl = `${VERIFY_BASE_URL}/verify/${opts.reference}`;
-  const verifyQr = await QRCode.toDataURL(verifyUrl, {
-    margin: 0,
-    width: 220,
-    errorCorrectionLevel: "H",
-    color: { dark: "#0a0a0a", light: "#ffffff" },
-  });
+  const verifyQr = await verifyQrFor(opts.reference);
 
   return renderToBuffer(
     <StatementDocument

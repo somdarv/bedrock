@@ -87,12 +87,22 @@ The `{TYPE}` segment reflects the **document kind**, which is independent of the
 
 | Code | Document type | Nav category |
 |------|---------------|--------------|
-| `INV` | Invoice | Invoices |
+| `INV` | Invoice | Invoices |¹
 | `PRO` | Proposal | Proposals |
 | `QUO` | Quote | Quotes |
 | `RCP` | Receipt | Receipts |
 | `BIL` | Fee Schedule / Billing | Proposals |
 | `CON` | Contract | Proposals |
+
+¹ **Two kinds of invoice/receipt exist, and only one is numbered this way.**
+
+- **Standalone invoices** (billing raised directly against a client — infrastructure renewals and
+  the like) are registry documents: issuing one mints an ID under the `FIN` unit, e.g.
+  `SAH-FIN-20260811-INV-GIGCOT-07`, and writes a `documents` row. See [INVOICES.md](./INVOICES.md).
+- **Work-package invoices/receipts** are rendered on the fly from a package and have no registry
+  row. Their reference encodes the package instead — `SAH-INV-{first 8 hex of the package slug}` —
+  and `VerifyController` answers it from live package data. That derivation is mirrored in
+  `lib/documents/package-refs.ts`; change one and you must change the other.
 
 ---
 

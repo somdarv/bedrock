@@ -28,6 +28,9 @@ export const api: BedrockApi = {
   // Infrastructure monitoring (domains/SSL/hosting). Rides the clients switch (same admin surface).
   infrastructure:
     isLive("infrastructure") || isLive("clients") ? httpApi.infrastructure : mockApi.infrastructure,
+  // Standalone invoices bill clients and settle infrastructure charges, so they ride the same
+  // switch as clients/infrastructure — flipping one without the other would split the money model.
+  invoices: isLive("invoices") || isLive("clients") ? httpApi.invoices : mockApi.invoices,
   // Vault rides the auth switch: it is per-user data keyed to the logged-in account, so it
   // only makes sense against the same backend that issued the session.
   vault: isLive("vault") || isLive("auth") ? httpApi.vault : mockApi.vault,

@@ -33,6 +33,7 @@ export const brand = {
   line: "#e5e7eb", // gray-200, borders
   hair: "#f3f4f6", // gray-100, subtle dividers
   panel: "#fafafa", // near-paper fill
+  paper: "#ffffff", // knocked-out text on an ink fill (the Pay button)
   danger: "#b91c1c",
   warn: "#b45309",
   ok: "#3f6212",
