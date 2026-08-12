@@ -46,19 +46,36 @@ export function paymentMethodLabel(method: string | null | undefined): string {
   return PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
 }
 
-export function paidTotal(pkg: Pick<WorkPackage, "payments">): number {
-  return pkg.payments
+/**
+ * Everything received against this package, however it arrived — directly, or as cedis on an
+ * invoice raised for it. Mirrors what `balance()` subtracts, so "paid + balance = total" holds
+ * on screen instead of quietly failing for a deferred package.
+ */
+export function paidTotal(pkg: Pick<WorkPackage, "payments"> & Partial<Pick<WorkPackage, "invoicedPaid">>): number {
+  const direct = pkg.payments
     .filter((p) => p.status === "success")
     .reduce((sum, p) => sum + p.amount, 0);
+  return direct + (pkg.invoicedPaid ?? 0);
+}
+
+/**
+ * Deferred billing has no gates at all: the work runs first and is invoiced after, so there is
+ * no deposit to wait for and nothing to withhold. Both gates report open from the start, which
+ * is the truth about the files — a deferred package uploads them unlocked.
+ */
+export function gatesApply(pkg: Pick<WorkPackage, "billingMode">): boolean {
+  return pkg.billingMode !== "deferred";
 }
 
 /** Start gate: opens once the deposit (or full small-job payment) has landed. */
 export function startGateOpen(pkg: WorkPackage): boolean {
+  if (!gatesApply(pkg)) return true;
   const plan = computePaymentPlan(effectiveTotal(pkg));
   return plan.depositDue > 0 && paidTotal(pkg) >= plan.depositDue;
 }
 
 /** Download gate: opens only when the outstanding balance reaches zero. */
 export function downloadGateOpen(pkg: WorkPackage): boolean {
+  if (!gatesApply(pkg)) return true;
   return effectiveTotal(pkg) > 0 && balance(pkg) <= 0;
 }

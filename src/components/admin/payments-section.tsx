@@ -15,12 +15,13 @@ import { balance, effectiveTotal, type PaymentKind, type WorkPackage } from "@/l
 import {
   computePaymentPlan,
   downloadGateOpen,
+  gatesApply,
   paidTotal,
   paymentMethodLabel,
   PAYMENT_METHODS,
   startGateOpen,
 } from "@/lib/payments";
-import { recordPayment, type PaymentFormState } from "@/lib/packages/actions";
+import { billPackage, recordPayment, type PaymentFormState } from "@/lib/packages/actions";
 import { formatCedis } from "@/lib/utils";
 
 export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
@@ -35,6 +36,9 @@ export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
   const fullyPaid = total > 0 && bal <= 0;
   const startOpen = startGateOpen(pkg);
   const dlOpen = downloadGateOpen(pkg);
+  const deferred = !gatesApply(pkg);
+  // What is owed but not yet on an invoice — the amount "Raise invoice" would ask for.
+  const toBill = Math.max(0, bal - pkg.invoicedOutstanding);
 
   // Suggest the next sensible payment for the modal.
   const suggested =
@@ -50,35 +54,74 @@ export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Payments</h2>
-        <Button size="sm" onClick={() => setRecording(true)} disabled={fullyPaid || total <= 0}>
-          Record payment
-        </Button>
+        <div className="flex items-center gap-2">
+          {deferred && <RaiseInvoiceButton pkg={pkg} amount={toBill} />}
+          <Button size="sm" onClick={() => setRecording(true)} disabled={fullyPaid || total <= 0}>
+            Record payment
+          </Button>
+        </div>
       </div>
 
       <p className="mb-4 text-sm text-muted-foreground">
-        {plan.rule === "full"
-          ? `Small job — ${formatCedis(plan.total)} due 100% upfront.`
-          : `${formatCedis(plan.depositDue)} deposit (40%) to start · ${formatCedis(plan.finalDue)} balance (60%) on delivery.`}{" "}
-        Confirmed in production by the verified Paystack webhook.
+        {deferred ? (
+          <>
+            Deferred billing — the work runs ungated and is invoiced after it lands. Nothing is
+            held back from the client while this is unpaid.
+          </>
+        ) : (
+          <>
+            {plan.rule === "full"
+              ? `Small job — ${formatCedis(plan.total)} due 100% upfront.`
+              : `${formatCedis(plan.depositDue)} deposit (40%) to start · ${formatCedis(plan.finalDue)} balance (60%) on delivery.`}{" "}
+            Confirmed in production by the verified Paystack webhook.
+          </>
+        )}
       </p>
 
-      {/* Gate state */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <GateCard
-          label="Start gate"
-          open={startOpen}
-          openText="Open — deposit received, work can begin."
-          closedText="Closed — awaiting the deposit."
-        />
-        <GateCard
-          label="Download gate"
-          open={dlOpen}
-          openText="Open — balance cleared, originals unlocked."
-          closedText="Closed — originals stay locked until the balance is zero."
-        />
-      </div>
+      {/* Gate state, or what has been billed when there are no gates to report on */}
+      {deferred ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <GateCard
+            label="Delivery"
+            open
+            openText="Open — files are not held back on this package."
+            closedText=""
+          />
+          <GateCard
+            label="Billed"
+            openLabel="Invoiced"
+            closedLabel="Not invoiced"
+            open={pkg.invoicedOutstanding > 0 || (bal <= 0 && pkg.invoicedPaid > 0)}
+            openText={
+              pkg.invoicedOutstanding > 0
+                ? `${formatCedis(pkg.invoicedOutstanding)} invoiced, awaiting payment.`
+                : "Invoiced and settled."
+            }
+            closedText={
+              toBill > 0
+                ? `${formatCedis(toBill)} of work not yet invoiced.`
+                : "Nothing to bill yet."
+            }
+          />
+        </div>
+      ) : (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <GateCard
+            label="Start gate"
+            open={startOpen}
+            openText="Open — deposit received, work can begin."
+            closedText="Closed — awaiting the deposit."
+          />
+          <GateCard
+            label="Download gate"
+            open={dlOpen}
+            openText="Open — balance cleared, originals unlocked."
+            closedText="Closed — originals stay locked until the balance is zero."
+          />
+        </div>
+      )}
 
       {/* Totals / receipt */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface p-4">
@@ -151,20 +194,60 @@ function GateCard({
   open,
   openText,
   closedText,
+  openLabel = "Open",
+  closedLabel = "Closed",
 }: {
   label: string;
   open: boolean;
   openText: string;
   closedText: string;
+  /** Override when the card reports something other than a gate (e.g. Billed / Not billed). */
+  openLabel?: string;
+  closedLabel?: string;
 }) {
   return (
     <div className="rounded-lg border bg-surface p-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
-        <Badge variant={open ? "success" : "warning"}>{open ? "Open" : "Closed"}</Badge>
+        <Badge variant={open ? "success" : "warning"}>{open ? openLabel : closedLabel}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{open ? openText : closedText}</p>
     </div>
+  );
+}
+
+/**
+ * Raise the invoice for work already done. Produces a draft and takes the operator to it —
+ * nothing reaches the client until it is issued there, so this button is safe to press.
+ */
+function RaiseInvoiceButton({ pkg, amount }: { pkg: WorkPackage; amount: number }) {
+  const [pending, setPending] = React.useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  async function handleClick() {
+    setPending(true);
+    const result = await billPackage(pkg.id);
+    setPending(false);
+    if (result.error) {
+      toast(result.error, "danger");
+      return;
+    }
+    toast(`Draft invoice raised for ${formatCedis(amount)}.`, "success");
+    if (result.invoiceId) router.push(`/admin/invoices/${result.invoiceId}`);
+    else router.refresh();
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={handleClick}
+      disabled={pending || amount <= 0 || pkg.status === "draft"}
+    >
+      {pending ? <Spinner /> : null}
+      Raise invoice
+    </Button>
   );
 }
 

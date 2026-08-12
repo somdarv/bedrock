@@ -53,6 +53,18 @@ export type PaymentKind = "deposit" | "final" | "full" | "progress";
  * milestones = web/systems (handover gate). See docs/RECEIVABLES-MILESTONES.md. */
 export type DeliveryMode = "gated_files" | "milestones";
 
+/**
+ * When the money is collected relative to the work.
+ *
+ * `gated` — quote, deposit to start, balance to unlock the files. The default, and right for a
+ * one-off client we have no history with.
+ *
+ * `deferred` — the work runs ungated and is invoiced afterwards, for an account we already work
+ * with continuously. Both gates are open from the start; the invoice raised against the package
+ * is what collects. See docs/DEFERRED-BILLING.md.
+ */
+export type BillingMode = "gated" | "deferred";
+
 export type MilestoneKind = "deposit" | "progress" | "final";
 export type MilestoneStatus = "pending" | "paid";
 
@@ -167,6 +179,11 @@ export interface WorkPackageInput {
   pricingMode: PricingMode;
   /** Optional on update; when omitted the backend preserves the current mode. */
   deliveryMode?: DeliveryMode;
+  /**
+   * Optional. On create, omitting it defaults to the client's account type (ongoing accounts
+   * get `deferred`); on update, omitting it preserves the current mode.
+   */
+  billingMode?: BillingMode;
   /** Required when pricingMode === "fixed"; ignored otherwise. */
   totalOverride: number | null;
   estimatedDeliveryDate: string | null;
@@ -246,6 +263,18 @@ export interface WorkPackage {
   publicSlug: string;
   pricingMode: PricingMode;
   deliveryMode: DeliveryMode;
+  billingMode: BillingMode;
+  /**
+   * Cedis received on invoices raised for this package (deferred billing). Counted against the
+   * balance: money that came in through an invoice paid for this work.
+   */
+  invoicedPaid: number;
+  /**
+   * Cedis still owed on issued, unpaid invoices for this package — billed, waiting to be paid.
+   * Already counted in the balance; Receivables subtracts it so the same money is not chased
+   * both as unbilled work and as an outstanding invoice.
+   */
+  invoicedOutstanding: number;
   /** Set only when pricingMode === "fixed". */
   totalOverride: number | null;
   estimatedDeliveryDate: string | null;
@@ -281,12 +310,35 @@ export function effectiveTotal(pkg: Pick<WorkPackage, "pricingMode" | "totalOver
   return pkg.lineItems.reduce((sum, li) => sum + li.quantity * li.unitPrice, 0);
 }
 
-/** Outstanding balance = effective total − successful payments. */
-export function balance(pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems" | "payments">) {
+/**
+ * Outstanding balance = effective total − successful payments − whatever an invoice settled
+ * (mirrors backend `balance()`).
+ *
+ * `invoicedPaid` is what makes deferred billing add up: the client's money arrives on the
+ * invoice raised for the package, not on the package itself, and without it a fully settled job
+ * would read as owing every pesewa. Optional so the older shapes (mock fixtures, a cached
+ * response from before the field existed) still compute, treating it as nothing received.
+ */
+export function balance(
+  pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems" | "payments"> &
+    Partial<Pick<WorkPackage, "invoicedPaid">>,
+) {
   const paid = pkg.payments
     .filter((p) => p.status === "success")
     .reduce((sum, p) => sum + p.amount, 0);
-  return effectiveTotal(pkg) - paid;
+  return effectiveTotal(pkg) - paid - (pkg.invoicedPaid ?? 0);
+}
+
+/**
+ * What is still owed on this package and NOT yet on an invoice — the money that needs billing
+ * rather than chasing. Receivables reads this so a package already invoiced stops appearing in
+ * the project buckets: it is counted once, in Invoices.
+ */
+export function unbilled(
+  pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems" | "payments"> &
+    Partial<Pick<WorkPackage, "invoicedPaid" | "invoicedOutstanding">>,
+) {
+  return Math.max(0, balance(pkg) - (pkg.invoicedOutstanding ?? 0));
 }
 
 /* ------------------------------------------------------------------ infrastructure
@@ -523,6 +575,11 @@ export interface Invoice {
   clientId: string;
   /** Present on list reads (the API eager-loads the client); null on some nested reads. */
   clientName: string | null;
+  /**
+   * The work package this invoice bills, when it was raised from one. Null for the ordinary
+   * case: infrastructure renewals and ad-hoc billing belong to no job.
+   */
+  workPackageId: string | null;
   /** Unguessable public slug — the pay page and the PDF's Pay button are keyed on it. */
   publicSlug: string;
   title: string;

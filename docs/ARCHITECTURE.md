@@ -151,13 +151,19 @@ Resolved when the package is **Sent**; derived logic, never hand-typed amounts.
 
 ### Balance & the two gates
 
-`Balance = effectiveTotal − sum(successful payments)`. **Gates are derived state**, not stored
-flags:
+`Balance = effectiveTotal − sum(successful payments) − money settled through a linked invoice`.
+**Gates are derived state**, not stored flags:
 
 - **Start gate** — opens when the deposit (or full small-job payment) is confirmed → status →
   **In Progress**.
 - **Download gate** — opens when `Balance == 0` → `Deliverable.locked` flips to `false`
   (a denormalized cache of the rule), download buttons appear, receipt sent.
+
+**Both gates apply only when `billing_mode == 'gated'`** (the default). A package set to
+`deferred` runs ungated and is invoiced after the work lands — the balance is still tracked and
+still owed, it is simply collected on an invoice raised against the package rather than withheld
+against the files. That invoice's payments are what the balance formula reads through. See
+**docs/DEFERRED-BILLING.md**.
 
 ### Hard rule — payment truth only via webhook
 

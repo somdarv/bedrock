@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { PortalPayButton } from "@/components/portal/portal-pay-button";
 import { PortalPreviews } from "@/components/portal/portal-previews";
 import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
+import { gatesApply, paidTotal } from "@/lib/payments";
 import { statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 
@@ -32,8 +33,12 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
   const meta = statusMeta(pkg.status);
   const total = effectiveTotal(pkg);
-  const paid = pkg.payments.filter((p) => p.status === "success").reduce((s, p) => s + p.amount, 0);
+  // Money that arrived on an invoice raised for this project counts here too, or a client who
+  // has settled in full would be shown a bill they already paid.
+  const paid = paidTotal(pkg);
   const due = Math.max(0, balance(pkg));
+  // Deferred billing: nothing is withheld, and the balance is chased on its own invoice.
+  const deferred = !gatesApply(pkg);
   const isFixed = pkg.pricingMode === "fixed";
   const settled = due <= 0;
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
@@ -101,7 +106,12 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
                 <p className="text-sm text-muted-foreground">
                   {nextDue
                     ? `${formatCedis(nextDue.amount)} due now for ${nextDue.label}.`
-                    : `${formatCedis(due)} due to ${pkg.status === "draft" || pkg.status === "sent" ? "start work" : "unlock your files"}.`}
+                    : deferred
+                      ? // Nothing is being held back, so do not imply otherwise.
+                        pkg.invoicedOutstanding > 0
+                        ? `${formatCedis(pkg.invoicedOutstanding)} invoiced on this project.`
+                        : `${formatCedis(due)} outstanding on this project.`
+                      : `${formatCedis(due)} due to ${pkg.status === "draft" || pkg.status === "sent" ? "start work" : "unlock your files"}.`}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Pay by card, MTN MoMo, Telecel Cash, AirtelTigo Money or bank transfer.

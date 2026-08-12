@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { PackageFormModal } from "@/components/admin/package-form-modal";
+import type { AccountType } from "@/lib/api";
 
 /** "New work package" for a specific client — opens the package form with the client pinned. */
 export function NewPackageButton({
   clientId,
   clientName,
+  accountType,
   size,
 }: {
   clientId: string;
   clientName: string;
+  /** Seeds the billing default: an ongoing account is invoiced after the work, not before. */
+  accountType?: AccountType;
   size?: "sm" | "md";
 }) {
   const router = useRouter();
@@ -35,7 +39,7 @@ export function NewPackageButton({
       {creating && (
         <PackageFormModal
           open
-          lockedClient={{ id: clientId, name: clientName }}
+          lockedClient={{ id: clientId, name: clientName, accountType }}
           onClose={() => setCreating(false)}
           onDone={handleDone}
         />

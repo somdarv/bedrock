@@ -1,4 +1,4 @@
-import type { WorkPackageStatus } from "@/lib/api";
+import type { BillingMode, WorkPackageStatus } from "@/lib/api";
 
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "info";
 
@@ -37,6 +37,25 @@ export const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]>
   closed: [],
 };
 
-export function nextTransitions(status: WorkPackageStatus): WorkPackageStatus[] {
-  return ALLOWED_TRANSITIONS[status];
+/**
+ * Deferred billing skips the two states that exist only to wait for money — the work is
+ * invoiced after it is done. The waiting states still lead forward so a package switched to
+ * deferred while parked in one is not stranded there. Mirrors the backend's own table.
+ */
+export const DEFERRED_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
+  draft: [],
+  sent: ["in_progress"],
+  awaiting_deposit: ["in_progress"],
+  in_progress: ["review"],
+  review: ["delivered"],
+  awaiting_final_payment: ["delivered"],
+  delivered: ["closed"],
+  closed: [],
+};
+
+export function nextTransitions(
+  status: WorkPackageStatus,
+  billingMode: BillingMode = "gated",
+): WorkPackageStatus[] {
+  return (billingMode === "deferred" ? DEFERRED_TRANSITIONS : ALLOWED_TRANSITIONS)[status];
 }

@@ -102,6 +102,12 @@ export interface BedrockApi {
     removeMilestone(packageId: string, milestoneId: string): Promise<WorkPackage>;
     /** Record a payment that settles a milestone, mark it paid, then run the gates. */
     payMilestone(packageId: string, milestoneId: string, method: string | null): Promise<WorkPackage>;
+    /**
+     * Deferred billing: raise the invoice for work already done. Returns a DRAFT invoice linked
+     * back to the package and carrying its lines — editable, and sent to nobody until issued.
+     * Paying it clears the package's balance.
+     */
+    bill(packageId: string): Promise<Invoice>;
   };
   infrastructure: {
     /** Hosting servers we monitor; optionally scoped to one client (null = Sahara's own). */

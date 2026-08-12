@@ -194,6 +194,8 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify({ method }),
       }),
+    bill: (packageId) =>
+      request<Invoice>(`/api/admin/packages/${packageId}/bill`, { method: "POST" }),
   },
   infrastructure: {
     listServers: async (clientId) => {

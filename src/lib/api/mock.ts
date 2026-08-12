@@ -1,6 +1,6 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type Invoice, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
-import { ALLOWED_TRANSITIONS, statusMeta } from "@/lib/status";
+import { balance, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type Invoice, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { nextTransitions, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
 /**
@@ -22,6 +22,7 @@ const invoices: Invoice[] = [
     id: "in_seed001",
     clientId: "cl_1",
     clientName: "Ama Boateng",
+    workPackageId: null,
     publicSlug: "3f2b91c4-7d6e-4a15-9b28-c50e7f14a2d3",
     title: "Infrastructure renewal 2026/27",
     memo: "Payable on receipt. Renewing now keeps your site and email online without interruption.",
@@ -111,6 +112,28 @@ function hydrateInvoice(invoice: Invoice): Invoice {
   };
 }
 
+/**
+ * Push the money on a package's invoices back onto the package, mirroring the API's
+ * WorkPackage::invoicedPaid()/invoicedOutstanding(). Called wherever a linked invoice moves,
+ * because a deferred package's balance is only correct once its invoices are accounted for.
+ *
+ * Cedis on both sides: a dollar invoice contributes what actually arrived, not its dollar face.
+ */
+function syncPackageBilling(packageId: string | null | undefined): void {
+  if (!packageId) return;
+  const pkg = packages.find((p) => p.id === packageId);
+  if (!pkg) return;
+
+  const linked = invoices.filter((i) => i.workPackageId === packageId).map(hydrateInvoice);
+  // Received money counts whatever the invoice's status: voiding a demand is not a refund.
+  pkg.invoicedPaid = round2(linked.reduce((sum, i) => sum + i.receivedGhs, 0));
+  pkg.invoicedOutstanding = round2(
+    linked
+      .filter((i) => i.status === "issued")
+      .reduce((sum, i) => sum + Math.max(0, i.balanceGhs ?? i.balance), 0),
+  );
+}
+
 /** Stand-in for the API's client code segment, e.g. "Ama Boateng" → "AMABOA". */
 function mockClientCode(clientId: string): string {
   const name = clients.find((c) => c.id === clientId)?.name ?? "CLIENT";
@@ -169,6 +192,9 @@ const packages: WorkPackage[] = [
     publicSlug: "8f1c2a90-3b6e-4a2d-9c11-7e5d0a2b4c6f",
     pricingMode: "itemized",
     deliveryMode: "gated_files",
+    billingMode: "gated",
+    invoicedPaid: 0,
+    invoicedOutstanding: 0,
     totalOverride: null,
     estimatedDeliveryDate: "2026-06-28",
     lineItems: [
@@ -404,6 +430,13 @@ export const mockApi: BedrockApi = {
         publicSlug: crypto.randomUUID(),
         pricingMode: input.pricingMode,
         deliveryMode: "gated_files",
+        // Mirrors the API: an account we already work with continuously is billed after the
+        // fact unless the operator says otherwise.
+        billingMode:
+          input.billingMode ??
+          (clients.find((c) => c.id === clientId)?.accountType === "ongoing" ? "deferred" : "gated"),
+        invoicedPaid: 0,
+        invoicedOutstanding: 0,
         totalOverride: input.pricingMode === "fixed" ? input.totalOverride : null,
         estimatedDeliveryDate: input.estimatedDeliveryDate,
         lineItems: [],
@@ -425,6 +458,14 @@ export const mockApi: BedrockApi = {
       pkg.title = input.title;
       pkg.pricingMode = input.pricingMode;
       if (input.deliveryMode) pkg.deliveryMode = input.deliveryMode;
+      if (input.billingMode && input.billingMode !== pkg.billingMode) {
+        pkg.billingMode = input.billingMode;
+        // The gate has to follow the setting for files already uploaded, not just the next one.
+        const gated = pkg.billingMode === "gated";
+        pkg.deliverables.forEach((d) => {
+          d.locked = gated ? balance(pkg) > 0 : false;
+        });
+      }
       pkg.totalOverride = input.pricingMode === "fixed" ? input.totalOverride : null;
       pkg.estimatedDeliveryDate = input.estimatedDeliveryDate;
       return pkg;
@@ -483,7 +524,7 @@ export const mockApi: BedrockApi = {
         packages.find((p) => p.id === id),
         "Work package",
       );
-      if (!ALLOWED_TRANSITIONS[pkg.status].includes(status)) {
+      if (!nextTransitions(pkg.status, pkg.billingMode).includes(status)) {
         throw new ApiError(
           409,
           `Cannot move from ${statusMeta(pkg.status).label} to ${statusMeta(status).label}.`,
@@ -547,8 +588,9 @@ export const mockApi: BedrockApi = {
         type,
         filename: file.name,
         previewUrl: null,
-        // Download gate: originals stay locked until the balance reaches zero.
-        locked: balance(pkg) > 0,
+        // Download gate: originals stay locked until the balance reaches zero. Deferred
+        // billing has no such gate — the work is invoiced after it lands.
+        locked: pkg.billingMode === "gated" && balance(pkg) > 0,
         archived: false,
         processingStatus: "processing",
       };
@@ -706,6 +748,95 @@ export const mockApi: BedrockApi = {
         logActivity(pkg, "payment_complete", "Balance cleared — downloads unlocked, receipt sent.");
       }
       return pkg;
+    },
+    async bill(packageId) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.id === packageId),
+        "Work package",
+      );
+      if (pkg.status === "draft") {
+        throw new ApiError(409, "Send this package before billing it — a draft is not agreed work yet.");
+      }
+      const live = invoices.find(
+        (i) => i.workPackageId === pkg.id && (i.status === "draft" || i.status === "issued"),
+      );
+      if (live) {
+        throw new ApiError(
+          409,
+          live.status === "draft"
+            ? "This package already has a draft invoice. Edit or delete that one."
+            : `Invoice ${live.reference ?? "for this package"} is already issued and unpaid.`,
+        );
+      }
+
+      const outstanding = round2(balance(pkg));
+      if (outstanding <= 0) throw new ApiError(422, "There is nothing left to bill on this package.");
+
+      // Copy the package's lines only while they still describe the whole amount due; past
+      // that, itemised lines summing above the balance would demand money already received.
+      const untouched = Math.abs(outstanding - effectiveTotal(pkg)) < 0.01;
+      const useLines = untouched && pkg.pricingMode === "itemized" && pkg.lineItems.length > 0;
+      const lines = useLines
+        ? pkg.lineItems.map((li) => ({
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+          }))
+        : [
+            {
+              description: untouched ? pkg.title : `Balance on ${pkg.title}`,
+              quantity: 1,
+              unitPrice: outstanding,
+            },
+          ];
+
+      const invoice: Invoice = {
+        id: `in_${crypto.randomUUID().slice(0, 8)}`,
+        clientId: pkg.clientId,
+        clientName: clients.find((c) => c.id === pkg.clientId)?.name ?? null,
+        workPackageId: pkg.id,
+        publicSlug: crypto.randomUUID(),
+        title: pkg.title,
+        memo: null,
+        // Work is quoted and paid in cedis; only infrastructure is bought in dollars.
+        currency: "GHS",
+        fxMarginPercent: null,
+        fxRateLocked: null,
+        fxRateLockedAt: null,
+        fxValidUntil: null,
+        fxExpired: false,
+        balanceGhs: null,
+        receivedGhs: 0,
+        documentId: null,
+        reference: null,
+        serial: null,
+        receiptDocumentId: null,
+        receiptReference: null,
+        receiptSerial: null,
+        issueDate: new Date().toISOString().slice(0, 10),
+        dueDate: null,
+        status: "draft",
+        issuedAt: null,
+        paidAt: null,
+        createdAt: new Date().toISOString(),
+        items: lines.map((line, i) => ({
+          id: `ii_${crypto.randomUUID().slice(0, 8)}`,
+          position: i,
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          amount: line.quantity * line.unitPrice,
+        })),
+        payments: [],
+        total: 0,
+        paid: 0,
+        balance: 0,
+      };
+      invoices.push(invoice);
+      syncPackageBilling(pkg.id);
+      logActivity(pkg, "package_billed", `Invoice raised for ${formatCedis(outstanding)} (draft).`);
+      return hydrateInvoice(invoice);
     },
   },
   infrastructure: {
@@ -1006,6 +1137,8 @@ export const mockApi: BedrockApi = {
         id: `in_${crypto.randomUUID().slice(0, 8)}`,
         clientId,
         clientName: clients.find((c) => c.id === clientId)?.name ?? null,
+        // Composed by hand against a client, so it bills no package. Only packages.bill() links.
+        workPackageId: null,
         publicSlug: crypto.randomUUID(),
         title: input.title,
         memo: input.memo,
@@ -1080,16 +1213,20 @@ export const mockApi: BedrockApi = {
       charges.forEach((c) => {
         c.invoiceId = invoice.id;
       });
+      // Editing a package's draft invoice changes what it will ask for.
+      syncPackageBilling(invoice.workPackageId);
       return hydrateInvoice(invoice);
     },
     async remove(id) {
       await delay();
       const at = invoices.findIndex((i) => i.id === id);
       if (at >= 0) {
+        const billedPackage = invoices[at].workPackageId;
         infraCharges.forEach((c) => {
           if (c.invoiceId === id) c.invoiceId = null;
         });
         invoices.splice(at, 1);
+        syncPackageBilling(billedPackage);
       }
     },
     async issue(id) {
@@ -1116,6 +1253,8 @@ export const mockApi: BedrockApi = {
         until.setDate(until.getDate() + fxState.validityDays);
         invoice.fxValidUntil = until.toISOString().slice(0, 10);
       }
+      // Issuing moves a package's work out of the unbilled bucket and into Invoices.
+      syncPackageBilling(invoice.workPackageId);
       return hydrateInvoice(invoice);
     },
     async recordPayment(id, input) {
@@ -1161,6 +1300,31 @@ export const mockApi: BedrockApi = {
           }
         });
       }
+
+      // An invoice raised for a package settles that package too, or the work would stay owing
+      // after the client has paid. Mirrors PaymentGates::applyAfterInvoicePayment.
+      syncPackageBilling(invoice.workPackageId);
+      const billed = packages.find((p) => p.id === invoice.workPackageId);
+      if (billed) {
+        if (billed.status === "sent" || billed.status === "awaiting_deposit") {
+          billed.status = "in_progress";
+          logActivity(billed, "work_started", "Invoice payment confirmed — work started.");
+        }
+        if (balance(billed) <= 0) {
+          billed.deliverables.forEach((d) => (d.locked = false));
+          billed.milestones.forEach((m) => {
+            if (m.status === "pending") {
+              m.status = "paid";
+              m.paidAt = new Date().toISOString();
+            }
+          });
+          logActivity(
+            billed,
+            "payment_complete",
+            "Invoice settled — balance cleared, downloads unlocked.",
+          );
+        }
+      }
       return hydrateInvoice(invoice);
     },
     async void(id) {
@@ -1172,6 +1336,7 @@ export const mockApi: BedrockApi = {
       infraCharges.forEach((c) => {
         if (c.invoiceId === id) c.invoiceId = null;
       });
+      syncPackageBilling(invoice.workPackageId);
       return hydrateInvoice(invoice);
     },
     async refreshRate(id) {

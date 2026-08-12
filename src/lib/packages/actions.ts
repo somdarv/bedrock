@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   api,
   ApiError,
+  type BillingMode,
   type ClientNotifyEvent,
   type DeliveryMode,
   effectiveTotal,
@@ -39,6 +40,10 @@ function parsePackage(formData: FormData): {
   const pricingMode = String(formData.get("pricingMode") ?? "itemized") as PricingMode;
   const overrideRaw = String(formData.get("totalOverride") ?? "").trim();
   const date = String(formData.get("estimatedDeliveryDate") ?? "").trim();
+  // Absent on create means "use the client's default" (ongoing accounts get deferred), so it
+  // is only sent when the form actually carried a choice.
+  const billingRaw = String(formData.get("billingMode") ?? "").trim();
+  const billingMode = billingRaw === "deferred" || billingRaw === "gated" ? billingRaw : undefined;
 
   const fieldErrors: PackageFormState["fieldErrors"] = {};
   if (!title) fieldErrors.title = "Title is required.";
@@ -59,7 +64,7 @@ function parsePackage(formData: FormData): {
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   return {
-    input: { title, pricingMode, totalOverride, estimatedDeliveryDate: date || null },
+    input: { title, pricingMode, billingMode, totalOverride, estimatedDeliveryDate: date || null },
   };
 }
 
@@ -128,6 +133,48 @@ export async function setPricingMode(id: string, mode: PricingMode): Promise<Pac
   }
   revalidatePackage(id);
   return { ok: true };
+}
+
+/**
+ * Switch a package between gated billing (deposit to start, balance to unlock) and deferred
+ * (work now, invoice later). The backend follows through on files already uploaded, so this
+ * changes what the client can reach right now, not just what happens next.
+ */
+export async function setBillingMode(id: string, mode: BillingMode): Promise<PackageFormState> {
+  try {
+    const pkg = await api.packages.get(id);
+    await api.packages.update(id, {
+      title: pkg.title,
+      pricingMode: pkg.pricingMode,
+      billingMode: mode,
+      totalOverride: pkg.totalOverride,
+      estimatedDeliveryDate: pkg.estimatedDeliveryDate,
+    });
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not change billing mode." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
+/**
+ * Raise the invoice for work already done. Returns the new DRAFT invoice's id so the caller can
+ * send the operator straight to it — nothing reaches the client until it is issued there.
+ */
+export async function billPackage(
+  id: string,
+): Promise<{ ok?: boolean; invoiceId?: string; error?: string }> {
+  let invoiceId: string;
+  try {
+    const invoice = await api.packages.bill(id);
+    invoiceId = invoice.id;
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not raise the invoice." };
+  }
+  revalidatePackage(id);
+  revalidatePath("/admin/invoices");
+  revalidatePath("/admin/receivables");
+  return { ok: true, invoiceId };
 }
 
 /** Switch a package between gated-files and milestones delivery. */

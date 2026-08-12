@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
-import type { Client, PricingMode, WorkPackage } from "@/lib/api";
+import type { AccountType, BillingMode, Client, PricingMode, WorkPackage } from "@/lib/api";
 import {
   createPackage,
   updatePackage,
@@ -16,13 +16,17 @@ import {
 
 const initial: PackageFormState = {};
 
+/** Ongoing accounts are worked with continuously, so their work is billed after the fact. */
+const defaultBilling = (accountType?: AccountType): BillingMode =>
+  accountType === "ongoing" ? "deferred" : "gated";
+
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Required in create mode to pick a client (omit when creating for a fixed client). */
   clients?: Client[];
   /** Create mode for one specific client — skips the picker and pins this client. */
-  lockedClient?: { id: string; name: string };
+  lockedClient?: { id: string; name: string; accountType?: AccountType };
   /** Provided in edit mode. */
   pkg?: WorkPackage;
   onDone: (message: string, packageId?: string) => void;
@@ -36,6 +40,17 @@ export function PackageFormModal({ open, onClose, clients, lockedClient, pkg, on
   );
   const [state, formAction, pending] = React.useActionState(action, initial);
   const [pricingMode, setPricingMode] = React.useState<PricingMode>(pkg?.pricingMode ?? "itemized");
+  const [clientId, setClientId] = React.useState(lockedClient?.id ?? "");
+  const [billingMode, setBillingMode] = React.useState<BillingMode>(
+    pkg?.billingMode ?? defaultBilling(lockedClient?.accountType),
+  );
+
+  // Picking a client re-seeds the billing default: an ongoing account is billed after the work,
+  // a one-off client up front. The operator can still override it before submitting.
+  function handleClientChange(id: string) {
+    setClientId(id);
+    setBillingMode(defaultBilling(clients?.find((c) => c.id === id)?.accountType));
+  }
 
   React.useEffect(() => {
     if (state.ok) {
@@ -61,7 +76,12 @@ export function PackageFormModal({ open, onClose, clients, lockedClient, pkg, on
             </>
           ) : (
             <Field label="Client" htmlFor="clientId" required error={state.fieldErrors?.clientId}>
-              <Select id="clientId" name="clientId" defaultValue="">
+              <Select
+                id="clientId"
+                name="clientId"
+                value={clientId}
+                onChange={(e) => handleClientChange(e.target.value)}
+              >
                 <option value="" disabled>
                   Select a client…
                 </option>
@@ -123,6 +143,26 @@ export function PackageFormModal({ open, onClose, clients, lockedClient, pkg, on
             />
           </Field>
         )}
+
+        <Field
+          label="Billing"
+          htmlFor="billingMode"
+          hint={
+            billingMode === "gated"
+              ? "Deposit to start, balance to unlock the files."
+              : "Work starts straight away and nothing is held back. Raise the invoice from the package when the work is done."
+          }
+        >
+          <Select
+            id="billingMode"
+            name="billingMode"
+            value={billingMode}
+            onChange={(e) => setBillingMode(e.target.value as BillingMode)}
+          >
+            <option value="gated">Gated — paid before delivery</option>
+            <option value="deferred">Deferred — invoice after the work</option>
+          </Select>
+        </Field>
 
         <Field label="Estimated delivery" htmlFor="estimatedDeliveryDate">
           <Input

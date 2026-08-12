@@ -83,14 +83,25 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Work packages</h2>
           {packages.length > 0 && (
-            <NewPackageButton clientId={client.id} clientName={client.name} size="sm" />
+            <NewPackageButton
+              clientId={client.id}
+              clientName={client.name}
+              accountType={client.accountType}
+              size="sm"
+            />
           )}
         </div>
         {packages.length === 0 ? (
           <EmptyState
             title="No packages yet"
             description="Create the first work package for this client."
-            action={<NewPackageButton clientId={client.id} clientName={client.name} />}
+            action={
+              <NewPackageButton
+                clientId={client.id}
+                clientName={client.name}
+                accountType={client.accountType}
+              />
+            }
           />
         ) : (
           <Table>

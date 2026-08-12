@@ -87,6 +87,15 @@ export function InvoiceDetail({
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Badge variant={meta.variant}>{meta.label}</Badge>
             {clientName && <span className="text-sm text-muted-foreground">{clientName}</span>}
+            {/* Raised from a package: paying this settles that job, so say which one. */}
+            {invoice.workPackageId && (
+              <Link
+                href={`/admin/packages/${invoice.workPackageId}`}
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Bills a work package
+              </Link>
+            )}
             {invoice.dueDate && (
               <span className="text-sm text-muted-foreground">
                 Due {new Date(invoice.dueDate).toLocaleDateString()}

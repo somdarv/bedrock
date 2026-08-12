@@ -35,6 +35,7 @@ import {
   setTotalOverride,
   toggleLineItemDone,
 } from "@/lib/packages/actions";
+import { paidTotal } from "@/lib/payments";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { cn, formatCedis, publicBaseUrl } from "@/lib/utils";
 
@@ -61,15 +62,15 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
 
   const meta = statusMeta(pkg.status);
   const isFixed = optimisticMode === "fixed";
-  const transitions = nextTransitions(pkg.status);
+  const transitions = nextTransitions(pkg.status, pkg.billingMode);
   const doneCount = pkg.lineItems.filter((li) => li.done).length;
   const progressPct = pkg.lineItems.length
     ? Math.round((doneCount / pkg.lineItems.length) * 100)
     : 0;
   const total = effectiveTotal(pkg);
-  const paid = pkg.payments
-    .filter((p) => p.status === "success")
-    .reduce((s, p) => s + p.amount, 0);
+  // Includes cedis that arrived on an invoice raised for this package, so Total − Paid = Balance
+  // still reads true when the work was billed rather than paid up front.
+  const paid = paidTotal(pkg);
   const bal = balance(pkg);
   const publicUrl = `${publicBaseUrl()}/p/${pkg.publicSlug}`;
 
@@ -185,6 +186,8 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight">{pkg.title}</h1>
               <Badge variant={meta.variant}>{meta.label}</Badge>
+              {/* Worth seeing at a glance: it changes what the client can reach right now. */}
+              {pkg.billingMode === "deferred" && <Badge variant="info">Invoiced later</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               For{" "}

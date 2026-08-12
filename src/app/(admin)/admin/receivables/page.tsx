@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { api, balance, effectiveTotal, type WorkPackage } from "@/lib/api";
+import { api, effectiveTotal, unbilled, type WorkPackage } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
 import { outstandingCedis } from "@/lib/invoices/display";
 import { formatCedis, formatMoney } from "@/lib/utils";
@@ -14,7 +14,10 @@ const UNDERWAY_STATUSES: WorkPackage["status"][] = ["in_progress", "review"];
 const FINAL_STATUSES: WorkPackage["status"][] = ["awaiting_final_payment"];
 const PROPOSAL_STATUSES: WorkPackage["status"][] = ["sent"];
 
-const owed = (p: WorkPackage) => Math.max(0, balance(p));
+// Owed here means owed AS WORK: the balance minus anything already sitting on an issued
+// invoice. Deferred billing raises a real invoice against a package, and counting that money
+// both as an unpaid job and as an outstanding invoice would inflate every total on this page.
+const owed = (p: WorkPackage) => unbilled(p);
 const byOwedDesc = (a: WorkPackage, b: WorkPackage) => owed(b) - owed(a);
 
 // Pending initial deposit: the unpaid deposit-kind milestones when a schedule is set,
@@ -116,7 +119,7 @@ export default async function ReceivablesPage() {
         eyebrow="Live jobs"
         title="Outstanding on work underway"
         total={underwayTotal + finalTotal}
-        note="Jobs already in progress with a balance still to clear. This is separate from the deposits above."
+        note="Jobs already in progress with a balance still to clear, and not yet invoiced. This is separate from the deposits above; work that has been billed moves down to Invoices."
         empty="No live jobs have an outstanding balance."
         rows={[...underway, ...awaitingFinal].sort(byOwedDesc).map((p) => ({
           id: p.id,
