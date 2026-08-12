@@ -87,6 +87,9 @@ project). That is a later phase; see [INFRASTRUCTURE-MODULE.md](../../bedrock-ap
 6. **Standalone invoices** — shipped. Charges were a ledger with no document; an operator could see
    GHS 600 owed for hosting but had no way to *ask* for it outside a work package. See
    [INVOICES.md](./INVOICES.md).
+7. **Retainers** — designed, not built. Recurring service revenue: a third source of billable
+   obligations alongside packages and assets, feeding the same charge and invoice layers. See
+   [RETAINERS.md](./RETAINERS.md).
 
 ## Decisions (from the operator)
 
