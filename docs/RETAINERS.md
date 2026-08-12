@@ -9,10 +9,14 @@
 Bedrock can bill two things: **project work** (a work package, priced once, finished once) and
 **infrastructure** (a fee attached to a client asset, recurring on that asset's expiry date).
 
-A retainer is neither. It is a fixed fee for our continued availability: support, maintenance,
-content updates, being on the end of the phone. It recurs on **the calendar**, not on a project
-plan and not on a domain's expiry. It never completes, so it has no total and no balance that
-reaches zero.
+A retainer is neither. In the operator's words: **they pay us to keep us working for them.** It
+buys our ongoing attention, not a named deliverable and not a specific asset. It recurs on **the
+calendar**, not on a project plan and not on a domain's expiry. It never completes, so it has no
+total and no balance that reaches zero.
+
+That definition is deliberately broad, and it decides two things later in this document: the
+invoice line describes a period of retained service rather than itemising what was done in it,
+and there is nothing to meter, so nothing meters it.
 
 It is also the only revenue in the business that is knowable in advance, and that number appears
 nowhere in the system today.
@@ -77,6 +81,8 @@ retainers
   starts_on        date
   ends_on          date null       -- null = open-ended
   status           string          -- active | paused | ended
+  paused_reason    string null     -- set to 'unpaid' by the auto-pause rule, so the alert
+                                   --   and the resume button can explain themselves
   bill_lead_days   int default 7   -- raise the charge this far before the period starts
   next_bill_on     date            -- the cursor: the next period start to bill
   auto_issue       bool default false
@@ -111,11 +117,21 @@ maintain.
 where `next_bill_on - bill_lead_days <= today`:
 
 1. Raise a charge for the period, `billed_for_date = next_bill_on`, skipping it if one exists.
-2. Advance `next_bill_on` by the interval.
-3. Stop at `ends_on`, and set the retainer `ended`.
+2. Compose a draft invoice from that charge, sweeping in anything else the client already owes.
+3. Advance `next_bill_on` by the interval.
+4. Stop at `ends_on`, and set the retainer `ended`.
+
+Then, whatever it billed: any active retainer carrying **two periods still unpaid** is set
+`paused` with `paused_reason = 'unpaid'` and raises an admin-lane alert. The clock stops rather
+than piling up a third document nobody is reading.
 
 Idempotent per period, so a missed day catches up and a double run does nothing. Same shape as
 `BillInfraRenewals`, which is deliberate: two generators, one contract.
+
+**Cycle dates are per retainer**, anchored on `starts_on`, with no proration. A client who should
+bill on the 1st is a retainer that starts on the 1st. Everything raised lands in the same drafts
+queue regardless, so the operator's month is one review session either way, and the alternative
+(a house billing day plus part-month arithmetic) buys nothing at this size.
 
 ### One client, one month, one invoice
 
@@ -128,17 +144,32 @@ already composes exactly that way from `chargeIds`.
 Going straight from retainer to invoice would be fewer moving parts and would quietly guarantee
 that every client with a retainer gets two invoices in any month they also owe for hosting.
 
-### Auto-issue defaults to off
+### How much of this is automated
 
-A retainer's value is that it does not need thinking about, so monthly manual invoicing defeats
-much of the point. But money documents that issue and send themselves are exactly the documents
-nobody reads before the client does. So it is opt-in per retainer, and staged:
+Yes, the invoicing automates, but the run stops one step short of the client.
 
-- **off** (default): the charge appears on Receivables, the operator raises the invoice.
-- **auto_issue**: a draft invoice is composed and issued, waiting to be sent.
-- **auto_send**: it goes out over WhatsApp and email on the same run.
+A retainer's whole value is that it does not need thinking about, so composing the same invoice by
+hand twelve times a year defeats most of the point. But an invoice that issues *and sends* itself
+is the one document nobody reads before the client does. The split is therefore between composing
+and sending, not between doing it and not:
 
-Turn it on per client once a retainer has run clean for a couple of cycles.
+| Step | Who | Why |
+|---|---|---|
+| Raise the charge for the period | automatic | An internal ledger row. Nothing has left the building. |
+| Compose the **draft** invoice | automatic | All of the toil, none of the risk. Drafts are freely editable and mint no reference. |
+| Send it | **operator** | The only step a mistake reaches a client through. |
+
+So each cycle the operator finds a finished draft waiting, previews the PDF (see
+[INVOICES.md](./INVOICES.md)) and sends it. That is a few seconds per client per month, against a
+few minutes of composing, and it keeps a human between our records and their inbox.
+
+**Draft rather than issued, specifically.** Issuing mints the reference and freezes the lines, so
+an invoice issued on the 1st cannot absorb the domain renewal charge that lands on the 12th
+without being voided and reissued. Leaving it in draft is what keeps the one-client-one-invoice
+batching above actually possible.
+
+`auto_issue` and `auto_send` stay in the model as per-retainer opt-ins, off by default. Turn them
+on for a client whose retainer has run clean for a few cycles and whose invoice never changes.
 
 ## The number this unlocks
 
@@ -157,9 +188,10 @@ end), plus a Retainers section on the client detail page beside packages and inv
 
 ## Deliberately out
 
-- **Hours and scope tracking.** There is no time tracking in Bedrock, and building it is a
-  different product. A retainer bills a fee for availability. If a month's work needs deliverables,
-  gates or a portal, that is a work package, and it can reference the retainer later.
+- **Hours and scope tracking.** Settled by the operator: a retainer buys ongoing service, not an
+  allowance, so there is nothing to meter and no "included versus billable" line to police. If a
+  month's work needs deliverables, gates or a portal, that is a work package raised alongside the
+  retainer at its own price.
 - **Paystack subscriptions** (stored card, auto-charged). Clients here pay by transfer and mobile
   money as often as by card, and auto-charging a saved card is a trust and compliance step of its
   own. An invoice per period with the existing pay page collects the same money through machinery
@@ -171,17 +203,28 @@ end), plus a Retainers section on the client detail page beside packages and inv
 1. **Rename** `infra_charges` to `charges` with `kind`, no behaviour change.
 2. **Model + CRUD**: migration, `Retainer`, controller, admin list and detail. Charges raised by
    hand from the retainer, to prove the shape before automating it.
-3. **The clock**: `retainers:bill`, scheduled, `--dry-run` first.
+3. **The clock**: `retainers:bill`, scheduled, `--dry-run` first. Raises the charge, composes the
+   draft invoice, advances the cursor, and applies the two-unpaid-periods pause.
 4. **Recurring revenue** on Receivables and the dashboard.
-5. **Auto-issue**, then **auto-send**, opt-in per retainer.
+5. **Auto-issue**, then **auto-send**, opt-in per retainer, once cycles have run clean.
 
-## Open questions for the operator
+## Decisions (from the operator)
 
-1. **Billed in advance or in arrears?** The design assumes **advance** (the charge is raised
-   `bill_lead_days` before the period starts, so payment lands near the start of the month it
-   covers). Arrears would only move `next_bill_on`.
-2. **What does a retainer entitle a client to, in writing?** Whatever the answer, it belongs in
-   `memo` and prints on every invoice, because it is what stops "I thought that was covered".
-3. **What happens to unpaid periods?** A retainer that has not paid for two months is either a
-   collections problem or a cancelled client, and the system should say which. Simplest rule that
-   works: after N unpaid periods it auto-pauses and alerts the admin lane.
+- **Billed in advance.** The charge is raised `bill_lead_days` before the period starts, so the
+  money lands near the beginning of the month it covers. We are paid to be available, and being
+  paid afterwards for availability nobody drew on is a harder conversation every time.
+- **A retainer buys ongoing service, not a scope.** "They pay us to keep us working for them."
+  So the invoice line reads as a period of retained service (`Ongoing services retainer, August
+  2026`), and `memo` carries the plain-language version of the arrangement rather than a list of
+  entitlements. There is no allowance to itemise against, and therefore nothing to argue about
+  having used up.
+- **Two unpaid periods auto-pauses the retainer and alerts the admin lane.** Pausing stops the
+  clock without ending the arrangement, so nothing further is raised while the position is
+  unclear, and the alert goes to us first rather than becoming a third invoice the client ignores.
+  Resuming is a button, not a re-setup.
+
+### What follows from "no scope"
+
+No time tracking, no hours ledger, no allowance drawdown, no "included versus billable" split.
+If a month's work is big enough to need a scope, it is a work package with its own price, raised
+alongside the retainer and not against it.
