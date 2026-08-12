@@ -196,19 +196,47 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
         {activity.documents.length > 0 && (
           <div className="mb-4 space-y-2">
-            {activity.documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-surface px-4 py-3"
-              >
-                <span className="text-muted-foreground">📄</span>
-                <span className="font-medium">{doc.title}</span>
-                <span className="text-xs uppercase tracking-wider text-subtle">{doc.type}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {doc.at ? new Date(doc.at).toLocaleString() : "—"}
-                </span>
-              </div>
-            ))}
+            {activity.documents.map((doc) => {
+              // Every sent document is readable back from here: an invoice, a receipt, a
+              // statement, an uploaded proposal. The title alone is not proof of what went out.
+              const href = `/api/admin/client-documents/${client.id}/${doc.id}`;
+              return (
+                <div
+                  key={doc.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-surface px-4 py-3"
+                >
+                  <span className="text-muted-foreground">📄</span>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener"
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {doc.title}
+                  </a>
+                  <span className="text-xs uppercase tracking-wider text-subtle">{doc.type}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {doc.at ? new Date(doc.at).toLocaleString() : "—"}
+                  </span>
+                  <span className="flex items-center gap-3 text-xs">
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener"
+                      className="font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      View
+                    </a>
+                    <a
+                      href={`${href}?download=1`}
+                      className="font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      Download
+                    </a>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 

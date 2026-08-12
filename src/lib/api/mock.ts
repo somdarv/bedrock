@@ -341,7 +341,8 @@ export const mockApi: BedrockApi = {
           { id: "n4", event: "files_ready", label: "Files ready to review", channel: "whatsapp", recipient: "+233201234567", status: "sent" as const, error: null, at: h(20) },
         ],
         documents: [
-          { id: "d1", title: "Brand proposal", type: "proposal", filename: "brand-proposal.pdf", size: 240_000, at: h(200) },
+          { id: "d1", title: "Invoice INV-AMABOA-01 — Infrastructure renewal 2026/27", type: "invoice", filename: "inv-amaboa-01.pdf", mime: "application/pdf", size: 31_000, at: h(30) },
+          { id: "d2", title: "Brand proposal", type: "proposal", filename: "brand-proposal.pdf", mime: "application/pdf", size: 240_000, at: h(200) },
         ],
       };
     },

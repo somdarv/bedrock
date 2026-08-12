@@ -114,6 +114,8 @@ export interface ActivityDocument {
   title: string;
   type: string;
   filename: string;
+  /** Content type as stored, so the admin can tell what will open inline. */
+  mime: string | null;
   size: number | null;
   at: string | null;
 }
