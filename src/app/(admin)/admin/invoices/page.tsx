@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, type Invoice } from "@/lib/api";
-import { formatCedis } from "@/lib/utils";
-import { invoiceStatusMeta } from "@/lib/invoices/display";
+import { formatCedis, formatMoney } from "@/lib/utils";
+import { cedisFor, invoiceStatusMeta, outstandingCedis } from "@/lib/invoices/display";
 
 export const metadata = { title: "Invoices" };
 
@@ -17,16 +17,38 @@ export const metadata = { title: "Invoices" };
 export default async function InvoicesPage() {
   const invoices = await api.invoices.list().catch(() => [] as Invoice[]);
 
-  const outstanding = invoices
-    .filter((i) => i.status === "issued")
-    .reduce((s, i) => s + i.balance, 0);
-  const collected = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + i.paid, 0);
+  const issued = invoices.filter((i) => i.status === "issued");
+  const settled = invoices.filter((i) => i.status === "paid");
   const drafts = invoices.filter((i) => i.status === "draft").length;
 
+  // Struck in cedis, because the list mixes dollar and cedi invoices and there is no other
+  // common denominator. The dollar side is stated underneath rather than folded away: it is the
+  // binding amount on those invoices, and the cedi figure only tracks it at the locked rate.
+  const outstanding = issued.reduce((s, i) => s + outstandingCedis(i), 0);
+  const outstandingUsd = issued
+    .filter((i) => i.currency === "USD")
+    .reduce((s, i) => s + Math.max(0, i.balance), 0);
+  // Collected is the cedis that actually arrived, never the dollars they settled — this is the
+  // figure that should reconcile against the bank.
+  const collected = settled.reduce((s, i) => s + i.receivedGhs, 0);
+  const collectedUsd = settled
+    .filter((i) => i.currency === "USD")
+    .reduce((s, i) => s + i.paid, 0);
+
   const stats = [
-    { label: "Outstanding", value: formatCedis(outstanding), hint: "issued, not yet settled" },
-    { label: "Collected", value: formatCedis(collected), hint: "settled in full" },
-    { label: "Drafts", value: String(drafts), hint: "not yet issued" },
+    {
+      label: "Outstanding",
+      value: formatCedis(outstanding),
+      sub: outstandingUsd > 0 ? `${formatMoney(outstandingUsd, "USD")} of it billed in dollars` : null,
+      hint: "issued, not yet settled",
+    },
+    {
+      label: "Collected",
+      value: formatCedis(collected),
+      sub: collectedUsd > 0 ? `${formatMoney(collectedUsd, "USD")} settled` : null,
+      hint: "settled in full",
+    },
+    { label: "Drafts", value: String(drafts), sub: null, hint: "not yet issued" },
   ];
 
   return (
@@ -53,7 +75,8 @@ export default async function InvoicesPage() {
             <div className="mt-2 font-display text-2xl font-semibold tracking-tight">
               {stat.value}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">{stat.hint}</div>
+            {stat.sub && <div className="mt-1 text-xs text-muted-foreground">{stat.sub}</div>}
+            <div className="mt-1 text-xs text-subtle">{stat.hint}</div>
           </div>
         ))}
       </div>
@@ -79,6 +102,18 @@ export default async function InvoicesPage() {
           <TBody>
             {invoices.map((invoice) => {
               const meta = invoiceStatusMeta(invoice);
+              const owed = Math.max(0, invoice.balance);
+              // The cedi line under a dollar total: what actually came in once it is settled,
+              // what the whole invoice comes to at the locked rate while it has not.
+              const billedGhs = cedisFor(invoice, invoice.total);
+              const totalGhs =
+                invoice.currency !== "USD"
+                  ? null
+                  : owed <= 0 && invoice.receivedGhs > 0
+                    ? `${formatCedis(invoice.receivedGhs)} received`
+                    : billedGhs !== null
+                      ? formatCedis(billedGhs)
+                      : null;
               return (
                 <TR key={invoice.id}>
                   <TD className="font-medium">
@@ -88,9 +123,25 @@ export default async function InvoicesPage() {
                   </TD>
                   <TD className="text-muted-foreground">{invoice.clientName ?? "—"}</TD>
                   <TD>{invoice.title}</TD>
-                  <TD className="text-right">{formatCedis(invoice.total)}</TD>
                   <TD className="text-right">
-                    {invoice.balance > 0 ? formatCedis(invoice.balance) : "—"}
+                    {formatMoney(invoice.total, invoice.currency)}
+                    {totalGhs && (
+                      <div className="text-xs font-normal text-muted-foreground">{totalGhs}</div>
+                    )}
+                  </TD>
+                  <TD className="text-right">
+                    {owed > 0 ? (
+                      <>
+                        {formatMoney(owed, invoice.currency)}
+                        {invoice.currency === "USD" && (
+                          <div className="text-xs font-normal text-muted-foreground">
+                            {formatCedis(outstandingCedis(invoice))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </TD>
                   <TD className="text-muted-foreground">
                     {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—"}

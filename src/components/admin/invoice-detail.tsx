@@ -22,7 +22,7 @@ import {
   sendInvoice,
   voidInvoice,
 } from "@/lib/invoices/actions";
-import { invoiceStatusMeta } from "@/lib/invoices/display";
+import { cedisFor, invoiceStatusMeta, outstandingCedis } from "@/lib/invoices/display";
 import { formatCedis, formatMoney, formatRate } from "@/lib/utils";
 
 const METHODS = ["bank transfer", "mobile money", "cash", "cheque", "card"];
@@ -58,6 +58,12 @@ export function InvoiceDetail({
   // Priced in dollars: the client pays cedis at the rate on the day, so "paid" and "received"
   // are two different figures and both matter.
   const isUsd = invoice.currency === "USD";
+  const hasReceipt = Boolean(invoice.receiptDocumentId);
+  // A balance can go past zero: cedis are sent in round numbers, and a dollar total rarely lands
+  // on one. Owed and overpaid are different facts, so neither is shown as a negative debt.
+  const owed = Math.max(0, invoice.balance);
+  const overpaid = Math.max(0, -invoice.balance);
+  const billedGhs = cedisFor(invoice, invoice.total);
 
   function run(fn: () => Promise<{ ok?: boolean; error?: string }>, success: string) {
     startTransition(async () => {
@@ -106,11 +112,20 @@ export function InvoiceDetail({
           )}
           {!isDraft && !isVoid && (
             <>
+              {/* Read the document before it goes out. Both open the exact PDF the client is
+                  sent — same route, same renderer — so nothing is signed off unseen. */}
               <Button variant="outline" size="sm" asChild>
                 <a href={`/i/${invoice.publicSlug}/invoice`} target="_blank" rel="noopener">
-                  Download PDF
+                  Invoice PDF
                 </a>
               </Button>
+              {hasReceipt && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`/i/${invoice.publicSlug}/receipt`} target="_blank" rel="noopener">
+                    Receipt PDF
+                  </a>
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setSending("invoice")}>
                 Send invoice
               </Button>
@@ -134,7 +149,7 @@ export function InvoiceDetail({
                   Record payment
                 </Button>
               )}
-              {invoice.receiptReference && (
+              {hasReceipt && (
                 <Button variant="outline" size="sm" onClick={() => setSending("receipt")}>
                   Send receipt
                 </Button>
@@ -156,6 +171,11 @@ export function InvoiceDetail({
             <div className="mt-2 font-display text-xl font-semibold tracking-tight">
               {formatMoney(invoice.total, invoice.currency)}
             </div>
+            {/* Every dollar figure carries its cedi counterpart: the invoice is binding in
+                dollars, but the money moves in cedis and that is what gets reconciled. */}
+            {isUsd && billedGhs !== null && (
+              <div className="mt-1 text-xs text-muted-foreground">{formatCedis(billedGhs)} billed</div>
+            )}
           </div>
           <div>
             <div className="eyebrow">{isUsd ? "Settled" : "Paid"}</div>
@@ -171,8 +191,21 @@ export function InvoiceDetail({
           <div>
             <div className="eyebrow">Balance</div>
             <div className={`mt-2 font-display text-xl font-semibold tracking-tight ${settled ? "text-success" : "text-warning"}`}>
-              {formatMoney(invoice.balance, invoice.currency)}
+              {formatMoney(owed, invoice.currency)}
             </div>
+            {owed > 0 && isUsd && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {formatCedis(outstandingCedis(invoice))} to pay
+              </div>
+            )}
+            {overpaid > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {formatMoney(overpaid, invoice.currency)} overpaid
+                {isUsd && cedisFor(invoice, overpaid) !== null
+                  ? ` · ${formatCedis(cedisFor(invoice, overpaid) as number)}`
+                  : ""}
+              </div>
+            )}
           </div>
         </div>
 
@@ -208,16 +241,20 @@ export function InvoiceDetail({
                       ` · ${invoice.fxMarginPercent}% over mid-market`}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4 sm:col-span-2">
-                  <dt className="text-muted-foreground">Client pays</dt>
-                  <dd className={invoice.fxExpired ? "text-danger" : undefined}>
-                    {invoice.balanceGhs !== null ? formatCedis(invoice.balanceGhs) : "—"}
-                    {invoice.fxValidUntil &&
-                      (invoice.fxExpired
-                        ? ` · expired ${new Date(invoice.fxValidUntil).toLocaleDateString()}`
-                        : ` · until ${new Date(invoice.fxValidUntil).toLocaleDateString()}`)}
-                  </dd>
-                </div>
+                {/* Only while something is actually owed. A settled invoice has no cedi figure
+                    left to quote, and the raw balance goes negative on any overpayment. */}
+                {owed > 0 && (
+                  <div className="flex justify-between gap-4 sm:col-span-2">
+                    <dt className="text-muted-foreground">Client pays</dt>
+                    <dd className={invoice.fxExpired ? "text-danger" : undefined}>
+                      {formatCedis(outstandingCedis(invoice))}
+                      {invoice.fxValidUntil &&
+                        (invoice.fxExpired
+                          ? ` · expired ${new Date(invoice.fxValidUntil).toLocaleDateString()}`
+                          : ` · until ${new Date(invoice.fxValidUntil).toLocaleDateString()}`)}
+                    </dd>
+                  </div>
+                )}
               </>
             )}
             <div className="flex justify-between gap-4 sm:col-span-2">
@@ -469,14 +506,26 @@ function SendModal({
 
         {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? <Spinner /> : null}
-            Send
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+          {/* The same route the PDF is rendered from, so this is the document itself and not a
+              likeness of it. Read it before it reaches the client, not after. */}
+          <a
+            href={`/i/${invoice.publicSlug}/${variant}`}
+            target="_blank"
+            rel="noopener"
+            className="text-sm underline underline-offset-4 hover:no-underline"
+          >
+            Preview the {variant === "receipt" ? "receipt" : "invoice"} PDF
+          </a>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? <Spinner /> : null}
+              Send
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

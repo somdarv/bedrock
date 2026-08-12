@@ -77,6 +77,27 @@ still look like a debtor. `receivedGhs()` reports the cedis for the record.
 This is what makes a part payment across a moving rate come out right: pay $50 worth at 13.00 and
 the remaining $88 at 20.00, and the invoice settles exactly, having received GHS 2,415.99.
 
+### Cedis on every screen
+
+A dollar invoice is still paid out of a cedi bank account, so no dollar figure is ever shown on
+its own in the admin: it carries the cedi counterpart underneath. **Settled invoices show the
+cedis that actually arrived** (`receivedGhs`) — the figure that reconciles against the bank —
+while live ones show the cedis still to pay at the locked rate.
+
+Aggregates (the Invoices tiles, the Receivables invoice total) are struck **in cedis**, converting
+each dollar balance at its own locked rate: a list mixing currencies has no other common
+denominator, and adding `$20` to `₵600` produces a number that is neither. `outstandingCedis()`
+and `cedisFor()` in `lib/invoices/display.ts` are the only places that conversion happens.
+
+Two rules follow, and both were once broken on the invoices list: **never print a dollar amount
+with a `₵` sign** (`formatMoney(x, invoice.currency)`, not `formatCedis(x)`), and never sum a
+`balance` column across invoices without converting first.
+
+A balance can also land **past zero** — cedis are sent in round numbers and a dollar total rarely
+is, so ₵270.00 against a $20.00 invoice settles $20.58. Owed and overpaid are different facts:
+the balance shows `$0.00` with the surplus stated beside it, rather than a negative debt, and a
+settled invoice stops quoting a cedi figure to pay at all.
+
 ### Charges carry a currency too
 
 `infra_charges.currency` exists because a charge is billed by becoming an invoice line. A charge
@@ -170,6 +191,13 @@ and hand it over, so a package invoice and a standalone invoice cannot drift int
 documents from different companies. Change the layout in one place only.
 
 ## Sending
+
+Nothing goes out unseen. The public PDF routes — `/i/{slug}/invoice` and `/i/{slug}/receipt` —
+render from the live invoice record on every request, so they *are* the document that gets sent,
+not a preview of it. The admin screen links to both (**Invoice PDF** / **Receipt PDF**), and the
+send dialog carries the same link for whichever variant is being sent. Because the render is live,
+this works on every invoice already issued and every payment already recorded: no re-issue, no
+stored copy to regenerate.
 
 `sendInvoice` renders the PDF server-side and posts it to the existing client-documents endpoint,
 which stores it for audit/re-send and fans it out over WhatsApp + email. It deliberately does **not**

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { api, balance, effectiveTotal, type WorkPackage } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
-import { formatCedis } from "@/lib/utils";
+import { outstandingCedis } from "@/lib/invoices/display";
+import { formatCedis, formatMoney } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 // Money buckets, keyed off the work-package lifecycle. These are read-only views over
@@ -50,6 +51,10 @@ export default async function ReceivablesPage() {
     awaitingDeposit.reduce((s, p) => s + owed(p), 0) + underwayTotal + finalTotal;
   // Proposals sent but not yet accepted — potential, deliberately kept out of the committed total.
   const proposalTotal = proposals.reduce((s, p) => s + effectiveTotal(p), 0);
+
+  // Invoice balances re-struck in cedis. The API totals `balance` in whatever each invoice is
+  // priced in, so a dollar invoice would otherwise contribute its dollar figure to a cedi sum.
+  const billedTotal = billed.items.reduce((s, i) => s + outstandingCedis(i), 0);
 
   const stats = [
     { label: "Awaiting deposit", value: formatCedis(depositTotal), hint: "accepted, not started" },
@@ -209,7 +214,7 @@ export default async function ReceivablesPage() {
           </div>
           <div className="text-right">
             <div className="font-display text-xl font-semibold tracking-tight">
-              {formatCedis(billed.total)}
+              {formatCedis(billedTotal)}
             </div>
             <div className="text-[11px] text-subtle">
               {billed.items.length} {billed.items.length === 1 ? "invoice" : "invoices"}
@@ -247,9 +252,13 @@ export default async function ReceivablesPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="font-display text-sm font-semibold tracking-tight">
-                        {formatCedis(invoice.balance)}
+                        {formatMoney(Math.max(0, invoice.balance), invoice.currency)}
                       </div>
-                      <div className="text-[11px] text-subtle">owed</div>
+                      <div className="text-[11px] text-subtle">
+                        {invoice.currency === "USD"
+                          ? `${formatCedis(outstandingCedis(invoice))} owed`
+                          : "owed"}
+                      </div>
                     </div>
                   </Link>
                 </li>
