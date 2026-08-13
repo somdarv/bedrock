@@ -822,7 +822,10 @@ export const mockApi: BedrockApi = {
         packages.find((p) => p.id === packageId),
         "Work package",
       );
-      if (pkg.status === "draft") {
+      // Gated packages must be sent first: their invoice is the opening message. Deferred ones
+      // bill from draft, because there the invoice is the last step and requiring a send first
+      // put a priced document in front of the client before it could be raised.
+      if (pkg.status === "draft" && pkg.billingMode !== "deferred") {
         throw new ApiError(409, "Send this package before billing it — a draft is not agreed work yet.");
       }
       const live = invoices.find(

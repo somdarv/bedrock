@@ -238,12 +238,15 @@ function RaiseInvoiceButton({ pkg, amount }: { pkg: WorkPackage; amount: number 
     else router.refresh();
   }
 
+  // A draft is billable here: this button only shows on deferred packages, where the invoice is
+  // the last step rather than the opening one. Requiring a send first meant the client received a
+  // priced document before the invoice could be raised at all.
   return (
     <Button
       size="sm"
       variant="outline"
       onClick={handleClick}
-      disabled={pending || amount <= 0 || pkg.status === "draft"}
+      disabled={pending || amount <= 0}
     >
       {pending ? <Spinner /> : null}
       Raise invoice

@@ -291,10 +291,14 @@ export function PackageDetail({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* What actually goes out depends on how the job is billed. A gated package opens WITH
+              its invoice, because the deposit is what starts the work. A deferred one opens with
+              the project and its link and no money: the invoice is raised afterwards, and a
+              document headed "amount due" up front would be the client's first of two. */}
           {pkg.status === "draft" && (
             <Button onClick={doSend} disabled={pendingLifecycle}>
               {pendingLifecycle ? <Spinner /> : null}
-              Send invoice &amp; link
+              {pkg.billingMode === "deferred" ? "Send project link" : "Send invoice & link"}
             </Button>
           )}
           {transitions.map((status) => (
