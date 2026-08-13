@@ -183,26 +183,35 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Qty</th>
+                {/* Only when something here was discounted, so an ordinary invoice keeps the
+                    columns it has always had rather than carrying an empty one. */}
+                {saved > 0 && (
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Discount</th>
+                )}
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Amount</th>
               </tr>
             </thead>
             <tbody>
               {invoice.items.map((item) => (
                 <tr key={item.id} className="border-t border-border">
-                  <td className="px-4 py-3">
-                    {item.description}
-                    {/* The standard price and what came off it. The whole point of discounting
-                        here rather than quietly quoting less is that the client sees both. */}
-                    {item.discountAmount > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {formatMoney(item.gross, invoice.currency)} less{" "}
-                        {item.discountType === "percent"
-                          ? `${item.discountValue}%`
-                          : formatMoney(item.discountAmount, invoice.currency)}
-                      </div>
-                    )}
-                  </td>
+                  <td className="px-4 py-3">{item.description}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground">{item.quantity}</td>
+                  {/* What came off this line. An empty cell on an undiscounted row is
+                      deliberate: a dash in every row would be louder than the discounts. */}
+                  {saved > 0 && (
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {item.discountAmount > 0 && (
+                        <>
+                          - {formatMoney(item.discountAmount, invoice.currency)}
+                          {item.discountType === "percent" && (
+                            <div className="text-xs text-muted-foreground">
+                              {item.discountValue}%
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right font-medium">{formatMoney(item.amount, invoice.currency)}</td>
                 </tr>
               ))}
@@ -212,7 +221,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
             {saved > 0 && (
               <tfoot className="border-t border-border bg-muted/40">
                 <tr>
-                  <td className="px-4 py-2.5 text-muted-foreground" colSpan={2}>
+                  <td className="px-4 py-2.5 text-muted-foreground" colSpan={3}>
                     Subtotal
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
@@ -221,7 +230,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
                 </tr>
                 {invoice.discountAmount > 0 && (
                   <tr>
-                    <td className="px-4 py-2.5 text-muted-foreground" colSpan={2}>
+                    <td className="px-4 py-2.5 text-muted-foreground" colSpan={3}>
                       {invoice.discountLabel?.trim() || "Discount"}
                       {invoice.discountType === "percent" && ` (${invoice.discountValue}%)`}
                     </td>
@@ -231,7 +240,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
                   </tr>
                 )}
                 <tr className="border-t border-border">
-                  <td className="px-4 py-2.5 font-medium" colSpan={2}>
+                  <td className="px-4 py-2.5 font-medium" colSpan={3}>
                     Total
                   </td>
                   <td className="px-4 py-2.5 text-right font-semibold tabular-nums">

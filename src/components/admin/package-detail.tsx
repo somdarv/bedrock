@@ -398,6 +398,9 @@ export function PackageDetail({
                   <>
                     <TH className="text-right">Qty</TH>
                     <TH className="text-right">Unit</TH>
+                    {/* Only when a line was actually discounted, so an ordinary package keeps
+                        the columns it has always had rather than carrying an empty one. */}
+                    {itemDiscountTotal(pkg) > 0 && <TH className="text-right">Discount</TH>}
                     <TH className="text-right">Line total</TH>
                   </>
                 )}
@@ -431,16 +434,23 @@ export function PackageDetail({
                       <>
                         <TD className="text-right">{li.quantity}</TD>
                         <TD className="text-right">{formatCedis(li.unitPrice)}</TD>
-                        <TD className="text-right">
-                          {formatCedis(lineNet(li))}
-                          {/* The list price stays visible next to what is actually charged:
-                              a discount nobody can see is a price cut, not a discount. */}
-                          {lineGross(li) > lineNet(li) && (
-                            <div className="text-xs font-normal text-muted-foreground">
-                              was {formatCedis(lineGross(li))}
-                            </div>
-                          )}
-                        </TD>
+                        {/* What came off this line. An empty cell on an undiscounted row is
+                            deliberate: a dash in every row would be louder than the discounts. */}
+                        {itemDiscountTotal(pkg) > 0 && (
+                          <TD className="text-right tabular-nums">
+                            {lineGross(li) > lineNet(li) && (
+                              <>
+                                - {formatCedis(lineGross(li) - lineNet(li))}
+                                {li.discountType === "percent" && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {li.discountValue}%
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </TD>
+                        )}
+                        <TD className="text-right">{formatCedis(lineNet(li))}</TD>
                       </>
                     )}
                     <TD>

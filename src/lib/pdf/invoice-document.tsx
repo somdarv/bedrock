@@ -1,10 +1,9 @@
-import type { BillTo, Invoice, Payment } from "@/lib/api";
+import { discountRate, type BillTo, type Invoice, type Payment } from "@/lib/api";
 import {
   BillingDocument,
   discountRowLabel,
   fmtDate,
   fmtLongDate,
-  lineDiscountNote,
   money,
   type BillingModel,
   type BillingSubRow,
@@ -117,15 +116,15 @@ export function invoiceBillingModel({
   // Always itemised: these invoices are a list of things being renewed, and the client is
   // entitled to see the unit price of each one rather than a single lump figure.
   //
-  // `item.amount` is net of the line's own discount, and the note beneath says what came off.
-  // The full price stays on the document either way — that is the point of discounting here
-  // rather than quietly quoting less.
+  // `item.amount` is net of the line's own discount, and the Discount column says what came off,
+  // so the whole sum reads across one line: qty x unit price, less the discount, equals amount.
   const lines = invoice.items.map((item) => ({
     id: item.id,
     description: item.description,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
-    discountNote: lineDiscountNote(item.gross, item.discountAmount, item.discountType, item.discountValue),
+    discountAmount: item.discountAmount,
+    discountRate: discountRate(item.discountType, item.discountValue),
     amount: item.amount,
   }));
 

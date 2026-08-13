@@ -7,6 +7,7 @@ import {
   ApiError,
   balance,
   effectiveTotal,
+  itemDiscountTotal,
   lineGross,
   lineNet,
   packageDiscount,
@@ -53,6 +54,9 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
   // Everything taken off the standard price, both levels together. With nothing discounted the
   // scope list stays exactly as plain as it was.
   const saved = savings(pkg);
+  // Only the per-line reductions: what decides whether the scope list needs a Discount column.
+  // The quote-wide one gets its own row under the list instead.
+  const lineDiscounts = itemDiscountTotal(pkg);
   const settled = due <= 0;
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
   // With a schedule in place the client pays the next step, not the whole outstanding sum.
@@ -214,31 +218,48 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
           {pkg.lineItems.length === 0 ? (
             <p className="px-5 py-6 text-sm text-muted-foreground">No scope included.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {pkg.lineItems.map((li) => (
-                <li key={li.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
-                  <div className="min-w-0">
-                    <span className="text-sm">{li.description}</span>
-                    {/* The standard price and what came off it. Showing both is the point:
-                        a reduction nobody can see is just a lower price. */}
-                    {!isFixed && lineGross(li) > lineNet(li) && (
-                      <div className="text-xs text-muted-foreground">
-                        {formatCedis(lineGross(li))} less{" "}
-                        {li.discountType === "percent"
-                          ? `${li.discountValue}%`
-                          : formatCedis(lineGross(li) - lineNet(li))}
-                      </div>
+            <>
+              {/* A heading row only when there is a Discount column to name. Without it a bare
+                  "- ₵50.00" beside a price is a figure the reader has to guess at. */}
+              {lineDiscounts > 0 && (
+                <div className="flex items-center justify-between gap-4 border-b border-border bg-muted/40 px-5 py-2 text-xs font-medium text-muted-foreground">
+                  <span>Item</span>
+                  <span className="flex shrink-0 gap-6">
+                    <span className="w-24 text-right">Discount</span>
+                    <span className="w-24 text-right">Amount</span>
+                  </span>
+                </div>
+              )}
+              <ul className="divide-y divide-border">
+                {pkg.lineItems.map((li) => (
+                  <li key={li.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
+                    <span className="min-w-0 text-sm">{li.description}</span>
+                    {/* Fixed mode shows a lump-sum total only — no per-line prices. */}
+                    {!isFixed && (
+                      <span className="flex shrink-0 items-baseline gap-6">
+                        {/* What came off this line. Empty on an undiscounted row deliberately:
+                            a dash in every row would be louder than the discounts. */}
+                        {lineDiscounts > 0 && (
+                          <span className="w-24 text-right text-sm tabular-nums text-muted-foreground">
+                            {lineGross(li) > lineNet(li) && (
+                              <>
+                                - {formatCedis(lineGross(li) - lineNet(li))}
+                                {li.discountType === "percent" && (
+                                  <span className="ml-1 text-xs">({li.discountValue}%)</span>
+                                )}
+                              </>
+                            )}
+                          </span>
+                        )}
+                        <span className="w-24 text-right text-sm font-medium tabular-nums">
+                          {formatCedis(lineNet(li))}
+                        </span>
+                      </span>
                     )}
-                  </div>
-                  {/* Fixed mode shows a lump-sum total only — no per-line prices. */}
-                  {!isFixed && (
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
-                      {formatCedis(lineNet(li))}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
           {/* The quote-wide discount gets its own row between the lines and the total, so the
               client can see the full price of the work and the reduction separately. */}

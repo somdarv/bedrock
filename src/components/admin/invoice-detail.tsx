@@ -288,34 +288,34 @@ export function InvoiceDetail({
               <TH>Description</TH>
               <TH className="text-right">Qty</TH>
               <TH className="text-right">Unit price</TH>
+              {/* Only when something here was discounted, so an ordinary invoice keeps the
+                  columns it has always had rather than carrying an empty one. */}
+              {saved > 0 && <TH className="text-right">Discount</TH>}
               <TH className="text-right">Amount</TH>
             </TR>
           </THead>
           <TBody>
             {invoice.items.map((item) => (
               <TR key={item.id}>
-                <TD>
-                  {item.description}
-                  {/* What came off this line, in the words the PDF prints. */}
-                  {item.discountAmount > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      {item.discountType === "percent"
-                        ? `Less ${item.discountValue}%`
-                        : "Discounted"}{" "}
-                      ({formatMoney(item.discountAmount, invoice.currency)} off)
-                    </div>
-                  )}
-                </TD>
+                <TD>{item.description}</TD>
                 <TD className="text-right text-muted-foreground">{item.quantity}</TD>
                 <TD className="text-right text-muted-foreground">{formatMoney(item.unitPrice, invoice.currency)}</TD>
-                <TD className="text-right font-medium">
-                  {formatMoney(item.amount, invoice.currency)}
-                  {item.discountAmount > 0 && (
-                    <div className="text-xs font-normal text-muted-foreground">
-                      was {formatMoney(item.gross, invoice.currency)}
-                    </div>
-                  )}
-                </TD>
+                {/* What came off this line, as the PDF prints it. An empty cell on an
+                    undiscounted row is deliberate: a dash in every row would be louder
+                    than the discounts. */}
+                {saved > 0 && (
+                  <TD className="text-right tabular-nums">
+                    {item.discountAmount > 0 && (
+                      <>
+                        - {formatMoney(item.discountAmount, invoice.currency)}
+                        {item.discountType === "percent" && (
+                          <div className="text-xs text-muted-foreground">{item.discountValue}%</div>
+                        )}
+                      </>
+                    )}
+                  </TD>
+                )}
+                <TD className="text-right font-medium">{formatMoney(item.amount, invoice.currency)}</TD>
               </TR>
             ))}
           </TBody>

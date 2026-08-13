@@ -79,15 +79,19 @@ const s = StyleSheet.create({
   cellDesc: { flex: 1, paddingRight: 14 },
   desc: { fontSize: 9.5, color: brand.ink, lineHeight: 1.45 },
   descSub: { fontSize: 8.5, color: brand.muted, marginTop: 2, lineHeight: 1.45 },
-  // The line's own discount. Same size as descSub but in body ink: it explains a figure the
-  // reader is looking at, so it has to be read rather than skimmed past.
-  discountNote: { fontSize: 8.5, color: brand.body, marginTop: 2, lineHeight: 1.45 },
   cellQty: { width: 40, textAlign: "right", fontSize: 9.5, color: brand.body },
   cellUnit: { width: 88, textAlign: "right", fontSize: 9.5, color: brand.body },
+  // The line's own discount, as its own column. Money in body ink like the unit price beside
+  // it; the rate sits underneath, muted, because the figure is what the column is for and the
+  // percentage only qualifies it.
+  cellDisc: { width: 80, alignItems: "flex-end" },
+  discValue: { fontSize: 9.5, color: brand.body },
+  discRate: { fontSize: 8, color: brand.muted, marginTop: 1 },
   cellAmt: { width: 96, textAlign: "right", fontSize: 9.5, color: brand.ink },
   // Header variants carry width/alignment only — a font size here would override s.th.
   thQty: { width: 40, textAlign: "right" },
   thUnit: { width: 88, textAlign: "right" },
+  thDisc: { width: 80, textAlign: "right" },
   thAmt: { width: 96, textAlign: "right" },
 
   // totals ladder — right half, hairline above each row
@@ -200,24 +204,6 @@ export function discountRowLabel(
   return type === "percent" && value ? `${base} (${pct(value)})` : base;
 }
 
-/**
- * The note under a discounted line: "6,000.00 less 15% (-900.00)".
- *
- * The line's Amount is net, so this is what stops it looking like a slip of the keyboard, and
- * it is where the client sees the price the work is normally sold at.
- */
-export function lineDiscountNote(
-  gross: number,
-  off: number,
-  type: "percent" | "amount" | null | undefined,
-  value: number | null | undefined,
-) {
-  if (off <= 0) return null;
-  return type === "percent" && value
-    ? `${amount(gross)} less ${pct(value)} (-${amount(off)})`
-    : `${amount(gross)} less ${amount(off)}`;
-}
-
 export function fmtDate(iso?: string | null) {
   const d = iso ? new Date(iso) : new Date();
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -240,15 +226,18 @@ export interface BillingLine {
   description: string;
   /** Muted second line under the description (e.g. the items rolled into a fixed price). */
   sub?: string | null;
-  /**
-   * What this line's discount did, spelled out: "6,000.00 less 15% (-900.00)".
-   *
-   * `amount` below is already net, so without this note the Amount column contradicts
-   * qty x unit price and reads as an arithmetic error rather than a favour.
-   */
-  discountNote?: string | null;
   quantity?: number | null;
   unitPrice?: number | null;
+  /**
+   * What this line's own discount takes off, as its own column.
+   *
+   * `amount` below is already net, so without this the Amount column contradicts qty x unit
+   * price and reads as an arithmetic error rather than a favour. In a column the whole sum is
+   * on one line and a reader can follow it across: qty x unit price, less this, equals amount.
+   */
+  discountAmount?: number | null;
+  /** "15%" when the reduction was a percentage; null when it was a flat figure. */
+  discountRate?: string | null;
   /** Always net of the line's own discount, so the column sums to the subtotal. */
   amount: number;
 }
@@ -336,6 +325,10 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
   const isReceipt = model.variant === "receipt";
   const { number, verify } = model;
   const code = model.currency ?? "GHS";
+  // The Discount column only exists when something on this document was actually discounted, so
+  // an ordinary invoice keeps the three columns it has always had rather than carrying an empty
+  // one. A fixed price has no per-line money to reduce, so it never shows the column either.
+  const showDiscount = model.itemised && model.lines.some((line) => (line.discountAmount ?? 0) > 0);
 
   return (
     <Document title={`${isReceipt ? "Receipt" : "Invoice"} ${number}`}>
@@ -406,6 +399,7 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
                 <Text style={[s.th, s.thUnit]}>Unit price</Text>
               </>
             ) : null}
+            {showDiscount ? <Text style={[s.th, s.thDisc]}>Discount</Text> : null}
             <Text style={[s.th, s.thAmt]}>Amount</Text>
           </View>
 
@@ -414,15 +408,24 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
               <View style={s.cellDesc}>
                 <Text style={s.desc}>{line.description}</Text>
                 {line.sub ? <Text style={s.descSub}>{line.sub}</Text> : null}
-                {/* Why the Amount is under qty x unit price. Without it the line reads as a
-                    mistake, and a discount the client has to spot is a discount wasted. */}
-                {line.discountNote ? <Text style={s.discountNote}>{line.discountNote}</Text> : null}
               </View>
               {model.itemised ? (
                 <>
                   <Text style={s.cellQty}>{line.quantity ?? 1}</Text>
                   <Text style={s.cellUnit}>{amount(line.unitPrice ?? line.amount)}</Text>
                 </>
+              ) : null}
+              {/* Why the Amount is under qty x unit price. An empty cell on an undiscounted
+                  line is deliberate: a dash in every row would be louder than the discounts. */}
+              {showDiscount ? (
+                <View style={s.cellDisc}>
+                  {line.discountAmount ? (
+                    <>
+                      <Text style={s.discValue}>- {amount(line.discountAmount)}</Text>
+                      {line.discountRate ? <Text style={s.discRate}>{line.discountRate}</Text> : null}
+                    </>
+                  ) : null}
+                </View>
               ) : null}
               <Text style={s.cellAmt}>{amount(line.amount)}</Text>
             </View>

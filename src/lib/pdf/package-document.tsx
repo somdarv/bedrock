@@ -1,6 +1,7 @@
 import {
   balance,
   discountOn,
+  discountRate,
   effectiveTotal,
   lineGross,
   lineNet,
@@ -17,7 +18,6 @@ import {
   discountRowLabel,
   fmtDate,
   fmtLongDate,
-  lineDiscountNote,
   money,
   type BillingLine,
   type BillingModel,
@@ -106,22 +106,15 @@ export function packageBillingModel({
   } else if (pkg.lineItems.length === 0) {
     lines = [{ id: pkg.id, description: pkg.title, quantity: 1, unitPrice: subtotal, amount: subtotal }];
   } else {
-    lines = pkg.lineItems.map((li) => {
-      const gross = lineGross(li);
-      return {
-        id: li.id,
-        description: li.description,
-        quantity: li.quantity,
-        unitPrice: li.unitPrice,
-        discountNote: lineDiscountNote(
-          gross,
-          discountOn(gross, li.discountType, li.discountValue),
-          li.discountType,
-          li.discountValue,
-        ),
-        amount: lineNet(li),
-      };
-    });
+    lines = pkg.lineItems.map((li) => ({
+      id: li.id,
+      description: li.description,
+      quantity: li.quantity,
+      unitPrice: li.unitPrice,
+      discountAmount: discountOn(lineGross(li), li.discountType, li.discountValue),
+      discountRate: discountRate(li.discountType, li.discountValue),
+      amount: lineNet(li),
+    }));
   }
 
   let subTable: BillingModel["subTable"] = null;
