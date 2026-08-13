@@ -1,4 +1,12 @@
-import { discountRate, type BillTo, type Invoice, type Payment } from "@/lib/api";
+import {
+  balanceAfter,
+  discountRate,
+  settledBy,
+  settledInOrder,
+  type BillTo,
+  type Invoice,
+  type Payment,
+} from "@/lib/api";
 import {
   BillingDocument,
   discountRowLabel,
@@ -81,12 +89,22 @@ function fxNoteFor(invoice: Invoice, due: number): string | null {
 export function invoiceBillingModel({
   invoice,
   variant,
+  payment,
   billTo,
   payUrl,
   verify,
 }: {
   invoice: Invoice;
   variant: "invoice" | "receipt";
+  /**
+   * The payment this receipt is FOR. A receipt acknowledges one payment, so with this set the
+   * document states what that payment did and what it left outstanding — which is the only way
+   * a part payment can be receipted at all.
+   *
+   * Omitted for the invoice variant, and for a settled invoice's canonical receipt, which
+   * speaks for the whole invoice as it always has.
+   */
+  payment?: Payment | null;
   billTo?: BillTo | null;
   /** The invoice's public page — where the Pay button lands. */
   payUrl?: string | null;
@@ -95,19 +113,28 @@ export function invoiceBillingModel({
   const isReceipt = variant === "receipt";
   const code = invoice.currency ?? "GHS";
   const isUsd = code === "USD";
-  const settledPayments = invoice.payments.filter((p) => p.status === "success");
+  const settledPayments = settledInOrder(invoice);
   const lastPayment = settledPayments[settledPayments.length - 1];
-  const due = Math.max(0, invoice.balance);
 
-  const number = (isReceipt ? invoice.receiptReference : invoice.reference) ?? "Draft";
+  // A receipt for one payment reports THAT payment: what it settled, and what was still owed
+  // the moment it landed. Both figures are frozen at that point in the sequence rather than
+  // read live, so a reprint of an old receipt still matches the copy the client filed.
+  const receiptFor = isReceipt ? (payment ?? null) : null;
+  const receiptPaid = receiptFor ? settledBy(invoice, receiptFor) : invoice.paid;
+  const receiptDue = receiptFor ? balanceAfter(invoice, receiptFor) : Math.max(0, invoice.balance);
+  const receiptDate = receiptFor?.paidAt ?? lastPayment?.paidAt ?? invoice.paidAt;
+  const due = isReceipt ? receiptDue : Math.max(0, invoice.balance);
+
+  const receiptNumber = receiptFor?.receiptReference ?? invoice.receiptReference;
+  const number = (isReceipt ? receiptNumber : invoice.reference) ?? "Draft";
 
   const meta: BillingModel["meta"] = [];
-  if (isReceipt && invoice.receiptReference) {
-    meta.push({ label: "Receipt number", value: invoice.receiptReference });
+  if (isReceipt && receiptNumber) {
+    meta.push({ label: "Receipt number", value: receiptNumber });
   }
   meta.push({ label: "Invoice number", value: invoice.reference ?? "Draft" });
   if (isReceipt) {
-    if (lastPayment) meta.push({ label: "Date paid", value: fmtDate(lastPayment.paidAt) });
+    if (receiptDate) meta.push({ label: "Date paid", value: fmtDate(receiptDate) });
   } else {
     meta.push({ label: "Date of issue", value: fmtDate(invoice.issueDate ?? invoice.createdAt) });
     if (invoice.dueDate) meta.push({ label: "Payment due", value: fmtDate(invoice.dueDate) });
@@ -131,12 +158,17 @@ export function invoiceBillingModel({
   // On a dollar invoice the history is stated in dollars settled (matching the totals ladder),
   // with the cedis actually sent and the rate applied on the line beneath — the client needs to
   // recognise the figure that left their account.
+  //
+  // A receipt for one payment lists only that payment: it is the record of a single transaction,
+  // and reprinting the client's whole payment history on it would restate money already
+  // receipted elsewhere.
+  const historyRows = receiptFor ? [receiptFor] : settledPayments;
   const subTable: BillingModel["subTable"] =
-    isReceipt && settledPayments.length > 0
+    isReceipt && historyRows.length > 0
       ? {
-          heading: "Payment history",
+          heading: receiptFor ? "This payment" : "Payment history",
           columns: ["Payment method", "Date", isUsd ? "Settled (USD)" : "Amount paid"],
-          rows: settledPayments.map<BillingSubRow>((p) => ({
+          rows: historyRows.map<BillingSubRow>((p) => ({
             id: p.id,
             label: methodLabel(p),
             sub: isUsd
@@ -150,12 +182,22 @@ export function invoiceBillingModel({
         }
       : null;
 
-  const receivedGhs = settledPayments.reduce((sum, p) => sum + p.amount, 0);
+  const receivedGhs = (receiptFor ? [receiptFor] : settledPayments).reduce((sum, p) => sum + p.amount, 0);
 
+  // What the client most needs to read on a receipt is whether the bill is now closed. Saying
+  // "settles it in full" on a part payment would be a plain untruth, and saying nothing leaves
+  // them to work it out from the totals ladder.
+  const stillOwed = `${money(receiptDue, code)} remains outstanding on invoice ${invoice.reference ?? ""}`.trim();
   const memo = isReceipt
     ? isUsd
-      ? `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(invoice.paid, "USD")} on this invoice in full.`
-      : "Thank you. This receipt confirms the payments listed below, and settles the invoice it refers to in full."
+      ? receiptDue > 0
+        ? `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(receiptPaid, "USD")}. ${stillOwed}.`
+        : `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(receiptPaid, "USD")} on this invoice in full.`
+      : receiptDue > 0
+        ? `Thank you. This receipt confirms the payment below. ${stillOwed}.`
+        : receiptFor
+          ? "Thank you. This receipt confirms the payment below, and settles the invoice it refers to in full."
+          : "Thank you. This receipt confirms the payments listed below, and settles the invoice it refers to in full."
     : due > 0
       ? invoice.memo?.trim() ||
         "Pay by card or mobile money using the button above. If you would rather pay another way, reply to this message and we will send you the details."
@@ -177,7 +219,7 @@ export function invoiceBillingModel({
     headline: isReceipt
       ? settledPayments.length === 0
         ? "No payments recorded yet"
-        : `${money(invoice.paid, code)} paid on ${fmtLongDate(lastPayment.paidAt)}`
+        : `${money(receiptPaid, code)} received on ${fmtLongDate(receiptDate)}`
       : due <= 0
         ? `${money(invoice.total, code)} paid in full`
         : dueLine(invoice.dueDate, due, code),
@@ -198,10 +240,12 @@ export function invoiceBillingModel({
         : null,
     savings: invoice.itemDiscountTotal + invoice.discountAmount,
     total: invoice.total,
-    paid: invoice.paid,
+    // On a payment receipt this is what THAT payment settled, so the "Amount paid" line and the
+    // "Balance remaining" above it describe the same moment.
+    paid: isReceipt ? receiptPaid : invoice.paid,
     due,
     subTable,
-    issuedDate: isReceipt ? (lastPayment?.paidAt ?? invoice.paidAt) : (invoice.issueDate ?? invoice.createdAt),
+    issuedDate: isReceipt ? (receiptDate ?? invoice.paidAt) : (invoice.issueDate ?? invoice.createdAt),
     verify,
   };
 }
@@ -209,6 +253,7 @@ export function invoiceBillingModel({
 export function InvoiceDocument({
   invoice,
   variant,
+  payment,
   billTo,
   payUrl,
   logo,
@@ -216,6 +261,8 @@ export function InvoiceDocument({
 }: {
   invoice: Invoice;
   variant: "invoice" | "receipt";
+  /** The payment this receipt acknowledges. See invoiceBillingModel. */
+  payment?: Payment | null;
   billTo?: BillTo | null;
   payUrl?: string | null;
   /** SaharaBase wordmark as a data URI (from brand.logoDataUri()). */
@@ -225,7 +272,7 @@ export function InvoiceDocument({
 }) {
   return (
     <BillingDocument
-      model={invoiceBillingModel({ invoice, variant, billTo, payUrl, verify })}
+      model={invoiceBillingModel({ invoice, variant, payment, billTo, payUrl, verify })}
       logo={logo}
     />
   );

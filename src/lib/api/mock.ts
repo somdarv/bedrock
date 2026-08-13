@@ -1343,7 +1343,16 @@ export const mockApi: BedrockApi = {
           ? (input.fxRate ?? invoice.fxRateLocked ?? effectiveRate())
           : null;
 
-      invoice.payments.push({
+      // Every payment mints its own receipt, part payment or not — money received produces a
+      // document. Mirrors InvoiceIssuer::issueReceiptForPayment.
+      const code = mockClientCode(invoice.clientId);
+      const seq = String(
+        invoices.reduce((n, i) => n + i.payments.filter((p) => p.receiptDocumentId).length, 0) + 1,
+      ).padStart(2, "0");
+      const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const receiptReference = `RCP-${code}-${seq}`;
+
+      const payment: Payment = {
         id: `pm_${crypto.randomUUID().slice(0, 8)}`,
         milestoneId: null,
         amount: input.amount,
@@ -1354,18 +1363,20 @@ export const mockApi: BedrockApi = {
         paystackReference: input.reference,
         method: input.method,
         paidAt: input.paidAt ?? new Date().toISOString(),
-      });
+        receiptReference,
+        receiptDocumentId: `SAH-FIN-${ymd}-${receiptReference}`,
+        receiptSerial: mockSerial(),
+      };
+      invoice.payments.push(payment);
 
       const hydrated = hydrateInvoice(invoice);
       if (hydrated.balance <= 0 && hydrated.total > 0) {
-        const code = mockClientCode(invoice.clientId);
-        const seq = String(invoices.filter((i) => i.receiptDocumentId).length + 1).padStart(2, "0");
-        const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
         invoice.status = "paid";
         invoice.paidAt = new Date().toISOString();
-        invoice.receiptReference = `RCP-${code}-${seq}`;
-        invoice.receiptDocumentId = `SAH-FIN-${ymd}-${invoice.receiptReference}`;
-        invoice.receiptSerial = mockSerial();
+        // A settled invoice keeps one canonical receipt: the one for the payment that closed it.
+        invoice.receiptReference = payment.receiptReference ?? null;
+        invoice.receiptDocumentId = payment.receiptDocumentId ?? null;
+        invoice.receiptSerial = payment.receiptSerial ?? null;
         infraCharges.forEach((c) => {
           if (c.invoiceId === invoice.id && c.status === "pending") {
             c.status = "paid";

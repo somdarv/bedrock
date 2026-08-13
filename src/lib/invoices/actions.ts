@@ -164,8 +164,14 @@ export interface SendInvoiceInput {
   replyToName: string;
   replyToMethod: string;
   replyToValue: string;
-  /** Send the receipt instead of the invoice (only once the invoice is settled). */
+  /** Send the receipt instead of the invoice. */
   variant?: "invoice" | "receipt";
+  /**
+   * Which payment's receipt to send. A receipt acknowledges one payment, so a part-paid invoice
+   * has as many receipts as it has payments. Omitted sends the invoice's canonical (settling)
+   * receipt, which is what a fully paid invoice has.
+   */
+  paymentId?: string;
   /** Receipt sends only: attach the invoice it settles alongside it. Defaults to true. */
   includeInvoice?: boolean;
 }
@@ -201,8 +207,18 @@ export async function sendInvoice(
     if (invoice.status === "draft") {
       return { error: "Issue the invoice before sending it." };
     }
-    if (variant === "receipt" && !invoice.receiptDocumentId) {
-      return { error: "There is no receipt yet — record the payment first." };
+    // The receipt being sent: one payment's, or the invoice's canonical one. A part payment now
+    // has a receipt of its own, so "there is no receipt yet" only means no money has arrived.
+    const payment = input.paymentId
+      ? (invoice.payments.find((p) => p.id === input.paymentId) ?? null)
+      : null;
+    if (variant === "receipt") {
+      if (input.paymentId && !payment?.receiptDocumentId) {
+        return { error: "That payment has no receipt yet." };
+      }
+      if (!input.paymentId && !invoice.receiptDocumentId) {
+        return { error: "There is no receipt yet — record the payment first." };
+      }
     }
 
     const client = await api.clients.get(invoice.clientId);
@@ -218,10 +234,12 @@ export async function sendInvoice(
           phone: contact?.phone ?? contact?.whatsapp ?? null,
         },
         payUrl: base ? `${base}/i/${invoice.publicSlug}` : null,
+        payment: of === "receipt" ? payment : null,
       });
 
     const label = (of: "invoice" | "receipt") => {
-      const ref = (of === "receipt" ? invoice.receiptReference : invoice.reference) ?? invoiceId;
+      const receiptRef = payment?.receiptReference ?? invoice.receiptReference;
+      const ref = (of === "receipt" ? receiptRef : invoice.reference) ?? invoiceId;
       return {
         type: of,
         filename: `${ref.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`,

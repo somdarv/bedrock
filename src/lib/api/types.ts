@@ -278,6 +278,14 @@ export interface Payment {
   paystackReference: string | null;
   method: string | null;
   paidAt: string | null;
+  /**
+   * This payment's own receipt, minted when the money was recorded — part payment or not.
+   * A part payment is still money received, and the client's books need a document for it.
+   * Absent on package payments, which are not receipted individually.
+   */
+  receiptDocumentId?: string | null;
+  receiptReference?: string | null;
+  receiptSerial?: string | null;
 }
 
 export interface PaymentInput {
@@ -836,6 +844,45 @@ export interface FxInput {
   marginPercent: number;
   manualRate: number | null;
   validityDays?: number;
+}
+
+/**
+ * Successful payments in the order the money arrived (mirrors `Invoice::settledInOrder`).
+ *
+ * Ordered by date and broken by id, so two payments on the same day still have a stable
+ * sequence. Every "what was left afterwards" figure depends on this order not moving.
+ */
+export function settledInOrder(invoice: Pick<Invoice, "payments">) {
+  return invoice.payments
+    .filter((p) => p.status === "success")
+    .sort((a, b) => {
+      const at = a.paidAt ? Date.parse(a.paidAt) : 0;
+      const bt = b.paidAt ? Date.parse(b.paidAt) : 0;
+      return at - bt || a.id.localeCompare(b.id);
+    });
+}
+
+/** What one payment settled, in the invoice's own currency (dollars on a USD invoice). */
+export function settledBy(invoice: Pick<Invoice, "currency">, payment: Payment) {
+  return invoice.currency === "USD" ? (payment.amountUsd ?? 0) : payment.amount;
+}
+
+/**
+ * What was still owed the moment this payment landed (mirrors `Invoice::balanceAfter`).
+ *
+ * A receipt is a snapshot, not a live view: printed once, sent, and filed. Quoting today's
+ * balance would make a reprint disagree with the copy the client is holding.
+ */
+export function balanceAfter(
+  invoice: Pick<Invoice, "currency" | "payments" | "total">,
+  payment: Payment,
+) {
+  let cumulative = 0;
+  for (const settled of settledInOrder(invoice)) {
+    cumulative += settledBy(invoice, settled);
+    if (settled.id === payment.id) break;
+  }
+  return round2(Math.max(0, invoice.total - cumulative));
 }
 
 export interface InvoicesOutstanding {

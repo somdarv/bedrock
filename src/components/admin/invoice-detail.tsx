@@ -46,7 +46,11 @@ export function InvoiceDetail({
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = React.useTransition();
-  const [sending, setSending] = React.useState<"invoice" | "receipt" | null>(null);
+  // A receipt belongs to one payment, so sending one has to say which. Omitting the payment
+  // sends the invoice's canonical receipt, which is what a fully settled invoice has.
+  const [sending, setSending] = React.useState<
+    { variant: "invoice" | "receipt"; paymentId?: string } | null
+  >(null);
   const [paying, setPaying] = React.useState(false);
   const [confirmVoid, setConfirmVoid] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -137,7 +141,7 @@ export function InvoiceDetail({
                   </a>
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => setSending("invoice")}>
+              <Button variant="outline" size="sm" onClick={() => setSending({ variant: "invoice" })}>
                 Send invoice
               </Button>
               {!settled && isUsd && invoice.fxExpired && (
@@ -161,7 +165,7 @@ export function InvoiceDetail({
                 </Button>
               )}
               {hasReceipt && (
-                <Button variant="outline" size="sm" onClick={() => setSending("receipt")}>
+                <Button variant="outline" size="sm" onClick={() => setSending({ variant: "receipt" })}>
                   Send receipt
                 </Button>
               )}
@@ -368,6 +372,8 @@ export function InvoiceDetail({
                 <TH>Status</TH>
                 <TH className="text-right">Received</TH>
                 {isUsd && <TH className="text-right">Settled</TH>}
+                {/* Each payment has its own receipt, part payment or not. */}
+                <TH className="text-right">Receipt</TH>
               </TR>
             </THead>
             <TBody>
@@ -397,6 +403,34 @@ export function InvoiceDetail({
                       ) : null}
                     </TD>
                   )}
+                  {/* This payment's own receipt: read it, then send it. A part payment is money
+                      received, so it gets a document like any other. */}
+                  <TD className="text-right">
+                    {p.receiptDocumentId ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost" asChild>
+                          <a
+                            href={`/i/${invoice.publicSlug}/receipt/${p.id}`}
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            PDF
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSending({ variant: "receipt", paymentId: p.id })}
+                        >
+                          Send
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {p.status === "success" ? "—" : ""}
+                      </span>
+                    )}
+                  </TD>
                 </TR>
               ))}
             </TBody>
@@ -408,7 +442,8 @@ export function InvoiceDetail({
         <SendModal
           invoice={invoice}
           contacts={contacts}
-          variant={sending}
+          variant={sending.variant}
+          paymentId={sending.paymentId}
           onClose={() => setSending(null)}
           onSent={(who) => {
             setSending(null);
@@ -494,33 +529,39 @@ function SendModal({
   invoice,
   contacts,
   variant,
+  paymentId,
   onClose,
   onSent,
 }: {
   invoice: Invoice;
   contacts: Contact[];
   variant: "invoice" | "receipt";
+  /** Which payment's receipt. Omitted sends the invoice's canonical (settling) one. */
+  paymentId?: string;
   onClose: () => void;
   onSent: (sentTo?: string) => void;
 }) {
   const isReceipt = variant === "receipt";
+  // The preview must be the exact document that goes out, so a per-payment receipt previews on
+  // its own route rather than the invoice's canonical one.
+  const href =
+    isReceipt && paymentId
+      ? `/i/${invoice.publicSlug}/receipt/${paymentId}`
+      : `/i/${invoice.publicSlug}/${variant}`;
 
   return (
     <DocumentSendModal
       heading={isReceipt ? "Send receipt" : "Send invoice"}
       description="Goes out over WhatsApp and email as a PDF attachment, and is filed in the client's document history."
       contacts={contacts}
-      preview={{
-        href: `/i/${invoice.publicSlug}/${variant}`,
-        label: `Preview the ${variant} PDF`,
-      }}
+      preview={{ href, label: `Preview the ${variant} PDF` }}
       // A receipt proves money moved; the invoice says what for. They belong in one email.
       pair={
         isReceipt && invoice.reference
           ? { label: `Attach invoice ${invoice.reference}`, href: `/i/${invoice.publicSlug}/invoice` }
           : null
       }
-      send={(values) => sendInvoice(invoice.id, { ...values, variant })}
+      send={(values) => sendInvoice(invoice.id, { ...values, variant, paymentId })}
       onClose={onClose}
       onSent={onSent}
     />

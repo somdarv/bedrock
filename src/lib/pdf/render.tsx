@@ -7,6 +7,7 @@ import type {
   ClientType,
   InfrastructureOverview,
   Invoice,
+  Payment,
   WorkPackage,
 } from "@/lib/api";
 import { packageDocumentRefs } from "@/lib/documents/package-refs";
@@ -59,18 +60,28 @@ export async function renderPackagePdf(
 export async function renderInvoicePdf(
   invoice: Invoice,
   variant: "invoice" | "receipt",
-  opts: { billTo?: BillTo | null; payUrl?: string | null } = {},
+  opts: { billTo?: BillTo | null; payUrl?: string | null; payment?: Payment | null } = {},
 ): Promise<Buffer> {
   registerBrandFonts();
 
-  const reference = (variant === "receipt" ? invoice.receiptDocumentId : invoice.documentId) ?? "";
-  const serial = (variant === "receipt" ? invoice.receiptSerial : invoice.serial) ?? "Pending issue";
+  // A receipt for one payment verifies as its OWN document: the payment carries the identity,
+  // because each payment is receipted separately and they cannot share a reference.
+  const payment = variant === "receipt" ? (opts.payment ?? null) : null;
+  const reference =
+    (variant === "receipt"
+      ? (payment?.receiptDocumentId ?? invoice.receiptDocumentId)
+      : invoice.documentId) ?? "";
+  const serial =
+    (variant === "receipt"
+      ? (payment?.receiptSerial ?? invoice.receiptSerial)
+      : invoice.serial) ?? "Pending issue";
   const verifyQr = await verifyQrFor(reference);
 
   return renderToBuffer(
     <InvoiceDocument
       invoice={invoice}
       variant={variant}
+      payment={payment}
       billTo={opts.billTo}
       payUrl={opts.payUrl}
       logo={logoDataUri()}

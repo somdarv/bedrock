@@ -8,7 +8,12 @@ import { renderInvoicePdf } from "./render";
  * unguessable slug) so Meta can fetch it as a WhatsApp document header and the client can
  * download it — the same contract the package invoice route works under.
  */
-export async function invoicePdfResponse(slug: string, variant: "invoice" | "receipt") {
+export async function invoicePdfResponse(
+  slug: string,
+  variant: "invoice" | "receipt",
+  /** Renders the receipt for ONE payment. Omitted gives the invoice's canonical receipt. */
+  paymentId?: string,
+) {
   let invoice;
   try {
     invoice = await api.invoices.getBySlug(slug);
@@ -19,9 +24,17 @@ export async function invoicePdfResponse(slug: string, variant: "invoice" | "rec
     throw e;
   }
 
-  // A receipt only exists once the invoice has actually been settled.
-  if (variant === "receipt" && !invoice.receiptDocumentId) {
-    return new Response("Not found", { status: 404 });
+  // A receipt exists once the money it acknowledges does. Per payment that means the payment
+  // must be on this invoice and carry its own minted receipt; without a payment it means the
+  // invoice has been settled and has its canonical one.
+  const payment = paymentId ? invoice.payments.find((p) => p.id === paymentId) : null;
+  if (variant === "receipt") {
+    if (paymentId && !payment?.receiptDocumentId) {
+      return new Response("Not found", { status: 404 });
+    }
+    if (!paymentId && !invoice.receiptDocumentId) {
+      return new Response("Not found", { status: 404 });
+    }
   }
 
   // NEXT_PUBLIC_APP_URL is not set everywhere; the verify origin is the same host and always is.
@@ -30,9 +43,10 @@ export async function invoicePdfResponse(slug: string, variant: "invoice" | "rec
   const pdf = await renderInvoicePdf(invoice, variant, {
     billTo: invoice.billTo,
     payUrl: base ? `${base}/i/${invoice.publicSlug}` : null,
+    payment,
   });
 
-  const name = invoice.reference?.toLowerCase() ?? slug;
+  const name = (payment?.receiptReference ?? invoice.reference)?.toLowerCase() ?? slug;
 
   return new Response(new Uint8Array(pdf), {
     headers: {
