@@ -50,6 +50,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
   const payable = invoice.quote?.amountGhs ?? null;
   const rateExpired = invoice.quote?.expired ?? false;
   const settled = invoice.balance <= 0;
+  // Everything taken off the standard price, both levels together. Nothing discounted, nothing
+  // to explain: the table stays as plain as it was before there were discounts.
+  const saved = invoice.itemDiscountTotal + invoice.discountAmount;
   const voided = invoice.status === "void";
   const dueDate = fmtDate(invoice.dueDate);
   const overdue = !settled && !voided && invoice.dueDate ? new Date(invoice.dueDate) < new Date() : false;
@@ -186,14 +189,64 @@ export default async function InvoicePage({ params }: { params: Promise<{ slug: 
             <tbody>
               {invoice.items.map((item) => (
                 <tr key={item.id} className="border-t border-border">
-                  <td className="px-4 py-3">{item.description}</td>
+                  <td className="px-4 py-3">
+                    {item.description}
+                    {/* The standard price and what came off it. The whole point of discounting
+                        here rather than quietly quoting less is that the client sees both. */}
+                    {item.discountAmount > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatMoney(item.gross, invoice.currency)} less{" "}
+                        {item.discountType === "percent"
+                          ? `${item.discountValue}%`
+                          : formatMoney(item.discountAmount, invoice.currency)}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">{item.quantity}</td>
                   <td className="px-4 py-3 text-right font-medium">{formatMoney(item.amount, invoice.currency)}</td>
                 </tr>
               ))}
             </tbody>
+            {/* The ladder: what the lines come to, what the invoice-wide discount takes off,
+                and the total. Only shown when there is a discount to explain. */}
+            {saved > 0 && (
+              <tfoot className="border-t border-border bg-muted/40">
+                <tr>
+                  <td className="px-4 py-2.5 text-muted-foreground" colSpan={2}>
+                    Subtotal
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">
+                    {formatMoney(invoice.subtotal, invoice.currency)}
+                  </td>
+                </tr>
+                {invoice.discountAmount > 0 && (
+                  <tr>
+                    <td className="px-4 py-2.5 text-muted-foreground" colSpan={2}>
+                      {invoice.discountLabel?.trim() || "Discount"}
+                      {invoice.discountType === "percent" && ` (${invoice.discountValue}%)`}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      - {formatMoney(invoice.discountAmount, invoice.currency)}
+                    </td>
+                  </tr>
+                )}
+                <tr className="border-t border-border">
+                  <td className="px-4 py-2.5 font-medium" colSpan={2}>
+                    Total
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                    {formatMoney(invoice.total, invoice.currency)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
+        {saved > 0 && (
+          <p className="mt-3 text-sm font-medium">
+            Includes {formatMoney(saved, invoice.currency)} off our standard price.
+          </p>
+        )}
         {invoice.memo && <p className="mt-4 text-sm text-muted-foreground">{invoice.memo}</p>}
       </section>
 

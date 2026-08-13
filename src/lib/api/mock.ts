@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type HostingServer, type InfraCharge, type Invoice, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -48,12 +48,22 @@ const invoices: Invoice[] = [
     issuedAt: "2026-08-11T09:00:00Z",
     paidAt: null,
     createdAt: "2026-08-11T09:00:00Z",
+    discountType: null,
+    discountValue: 0,
+    discountLabel: null,
+    // Spelled out rather than built by the helper below: this array is evaluated as the module
+    // loads, and a fixture that calls across module boundaries at that moment depends on the
+    // bundler's evaluation order to work at all.
     items: [
-      { id: "ii_s1", position: 0, description: "Domain renewal for amaboateng.com (12 months)", quantity: 1, unitPrice: 18, amount: 18 },
-      { id: "ii_s2", position: 1, description: "Web hosting, Starter plan (12 months)", quantity: 1, unitPrice: 120, amount: 120 },
-      { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 8, amount: 16 },
+      { id: "ii_s1", position: 0, description: "Domain renewal for amaboateng.com (12 months)", quantity: 1, unitPrice: 18, discountType: null, discountValue: 0, discountAmount: 0, gross: 18, amount: 18 },
+      { id: "ii_s2", position: 1, description: "Web hosting, Starter plan (12 months)", quantity: 1, unitPrice: 120, discountType: null, discountValue: 0, discountAmount: 0, gross: 120, amount: 120 },
+      { id: "ii_s3", position: 2, description: "SSL certificate renewal", quantity: 2, unitPrice: 8, discountType: null, discountValue: 0, discountAmount: 0, gross: 16, amount: 16 },
     ],
     payments: [],
+    grossSubtotal: 0,
+    itemDiscountTotal: 0,
+    subtotal: 0,
+    discountAmount: 0,
     total: 0,
     paid: 0,
     balance: 0,
@@ -84,8 +94,43 @@ const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
  * On a dollar invoice `paid` is the DOLLARS those cedis bought, not the cedis themselves:
  * summing cedis against a dollar total compares two different things.
  */
+/**
+ * Build one invoice line, pricing its discount exactly as the API does. Everything that makes
+ * an invoice item in this mock goes through here so `amount` is never left at gross by accident.
+ */
+function mockInvoiceItem(
+  item: { description: string; quantity: number; unitPrice: number } & Partial<Discountable>,
+  position: number,
+): InvoiceItem {
+  const gross = round2(item.quantity * item.unitPrice);
+  const discountAmount = discountOn(gross, item.discountType, item.discountValue);
+  return {
+    id: `ii_${crypto.randomUUID().slice(0, 8)}`,
+    position,
+    description: item.description,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    discountType: item.discountType ?? null,
+    discountValue: item.discountValue ?? 0,
+    discountAmount,
+    gross,
+    amount: round2(gross - discountAmount),
+  };
+}
+
 function hydrateInvoice(invoice: Invoice): Invoice {
-  const total = round2(invoice.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
+  // The same ladder the API derives: list price → less line discounts → subtotal → less the
+  // invoice-wide discount → total. Everything below prices off `total`, as it does live.
+  const grossSubtotal = round2(invoice.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0));
+  const itemDiscountTotal = round2(
+    invoice.items.reduce(
+      (sum, i) => sum + discountOn(round2(i.quantity * i.unitPrice), i.discountType, i.discountValue),
+      0,
+    ),
+  );
+  const subtotal = round2(grossSubtotal - itemDiscountTotal);
+  const discountAmount = discountOn(subtotal, invoice.discountType, invoice.discountValue);
+  const total = round2(subtotal - discountAmount);
   const settled = invoice.payments.filter((p) => p.status === "success");
   const paid = round2(
     invoice.currency === "USD"
@@ -96,6 +141,10 @@ function hydrateInvoice(invoice: Invoice): Invoice {
   const balance = round2(total - paid);
   return {
     ...invoice,
+    grossSubtotal,
+    itemDiscountTotal,
+    subtotal,
+    discountAmount,
     total,
     paid,
     balance,
@@ -191,6 +240,9 @@ const packages: WorkPackage[] = [
     status: "in_progress",
     publicSlug: "8f1c2a90-3b6e-4a2d-9c11-7e5d0a2b4c6f",
     pricingMode: "itemized",
+    discountType: null,
+    discountValue: 0,
+    discountLabel: null,
     deliveryMode: "gated_files",
     billingMode: "gated",
     invoicedPaid: 0,
@@ -429,6 +481,9 @@ export const mockApi: BedrockApi = {
         status: "draft",
         publicSlug: crypto.randomUUID(),
         pricingMode: input.pricingMode,
+        discountType: input.discountType ?? null,
+        discountValue: input.discountValue ?? 0,
+        discountLabel: input.discountLabel ?? null,
         deliveryMode: "gated_files",
         // Mirrors the API: an account we already work with continuously is billed after the
         // fact unless the operator says otherwise.
@@ -468,6 +523,14 @@ export const mockApi: BedrockApi = {
       }
       pkg.totalOverride = input.pricingMode === "fixed" ? input.totalOverride : null;
       pkg.estimatedDeliveryDate = input.estimatedDeliveryDate;
+      // Preserved when the request does not mention it, mirroring the API: several callers
+      // PATCH one setting by reading the package back, and a discount cleared as a side effect
+      // of switching delivery mode would silently re-bill the client at full price.
+      if ("discountType" in input) {
+        pkg.discountType = input.discountType ?? null;
+        pkg.discountValue = input.discountValue ?? 0;
+      }
+      if ("discountLabel" in input) pkg.discountLabel = input.discountLabel ?? null;
       return pkg;
     },
     async remove(id) {
@@ -487,6 +550,8 @@ export const mockApi: BedrockApi = {
         description: input.description,
         quantity: input.quantity,
         unitPrice: input.unitPrice,
+        discountType: input.discountType ?? null,
+        discountValue: input.discountValue ?? 0,
         done: false,
       };
       pkg.lineItems.push(item);
@@ -505,6 +570,8 @@ export const mockApi: BedrockApi = {
       item.description = input.description;
       item.quantity = input.quantity;
       item.unitPrice = input.unitPrice;
+      item.discountType = input.discountType ?? null;
+      item.discountValue = input.discountValue ?? 0;
       return pkg;
     },
     async removeLineItem(packageId, itemId) {
@@ -782,6 +849,8 @@ export const mockApi: BedrockApi = {
             description: li.description,
             quantity: li.quantity,
             unitPrice: li.unitPrice,
+            discountType: li.discountType ?? null,
+            discountValue: li.discountValue ?? 0,
           }))
         : [
             {
@@ -820,15 +889,19 @@ export const mockApi: BedrockApi = {
         issuedAt: null,
         paidAt: null,
         createdAt: new Date().toISOString(),
-        items: lines.map((line, i) => ({
-          id: `ii_${crypto.randomUUID().slice(0, 8)}`,
-          position: i,
-          description: line.description,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          amount: line.quantity * line.unitPrice,
-        })),
+        // Carry the quote's discounts onto the bill for it, as the API does: copying the lines
+        // at list price and dropping the reduction would invoice more than was agreed.
+        // The single-line fallback is already net of everything, so the package discount only
+        // travels on the itemised path where the lines are copied at list price.
+        discountType: useLines ? (pkg.discountType ?? null) : null,
+        discountValue: useLines ? (pkg.discountValue ?? 0) : 0,
+        discountLabel: useLines ? (pkg.discountLabel ?? null) : null,
+        items: lines.map((line, i) => mockInvoiceItem(line, i)),
         payments: [],
+        grossSubtotal: 0,
+        itemDiscountTotal: 0,
+        subtotal: 0,
+        discountAmount: 0,
         total: 0,
         paid: 0,
         balance: 0,
@@ -1162,15 +1235,15 @@ export const mockApi: BedrockApi = {
         issuedAt: null,
         paidAt: null,
         createdAt: new Date().toISOString(),
-        items: items.map((item) => ({
-          id: `ii_${crypto.randomUUID().slice(0, 8)}`,
-          position: item.position,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          amount: item.quantity * item.unitPrice,
-        })),
+        discountType: input.discountType ?? null,
+        discountValue: input.discountValue ?? 0,
+        discountLabel: input.discountLabel ?? null,
+        items: items.map((item) => mockInvoiceItem(item, item.position)),
         payments: [],
+        grossSubtotal: 0,
+        itemDiscountTotal: 0,
+        subtotal: 0,
+        discountAmount: 0,
         total: 0,
         paid: 0,
         balance: 0,
@@ -1199,17 +1272,14 @@ export const mockApi: BedrockApi = {
       invoice.currency = input.currency ?? invoice.currency;
       invoice.issueDate = input.issueDate;
       invoice.dueDate = input.dueDate;
+      invoice.discountType = input.discountType ?? null;
+      invoice.discountValue = input.discountValue ?? 0;
+      invoice.discountLabel = input.discountLabel ?? null;
+      // Charge lines carry no discount of their own: a supplier's price passed through at cost.
       invoice.items = [
         ...input.items,
         ...charges.map((c) => ({ description: c.description, quantity: 1, unitPrice: c.amount })),
-      ].map((item, i) => ({
-        id: `ii_${crypto.randomUUID().slice(0, 8)}`,
-        position: i,
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        amount: item.quantity * item.unitPrice,
-      }));
+      ].map((item, i) => mockInvoiceItem(item, i));
       charges.forEach((c) => {
         c.invoiceId = invoice.id;
       });

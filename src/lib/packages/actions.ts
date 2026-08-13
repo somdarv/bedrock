@@ -195,6 +195,49 @@ export async function setDeliveryMode(id: string, mode: DeliveryMode): Promise<P
   return { ok: true };
 }
 
+/**
+ * Set (or clear) the discount on the whole quote. Independent of anything the lines discount:
+ * this is "the job is cheaper for you", not "this item is cheaper for you".
+ *
+ * Sent explicitly rather than folded into the price, so the client's documents can show the
+ * standard price and the reduction as separate rows. Clearing sends `discountType: null`,
+ * which the API treats as a removal — omitting the field would preserve what is there.
+ */
+export async function setPackageDiscount(
+  id: string,
+  _prev: PackageFormState,
+  formData: FormData,
+): Promise<PackageFormState> {
+  const raw = String(formData.get("discountType") ?? "").trim();
+  const type = raw === "percent" || raw === "amount" ? raw : null;
+  const value = Number(String(formData.get("discountValue") ?? "").trim());
+  const label = String(formData.get("discountLabel") ?? "").trim();
+
+  if (type && (!Number.isFinite(value) || value <= 0)) {
+    return { error: "Enter how much the discount takes off." };
+  }
+  if (type === "percent" && value > 100) {
+    return { error: "A percentage discount cannot be more than 100%." };
+  }
+
+  try {
+    const pkg = await api.packages.get(id);
+    await api.packages.update(id, {
+      title: pkg.title,
+      pricingMode: pkg.pricingMode,
+      totalOverride: pkg.totalOverride,
+      estimatedDeliveryDate: pkg.estimatedDeliveryDate,
+      discountType: type,
+      discountValue: type ? value : 0,
+      discountLabel: type ? label || null : null,
+    });
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not save the discount." };
+  }
+  revalidatePackage(id);
+  return { ok: true };
+}
+
 export async function setTotalOverride(
   id: string,
   _prev: PackageFormState,
@@ -363,14 +406,25 @@ function parseLineItem(formData: FormData): {
   const description = String(formData.get("description") ?? "").trim();
   const quantity = Number(String(formData.get("quantity") ?? "").trim());
   const unitPrice = Number(String(formData.get("unitPrice") ?? "").trim());
+  const rawType = String(formData.get("discountType") ?? "").trim();
+  const discountValue = Number(String(formData.get("discountValue") ?? "").trim()) || 0;
+  // A type with no value is not a discount — both collapse to none, so a half-filled form
+  // saves as "no discount" rather than as a silent zero-percent row.
+  const discountType =
+    (rawType === "percent" || rawType === "amount") && discountValue > 0 ? rawType : null;
 
   const fieldErrors: LineItemFormState["fieldErrors"] = {};
   if (!description) fieldErrors.description = "Description is required.";
   if (!Number.isFinite(quantity) || quantity <= 0) fieldErrors.quantity = "Quantity must be ≥ 1.";
   if (!Number.isFinite(unitPrice) || unitPrice < 0) fieldErrors.unitPrice = "Enter a valid price.";
+  if (discountType === "percent" && discountValue > 100) {
+    fieldErrors.discountValue = "A percentage discount cannot be more than 100%.";
+  }
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
-  return { input: { description, quantity, unitPrice } };
+  return {
+    input: { description, quantity, unitPrice, discountType, discountValue: discountType ? discountValue : 0 },
+  };
 }
 
 export async function addLineItem(

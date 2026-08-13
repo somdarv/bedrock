@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
-import type { LineItem } from "@/lib/api";
+import { discountOn, type DiscountType, type LineItem } from "@/lib/api";
 import { addLineItem, updateLineItem, type LineItemFormState } from "@/lib/packages/actions";
 import { formatCedis } from "@/lib/utils";
 
@@ -35,13 +36,21 @@ export function LineItemModal({ open, onClose, packageId, item, fixed = false, o
 
   const [quantity, setQuantity] = React.useState(item?.quantity ?? 1);
   const [unitPrice, setUnitPrice] = React.useState(item?.unitPrice ?? 0);
+  const [discountType, setDiscountType] = React.useState<"" | DiscountType>(
+    (item?.discountType ?? "") as "" | DiscountType,
+  );
+  const [discountValue, setDiscountValue] = React.useState(item?.discountValue ?? 0);
 
   React.useEffect(() => {
     if (state.ok) onDone(isEdit ? "Line item updated." : "Line item added.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ok]);
 
-  const lineTotal = (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
+  // The price above stays at list; this is what comes off it. Priced with the same helper the
+  // API uses, so the figure here is the figure the client's document will print.
+  const gross = (Number.isFinite(quantity) ? quantity : 0) * (Number.isFinite(unitPrice) ? unitPrice : 0);
+  const off = discountOn(gross, discountType || null, Number.isFinite(discountValue) ? discountValue : 0);
+  const lineTotal = gross - off;
 
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit line item" : "Add line item"}>
@@ -97,9 +106,58 @@ export function LineItemModal({ open, onClose, packageId, item, fixed = false, o
               </Field>
             </div>
 
-            <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Line total</span>
-              <span className="font-semibold">{formatCedis(lineTotal)}</span>
+            {/* Discount on this line alone. The unit price above stays at list, so the client
+                is shown what the work costs and what they are being charged for it. */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Discount" htmlFor="discountType">
+                <Select
+                  id="discountType"
+                  name="discountType"
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as "" | DiscountType)}
+                >
+                  <option value="">None</option>
+                  <option value="percent">Percent off</option>
+                  <option value="amount">Amount off</option>
+                </Select>
+              </Field>
+              {discountType && (
+                <Field
+                  label={discountType === "percent" ? "Off (%)" : "Off (₵)"}
+                  htmlFor="discountValue"
+                  error={state.fieldErrors?.discountValue}
+                >
+                  <Input
+                    id="discountValue"
+                    name="discountValue"
+                    type="number"
+                    min={0}
+                    max={discountType === "percent" ? 100 : undefined}
+                    step="0.01"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(Number(e.target.value))}
+                  />
+                </Field>
+              )}
+            </div>
+
+            <div className="space-y-1 rounded-md bg-muted px-3 py-2 text-sm">
+              {off > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>List price</span>
+                    <span>{formatCedis(gross)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Discount</span>
+                    <span>- {formatCedis(off)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Line total</span>
+                <span className="font-semibold">{formatCedis(lineTotal)}</span>
+              </div>
             </div>
           </>
         )}

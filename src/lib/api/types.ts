@@ -142,18 +142,87 @@ export function primaryContact(client: Client): Contact | null {
   return client.contacts.find((c) => c.isPrimary) ?? client.contacts[0] ?? null;
 }
 
-export interface LineItem {
+/* --------------------------------------------------------------------- discounts
+ * Charging the list price and then visibly taking something off it, rather than quietly
+ * quoting less. Two independent levels — one on a line, one on the document's subtotal —
+ * and either, both, or neither may be set.
+ *
+ * Prices are stored at list, never pre-discounted, so every document can print what the work
+ * costs beside what this client is paying. Mirrors App\Support\Discount in bedrock-api.
+ */
+
+export type DiscountType = "percent" | "amount";
+
+/** The two columns every discountable record carries. Absent on shapes older than the feature. */
+export interface Discountable {
+  discountType: DiscountType | null;
+  /** Read against `discountType`: a percentage of the gross, or a flat sum in the currency. */
+  discountValue: number;
+}
+
+/**
+ * Deliberately a function declaration, not a `const` arrow.
+ *
+ * The helpers below are called from other modules' top-level code (the mock backend prices its
+ * seed fixtures as it defines them). A `const` is in its temporal dead zone until this module
+ * finishes evaluating, so under the bundler's module order that call throws "Cannot access
+ * before initialization" and takes every PDF route down with it. A declaration is hoisted.
+ */
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * What a discount takes off `gross` (mirrors `Discount::on`).
+ *
+ * Never negative and never more than the thing it reduces: an overshooting discount is bad
+ * input, not money we owe the client, and letting it through would put a negative line on an
+ * invoice. Change this and you must change the PHP — the two prices the same document.
+ */
+export function discountOn(gross: number, type: DiscountType | null | undefined, value: number | undefined) {
+  const v = value ?? 0;
+  if (gross <= 0 || v <= 0 || (type !== "percent" && type !== "amount")) return 0;
+  const off = type === "percent" ? (gross * Math.min(v, 100)) / 100 : v;
+  return round2(Math.min(off, gross));
+}
+
+/** `gross` with the discount taken off (mirrors `Discount::net`). */
+export function discountedNet(gross: number, type: DiscountType | null | undefined, value: number | undefined) {
+  return round2(Math.max(0, gross - discountOn(gross, type, value)));
+}
+
+/** How a discount reads to a client: "15%" or a flat figure they can check against the line. */
+export function discountRate(type: DiscountType | null | undefined, value: number | undefined) {
+  if (!type || !value || value <= 0) return null;
+  return type === "percent" ? `${round2(Math.min(value, 100))}%` : null;
+}
+
+export interface LineItem extends Partial<Discountable> {
   id: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  /** Server-computed conveniences: list price, what came off it, and what it actually costs. */
+  gross?: number;
+  discountAmount?: number;
+  amount?: number;
   done: boolean;
 }
 
-export interface LineItemInput {
+export interface LineItemInput extends Partial<Discountable> {
   description: string;
   quantity: number;
   unitPrice: number;
+}
+
+/** List price for one line, before its own discount. */
+export function lineGross(li: Pick<LineItem, "quantity" | "unitPrice">) {
+  return round2(li.quantity * li.unitPrice);
+}
+
+/** What one line actually costs: list price less its own discount. */
+export function lineNet(li: Pick<LineItem, "quantity" | "unitPrice"> & Partial<Discountable>) {
+  return discountedNet(lineGross(li), li.discountType, li.discountValue);
 }
 
 /** One step in a package's payment schedule (the plan for how money comes in). */
@@ -187,6 +256,11 @@ export interface WorkPackageInput {
   /** Required when pricingMode === "fixed"; ignored otherwise. */
   totalOverride: number | null;
   estimatedDeliveryDate: string | null;
+  /** A reduction on the whole quote, taken off the subtotal. Independent of any line discount. */
+  discountType?: DiscountType | null;
+  discountValue?: number;
+  /** What the client reads on the discount row, e.g. "Launch offer". */
+  discountLabel?: string | null;
 }
 
 export interface Payment {
@@ -277,6 +351,23 @@ export interface WorkPackage {
   invoicedOutstanding: number;
   /** Set only when pricingMode === "fixed". */
   totalOverride: number | null;
+  /**
+   * A reduction on the whole quote, taken off the subtotal once the lines have settled.
+   * Independent of the discounts individual lines carry; both can apply at once.
+   */
+  discountType: DiscountType | null;
+  discountValue: number;
+  /** What the client reads on the discount row, e.g. "Launch offer". */
+  discountLabel: string | null;
+  /**
+   * The server's copy of the pricing ladder. Optional because nothing reads it: a package's
+   * money is always computed here by the accessors below (a package is edited line by line,
+   * so the client recomputes on every keystroke and the payload would be stale anyway).
+   */
+  discountAmount?: number;
+  itemDiscountTotal?: number;
+  grossSubtotal?: number;
+  subtotal?: number;
   estimatedDeliveryDate: string | null;
   lineItems: LineItem[];
   milestones: Milestone[];
@@ -302,12 +393,50 @@ export interface AdminSession {
   user: SessionUser;
 }
 
-/** Effective total resolved by pricing mode (mirrors backend `effectiveTotal()`). */
-export function effectiveTotal(pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems">) {
-  if (pkg.pricingMode === "fixed") {
-    return pkg.totalOverride ?? 0;
-  }
-  return pkg.lineItems.reduce((sum, li) => sum + li.quantity * li.unitPrice, 0);
+/**
+ * The fields the pricing ladder reads. Discounts are optional so a shape from before the
+ * feature — a mock fixture, a cached response — still prices correctly as "no discount".
+ */
+type PricedPackage = Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems"> &
+  Partial<Discountable>;
+
+/**
+ * List price before any discount (mirrors backend `grossSubtotal()`).
+ *
+ * A fixed price counts only `totalOverride`: its line items are scope, not money, so they
+ * carry no price to discount and the package-level discount is the only one that applies.
+ */
+export function grossSubtotal(pkg: PricedPackage) {
+  if (pkg.pricingMode === "fixed") return round2(pkg.totalOverride ?? 0);
+  return round2(pkg.lineItems.reduce((sum, li) => sum + lineGross(li), 0));
+}
+
+/** What the per-line discounts take off (mirrors backend `itemDiscountTotal()`). */
+export function itemDiscountTotal(pkg: PricedPackage) {
+  if (pkg.pricingMode === "fixed") return 0;
+  return round2(
+    pkg.lineItems.reduce((sum, li) => sum + discountOn(lineGross(li), li.discountType, li.discountValue), 0),
+  );
+}
+
+/** The lines at what they actually cost — what the package-level discount comes off. */
+export function subtotal(pkg: PricedPackage) {
+  return round2(grossSubtotal(pkg) - itemDiscountTotal(pkg));
+}
+
+/** The package-wide reduction on the subtotal (mirrors backend `discountAmount()`). */
+export function packageDiscount(pkg: PricedPackage) {
+  return discountOn(subtotal(pkg), pkg.discountType, pkg.discountValue);
+}
+
+/** Everything taken off the list price, both levels together. What the client saved. */
+export function savings(pkg: PricedPackage) {
+  return round2(itemDiscountTotal(pkg) + packageDiscount(pkg));
+}
+
+/** Effective total resolved by pricing mode, less discounts (mirrors backend `effectiveTotal()`). */
+export function effectiveTotal(pkg: PricedPackage) {
+  return round2(subtotal(pkg) - packageDiscount(pkg));
 }
 
 /**
@@ -320,7 +449,8 @@ export function effectiveTotal(pkg: Pick<WorkPackage, "pricingMode" | "totalOver
  * response from before the field existed) still compute, treating it as nothing received.
  */
 export function balance(
-  pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems" | "payments"> &
+  pkg: PricedPackage &
+    Pick<WorkPackage, "payments"> &
     Partial<Pick<WorkPackage, "invoicedPaid">>,
 ) {
   const paid = pkg.payments
@@ -335,7 +465,8 @@ export function balance(
  * the project buckets: it is counted once, in Invoices.
  */
 export function unbilled(
-  pkg: Pick<WorkPackage, "pricingMode" | "totalOverride" | "lineItems" | "payments"> &
+  pkg: PricedPackage &
+    Pick<WorkPackage, "payments"> &
     Partial<Pick<WorkPackage, "invoicedPaid" | "invoicedOutstanding">>,
 ) {
   return Math.max(0, balance(pkg) - (pkg.invoicedOutstanding ?? 0));
@@ -561,16 +692,20 @@ export interface InfraChargesOutstanding {
 
 export type InvoiceStatus = "draft" | "issued" | "paid" | "void";
 
-export interface InvoiceItem {
+export interface InvoiceItem extends Discountable {
   id: string;
   position: number;
   description: string;
   quantity: number;
   unitPrice: number;
+  /** What this line's own discount takes off, and the list price it comes off. */
+  discountAmount: number;
+  gross: number;
+  /** Always net of the line's discount, so the lines sum to the subtotal. */
   amount: number;
 }
 
-export interface Invoice {
+export interface Invoice extends Discountable {
   id: string;
   clientId: string;
   /** Present on list reads (the API eager-loads the client); null on some nested reads. */
@@ -622,12 +757,24 @@ export interface Invoice {
   createdAt: string;
   items: InvoiceItem[];
   payments: Payment[];
+  /**
+   * The pricing ladder the document prints, all in the invoice's own currency:
+   * `grossSubtotal` (every line at list price) → less `itemDiscountTotal` → `subtotal` →
+   * less `discountAmount` → `total`. Nothing downstream needs to know a discount happened;
+   * `total` is the only figure the balance, the receipt and Receivables read.
+   */
+  grossSubtotal: number;
+  itemDiscountTotal: number;
+  subtotal: number;
+  discountAmount: number;
+  /** What the client reads on the discount row, e.g. "Launch offer". */
+  discountLabel: string | null;
   total: number;
   paid: number;
   balance: number;
 }
 
-export interface InvoiceItemInput {
+export interface InvoiceItemInput extends Partial<Discountable> {
   description: string;
   quantity: number;
   unitPrice: number;
@@ -640,6 +787,11 @@ export interface InvoiceInput {
   issueDate: string | null;
   dueDate: string | null;
   items: InvoiceItemInput[];
+  /** A reduction on the subtotal, on top of whatever the individual lines carry. */
+  discountType?: DiscountType | null;
+  discountValue?: number;
+  /** What the client reads on the discount row, e.g. "Launch offer". */
+  discountLabel?: string | null;
   /** Outstanding infrastructure charges to bill on this invoice; appended as lines. */
   chargeIds: string[];
 }

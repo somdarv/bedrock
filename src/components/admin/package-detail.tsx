@@ -8,6 +8,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
@@ -19,7 +20,14 @@ import { PackageFormModal } from "@/components/admin/package-form-modal";
 import {
   balance,
   type ClientNotifyEvent,
+  type DiscountType,
   effectiveTotal,
+  grossSubtotal,
+  itemDiscountTotal,
+  lineGross,
+  lineNet,
+  packageDiscount,
+  savings,
   type LineItem,
   type PricingMode,
   type WorkPackage,
@@ -31,6 +39,7 @@ import {
   deleteLineItem,
   sendPackage,
   sendStatement,
+  setPackageDiscount,
   setPricingMode,
   setTotalOverride,
   toggleLineItemDone,
@@ -68,6 +77,9 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
     ? Math.round((doneCount / pkg.lineItems.length) * 100)
     : 0;
   const total = effectiveTotal(pkg);
+  // Everything taken off the list price, both levels together. Drives whether the pricing
+  // ladder is worth showing at all: with no discount anywhere it would just repeat the total.
+  const saved = savings(pkg);
   // Includes cedis that arrived on an invoice raised for this package, so Total − Paid = Balance
   // still reads true when the work was billed rather than paid up front.
   const paid = paidTotal(pkg);
@@ -386,7 +398,16 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
                       <>
                         <TD className="text-right">{li.quantity}</TD>
                         <TD className="text-right">{formatCedis(li.unitPrice)}</TD>
-                        <TD className="text-right">{formatCedis(li.quantity * li.unitPrice)}</TD>
+                        <TD className="text-right">
+                          {formatCedis(lineNet(li))}
+                          {/* The list price stays visible next to what is actually charged:
+                              a discount nobody can see is a price cut, not a discount. */}
+                          {lineGross(li) > lineNet(li) && (
+                            <div className="text-xs font-normal text-muted-foreground">
+                              was {formatCedis(lineGross(li))}
+                            </div>
+                          )}
+                        </TD>
                       </>
                     )}
                     <TD>
@@ -410,6 +431,8 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           </Button>
 
           {isFixed && <FixedTotalForm packageId={pkg.id} current={pkg.totalOverride} />}
+
+          <PackageDiscountForm pkg={pkg} />
         </div>
 
         {/* Summary */}
@@ -430,6 +453,31 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           </div>
 
           <div className="space-y-3 rounded-lg border bg-surface p-5">
+            {/* The ladder, only when there is one to show: what the work lists at, what came
+                off it, and what is actually being charged. */}
+            {saved > 0 && (
+              <div className="space-y-1.5 border-b pb-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">List price</span>
+                  <span className="tabular-nums">{formatCedis(grossSubtotal(pkg))}</span>
+                </div>
+                {itemDiscountTotal(pkg) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Discounts on lines</span>
+                    <span className="tabular-nums">- {formatCedis(itemDiscountTotal(pkg))}</span>
+                  </div>
+                )}
+                {packageDiscount(pkg) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      {pkg.discountLabel?.trim() || "Discount"}
+                      {pkg.discountType === "percent" && ` (${pkg.discountValue}%)`}
+                    </span>
+                    <span className="tabular-nums">- {formatCedis(packageDiscount(pkg))}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total</span>
               <span className="text-lg font-semibold">{formatCedis(total)}</span>
@@ -564,6 +612,105 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
         }
       />
     </div>
+  );
+}
+
+/**
+ * The discount on the whole quote, taken off the subtotal once the lines have settled.
+ *
+ * Deliberately separate from the price above rather than folded into it: the client's documents
+ * print the standard price and this reduction as two rows, so they can see what the work is
+ * worth as well as what they are paying. Lines can carry their own discounts as well; the two
+ * are independent and both apply.
+ */
+function PackageDiscountForm({ pkg }: { pkg: WorkPackage }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const action = React.useMemo(() => setPackageDiscount.bind(null, pkg.id), [pkg.id]);
+  const [state, formAction, pending] = React.useActionState(action, {});
+  const [type, setType] = React.useState<"" | DiscountType>((pkg.discountType ?? "") as "" | DiscountType);
+
+  React.useEffect(() => {
+    if (state.ok) {
+      toast("Discount updated.", "success");
+      router.refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
+
+  const off = packageDiscount(pkg);
+
+  return (
+    <form action={formAction} className="space-y-3 rounded-lg border bg-muted/40 p-4">
+      <div>
+        <h3 className="text-sm font-medium">Discount on the total</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Comes off the subtotal, on top of anything the lines above discount. The client sees
+          the full price and this reduction as separate rows.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-36">
+          <label htmlFor="pkg-discount-type" className="block text-xs text-muted-foreground">
+            Type
+          </label>
+          <Select
+            id="pkg-discount-type"
+            name="discountType"
+            value={type}
+            onChange={(e) => setType(e.target.value as "" | DiscountType)}
+            className="mt-1"
+          >
+            <option value="">No discount</option>
+            <option value="percent">Percent</option>
+            <option value="amount">Fixed amount</option>
+          </Select>
+        </div>
+        {type && (
+          <>
+            <div className="w-28">
+              <label htmlFor="pkg-discount-value" className="block text-xs text-muted-foreground">
+                {type === "percent" ? "Off (%)" : "Off (₵)"}
+              </label>
+              <Input
+                id="pkg-discount-value"
+                name="discountValue"
+                type="number"
+                min={0}
+                max={type === "percent" ? 100 : undefined}
+                step="0.01"
+                defaultValue={pkg.discountValue || ""}
+                className="mt-1"
+              />
+            </div>
+            <div className="min-w-50 flex-1">
+              <label htmlFor="pkg-discount-label" className="block text-xs text-muted-foreground">
+                Reason (printed on the invoice)
+              </label>
+              <Input
+                id="pkg-discount-label"
+                name="discountLabel"
+                defaultValue={pkg.discountLabel ?? ""}
+                placeholder="e.g. Launch offer, Partner rate"
+                className="mt-1"
+              />
+            </div>
+          </>
+        )}
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending ? <Spinner /> : null}
+          Save discount
+        </Button>
+      </div>
+
+      {off > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Currently taking {formatCedis(off)} off this quote.
+        </p>
+      )}
+      {state.error && <p className="text-xs text-danger">{state.error}</p>}
+    </form>
   );
 }
 

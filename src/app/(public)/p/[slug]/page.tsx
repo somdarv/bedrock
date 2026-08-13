@@ -2,7 +2,17 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { PortalPayButton } from "@/components/portal/portal-pay-button";
 import { PortalPreviews } from "@/components/portal/portal-previews";
-import { api, ApiError, balance, effectiveTotal } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  balance,
+  effectiveTotal,
+  lineGross,
+  lineNet,
+  packageDiscount,
+  savings,
+  subtotal,
+} from "@/lib/api";
 import { gatesApply, paidTotal } from "@/lib/payments";
 import { statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
@@ -40,6 +50,9 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
   // Deferred billing: nothing is withheld, and the balance is chased on its own invoice.
   const deferred = !gatesApply(pkg);
   const isFixed = pkg.pricingMode === "fixed";
+  // Everything taken off the standard price, both levels together. With nothing discounted the
+  // scope list stays exactly as plain as it was.
+  const saved = savings(pkg);
   const settled = due <= 0;
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
   // With a schedule in place the client pays the next step, not the whole outstanding sum.
@@ -204,22 +217,58 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
             <ul className="divide-y divide-border">
               {pkg.lineItems.map((li) => (
                 <li key={li.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
-                  <span className="text-sm">{li.description}</span>
+                  <div className="min-w-0">
+                    <span className="text-sm">{li.description}</span>
+                    {/* The standard price and what came off it. Showing both is the point:
+                        a reduction nobody can see is just a lower price. */}
+                    {!isFixed && lineGross(li) > lineNet(li) && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatCedis(lineGross(li))} less{" "}
+                        {li.discountType === "percent"
+                          ? `${li.discountValue}%`
+                          : formatCedis(lineGross(li) - lineNet(li))}
+                      </div>
+                    )}
+                  </div>
                   {/* Fixed mode shows a lump-sum total only — no per-line prices. */}
                   {!isFixed && (
                     <span className="shrink-0 text-sm font-medium tabular-nums">
-                      {formatCedis(li.quantity * li.unitPrice)}
+                      {formatCedis(lineNet(li))}
                     </span>
                   )}
                 </li>
               ))}
             </ul>
           )}
+          {/* The quote-wide discount gets its own row between the lines and the total, so the
+              client can see the full price of the work and the reduction separately. */}
+          {saved > 0 && (
+            <>
+              <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                <span className="text-sm text-muted-foreground">Subtotal</span>
+                <span className="text-sm tabular-nums">{formatCedis(subtotal(pkg))}</span>
+              </div>
+              {packageDiscount(pkg) > 0 && (
+                <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                  <span className="text-sm text-muted-foreground">
+                    {pkg.discountLabel?.trim() || "Discount"}
+                    {pkg.discountType === "percent" && ` (${pkg.discountValue}%)`}
+                  </span>
+                  <span className="text-sm tabular-nums">- {formatCedis(packageDiscount(pkg))}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex items-center justify-between border-t border-border bg-muted/40 px-5 py-3.5">
             <span className="text-sm font-medium">Project total</span>
             <span className="font-display text-base font-semibold tabular-nums">{formatCedis(total)}</span>
           </div>
         </div>
+        {saved > 0 && (
+          <p className="mt-3 text-sm font-medium">
+            Includes {formatCedis(saved)} off our standard price.
+          </p>
+        )}
       </section>
 
       {/* Infrastructure fees — the client's outstanding hosting/domain charges */}

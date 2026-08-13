@@ -64,6 +64,8 @@ export function InvoiceDetail({
   const owed = Math.max(0, invoice.balance);
   const overpaid = Math.max(0, -invoice.balance);
   const billedGhs = cedisFor(invoice, invoice.total);
+  // Everything taken off the list price, both levels together. Nothing discounted, nothing to show.
+  const saved = invoice.itemDiscountTotal + invoice.discountAmount;
 
   function run(fn: () => Promise<{ ok?: boolean; error?: string }>, success: string) {
     startTransition(async () => {
@@ -292,14 +294,66 @@ export function InvoiceDetail({
           <TBody>
             {invoice.items.map((item) => (
               <TR key={item.id}>
-                <TD>{item.description}</TD>
+                <TD>
+                  {item.description}
+                  {/* What came off this line, in the words the PDF prints. */}
+                  {item.discountAmount > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      {item.discountType === "percent"
+                        ? `Less ${item.discountValue}%`
+                        : "Discounted"}{" "}
+                      ({formatMoney(item.discountAmount, invoice.currency)} off)
+                    </div>
+                  )}
+                </TD>
                 <TD className="text-right text-muted-foreground">{item.quantity}</TD>
                 <TD className="text-right text-muted-foreground">{formatMoney(item.unitPrice, invoice.currency)}</TD>
-                <TD className="text-right font-medium">{formatMoney(item.amount, invoice.currency)}</TD>
+                <TD className="text-right font-medium">
+                  {formatMoney(item.amount, invoice.currency)}
+                  {item.discountAmount > 0 && (
+                    <div className="text-xs font-normal text-muted-foreground">
+                      was {formatMoney(item.gross, invoice.currency)}
+                    </div>
+                  )}
+                </TD>
               </TR>
             ))}
           </TBody>
         </Table>
+
+        {/* The ladder exactly as the client reads it on the PDF. Only worth printing when
+            something was actually taken off. */}
+        {saved > 0 && (
+          <dl className="ml-auto mt-4 max-w-xs space-y-1.5 text-sm">
+            <div className="flex justify-between gap-8">
+              <dt className="text-muted-foreground">List price</dt>
+              <dd className="tabular-nums">{formatMoney(invoice.grossSubtotal, invoice.currency)}</dd>
+            </div>
+            {invoice.itemDiscountTotal > 0 && (
+              <div className="flex justify-between gap-8">
+                <dt className="text-muted-foreground">Discounts on lines</dt>
+                <dd className="tabular-nums">
+                  - {formatMoney(invoice.itemDiscountTotal, invoice.currency)}
+                </dd>
+              </div>
+            )}
+            {invoice.discountAmount > 0 && (
+              <div className="flex justify-between gap-8">
+                <dt className="text-muted-foreground">
+                  {invoice.discountLabel?.trim() || "Discount"}
+                  {invoice.discountType === "percent" && ` (${invoice.discountValue}%)`}
+                </dt>
+                <dd className="tabular-nums">
+                  - {formatMoney(invoice.discountAmount, invoice.currency)}
+                </dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-8 border-t border-border pt-1.5 font-medium">
+              <dt>Total</dt>
+              <dd className="tabular-nums">{formatMoney(invoice.total, invoice.currency)}</dd>
+            </div>
+          </dl>
+        )}
       </section>
 
       {invoice.payments.length > 0 && (

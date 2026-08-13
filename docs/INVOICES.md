@@ -190,6 +190,13 @@ Both `package-document.tsx` and `invoice-document.tsx` are thin adapters that bu
 and hand it over, so a package invoice and a standalone invoice cannot drift into looking like
 documents from different companies. Change the layout in one place only.
 
+## Discounts
+
+An invoice can be reduced at two independent levels: per line, and once on the subtotal. Prices
+are stored at list either way, so the document prints what the work costs beside what the client
+is paying. `total()` still resolves to the single figure everything downstream reads. Full note:
+[DISCOUNTS.md](./DISCOUNTS.md).
+
 ## Sending
 
 Nothing goes out unseen. The public PDF routes — `/i/{slug}/invoice` and `/i/{slug}/receipt` —

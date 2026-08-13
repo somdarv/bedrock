@@ -79,6 +79,9 @@ const s = StyleSheet.create({
   cellDesc: { flex: 1, paddingRight: 14 },
   desc: { fontSize: 9.5, color: brand.ink, lineHeight: 1.45 },
   descSub: { fontSize: 8.5, color: brand.muted, marginTop: 2, lineHeight: 1.45 },
+  // The line's own discount. Same size as descSub but in body ink: it explains a figure the
+  // reader is looking at, so it has to be read rather than skimmed past.
+  discountNote: { fontSize: 8.5, color: brand.body, marginTop: 2, lineHeight: 1.45 },
   cellQty: { width: 40, textAlign: "right", fontSize: 9.5, color: brand.body },
   cellUnit: { width: 88, textAlign: "right", fontSize: 9.5, color: brand.body },
   cellAmt: { width: 96, textAlign: "right", fontSize: 9.5, color: brand.ink },
@@ -98,6 +101,9 @@ const s = StyleSheet.create({
   settledSubRow: { flexDirection: "row", justifyContent: "flex-end", paddingTop: 3 },
   settledSub: { fontFamily: "Sora", fontSize: 11, fontWeight: 600, color: brand.ink },
   currencyNote: { marginTop: 10, marginLeft: "auto", fontSize: 8, color: brand.faint },
+  // Right-aligned under the ladder, in body ink rather than faint: this is the sentence the
+  // whole discount exists to let the client read.
+  savingsNote: { marginTop: 9, marginLeft: "auto", width: 268, fontSize: 8.5, color: brand.body, textAlign: "right" },
   // Exchange note on a dollar-denominated document. Bordered and full width rather than tucked
   // under the totals: a client who misses it has no idea what to actually send.
   fxNote: {
@@ -173,6 +179,45 @@ export function money(n: number, code = "GHS") {
   return `${code} ${nf.format(n)}`;
 }
 
+/** "15%", "12.5%" — a rate with no trailing zeros to make the reader parse. */
+function pct(value: number) {
+  return `${Number(value.toFixed(2))}%`;
+}
+
+/**
+ * The label on the document-level discount row.
+ *
+ * The operator's own words if they gave any, because a discount with a reason ("Launch offer",
+ * "Partner rate") is a favour with a shelf life, while a bare "Discount" reads as a price that
+ * was never real. The percentage rides along so the client can check the arithmetic.
+ */
+export function discountRowLabel(
+  label: string | null | undefined,
+  type: "percent" | "amount" | null | undefined,
+  value: number | null | undefined,
+) {
+  const base = label?.trim() || "Discount";
+  return type === "percent" && value ? `${base} (${pct(value)})` : base;
+}
+
+/**
+ * The note under a discounted line: "6,000.00 less 15% (-900.00)".
+ *
+ * The line's Amount is net, so this is what stops it looking like a slip of the keyboard, and
+ * it is where the client sees the price the work is normally sold at.
+ */
+export function lineDiscountNote(
+  gross: number,
+  off: number,
+  type: "percent" | "amount" | null | undefined,
+  value: number | null | undefined,
+) {
+  if (off <= 0) return null;
+  return type === "percent" && value
+    ? `${amount(gross)} less ${pct(value)} (-${amount(off)})`
+    : `${amount(gross)} less ${amount(off)}`;
+}
+
 export function fmtDate(iso?: string | null) {
   const d = iso ? new Date(iso) : new Date();
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -195,8 +240,16 @@ export interface BillingLine {
   description: string;
   /** Muted second line under the description (e.g. the items rolled into a fixed price). */
   sub?: string | null;
+  /**
+   * What this line's discount did, spelled out: "6,000.00 less 15% (-900.00)".
+   *
+   * `amount` below is already net, so without this note the Amount column contradicts
+   * qty x unit price and reads as an arithmetic error rather than a favour.
+   */
+  discountNote?: string | null;
   quantity?: number | null;
   unitPrice?: number | null;
+  /** Always net of the line's own discount, so the column sums to the subtotal. */
   amount: number;
 }
 
@@ -238,6 +291,19 @@ export interface BillingModel {
   /** Show the qty/unit-price columns. A single fixed price reads better without them. */
   itemised: boolean;
   lines: BillingLine[];
+  /**
+   * The lines added up, net of anything discounted on them individually — so it always equals
+   * the Amount column. Omitted on documents with no discounts anywhere, where it is the total.
+   */
+  subtotal?: number;
+  /** The document-wide reduction taken off the subtotal, named as the client will read it. */
+  discount?: { label: string; amount: number } | null;
+  /**
+   * Everything taken off the list price, both levels together. Printed as a plain statement
+   * under the ladder: the per-line reductions are absorbed into the line amounts, so without
+   * it the client can only see what they saved by doing the arithmetic themselves.
+   */
+  savings?: number;
   total: number;
   paid: number;
   due: number;
@@ -348,6 +414,9 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
               <View style={s.cellDesc}>
                 <Text style={s.desc}>{line.description}</Text>
                 {line.sub ? <Text style={s.descSub}>{line.sub}</Text> : null}
+                {/* Why the Amount is under qty x unit price. Without it the line reads as a
+                    mistake, and a discount the client has to spot is a discount wasted. */}
+                {line.discountNote ? <Text style={s.discountNote}>{line.discountNote}</Text> : null}
               </View>
               {model.itemised ? (
                 <>
@@ -361,7 +430,13 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
         </View>
 
         <View style={s.totals} wrap={false}>
-          <TotalRow label="Subtotal" value={amount(model.total)} />
+          {/* Subtotal is the Amount column added up, so a reader can check it by hand. Any
+              per-line discount is already inside those amounts; only the document-wide one
+              gets a row of its own, between the subtotal and the total it produces. */}
+          <TotalRow label="Subtotal" value={amount(model.subtotal ?? model.total)} />
+          {model.discount ? (
+            <TotalRow label={model.discount.label} value={`- ${amount(model.discount.amount)}`} />
+          ) : null}
           <TotalRow label="Total" value={amount(model.total)} />
           {isReceipt ? (
             <>
@@ -387,6 +462,15 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
             </>
           )}
         </View>
+        {/* What the discounts came to, stated once. Per-line reductions are absorbed into the
+            line amounts and the document-level one is a single row, so this is the only place
+            the client sees the whole figure without adding it up themselves. */}
+        {model.savings && model.savings > 0 ? (
+          <Text style={s.savingsNote}>
+            Includes {money(model.savings, code)} off our standard price.
+          </Text>
+        ) : null}
+
         {/* The exchange note names the currency itself, so the standalone note would only repeat
             it — and a line saved here is what keeps a short invoice on one page. */}
         {model.fxNote ? null : (

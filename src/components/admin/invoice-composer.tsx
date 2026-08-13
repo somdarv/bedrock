@@ -8,15 +8,27 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
-import type { Client, InfraChargeRow, Invoice, InvoiceInput } from "@/lib/api";
+import {
+  discountOn,
+  type Client,
+  type DiscountType,
+  type InfraChargeRow,
+  type Invoice,
+  type InvoiceInput,
+} from "@/lib/api";
 import { createInvoice, updateInvoice } from "@/lib/invoices/actions";
 import { formatMoney } from "@/lib/utils";
+
+/** "" is no discount. The two real types match the API's `discount_type` exactly. */
+type DraftDiscount = "" | DiscountType;
 
 interface DraftLine {
   key: string;
   description: string;
   quantity: string;
   unitPrice: string;
+  discountType: DraftDiscount;
+  discountValue: string;
 }
 
 const blankLine = (): DraftLine => ({
@@ -24,7 +36,19 @@ const blankLine = (): DraftLine => ({
   description: "",
   quantity: "1",
   unitPrice: "",
+  discountType: "",
+  discountValue: "",
 });
+
+/** What one draft line costs at list price, before its own discount. */
+function draftGross(l: DraftLine) {
+  return (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0);
+}
+
+/** What the line's own discount takes off. Priced with the same helper the API uses. */
+function draftDiscount(l: DraftLine) {
+  return discountOn(draftGross(l), l.discountType || null, Number(l.discountValue) || 0);
+}
 
 /**
  * Lines that look like a hand-added bank or card fee.
@@ -51,6 +75,8 @@ function linesFrom(invoice: Invoice, chargeDescriptions: Set<string>): DraftLine
     description: item.description,
     quantity: String(item.quantity),
     unitPrice: String(item.unitPrice),
+    discountType: (item.discountType ?? "") as DraftDiscount,
+    discountValue: item.discountValue ? String(item.discountValue) : "",
   }));
 }
 
@@ -96,6 +122,14 @@ export function InvoiceComposer({
   const [checked, setChecked] = React.useState<Set<string>>(
     () => new Set(charges.filter((c) => c.invoiceId === invoice?.id).map((c) => c.id)),
   );
+  // The invoice-wide discount, taken off the subtotal on top of anything the lines carry.
+  const [discountType, setDiscountType] = React.useState<DraftDiscount>(
+    (invoice?.discountType ?? "") as DraftDiscount,
+  );
+  const [discountValue, setDiscountValue] = React.useState(
+    invoice?.discountValue ? String(invoice.discountValue) : "",
+  );
+  const [discountLabel, setDiscountLabel] = React.useState(invoice?.discountLabel ?? "");
   const [error, setError] = React.useState<string | null>(null);
 
   // Only this client's charges are billable on this invoice: ones no other invoice has claimed,
@@ -114,14 +148,22 @@ export function InvoiceComposer({
       (c.currency ?? "GHS") !== currency,
   ).length;
 
-  const lineTotal = lines.reduce(
-    (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
-    0,
-  );
+  // The same ladder the PDF prints, computed live: list price, less what the lines discount,
+  // less the invoice-wide discount. Charge lines carry no discount of their own (they are a
+  // supplier's price passed through at cost) but do sit inside the subtotal.
   const chargeTotal = available
     .filter((c) => checked.has(c.id))
     .reduce((sum, c) => sum + c.amount, 0);
-  const total = lineTotal + chargeTotal;
+  const grossSubtotal = lines.reduce((sum, l) => sum + draftGross(l), 0) + chargeTotal;
+  const itemDiscountTotal = lines.reduce((sum, l) => sum + draftDiscount(l), 0);
+  const subtotal = grossSubtotal - itemDiscountTotal;
+  const invoiceDiscount = discountOn(subtotal, discountType || null, Number(discountValue) || 0);
+  const total = subtotal - invoiceDiscount;
+  const savings = itemDiscountTotal + invoiceDiscount;
+  // A percentage over 100 is refused by the API rather than clamped, so say so before the save.
+  const percentTooHigh =
+    (discountType === "percent" && Number(discountValue) > 100) ||
+    lines.some((l) => l.discountType === "percent" && Number(l.discountValue) > 100);
 
   // Only a warning on dollar invoices: on a cedi invoice there is no settlement rate to
   // double up with, so a "bank charges" line may be perfectly legitimate.
@@ -146,12 +188,17 @@ export function InvoiceComposer({
     if (!clientId) return setError("Choose a client.");
     if (!title.trim()) return setError("Give the invoice a title.");
 
+    if (percentTooHigh) return setError("A percentage discount cannot be more than 100%.");
+
     const items = lines
       .filter((l) => l.description.trim())
       .map((l) => ({
         description: l.description.trim(),
         quantity: Number(l.quantity) || 1,
         unitPrice: Number(l.unitPrice) || 0,
+        // A type with no value is not a discount: send nothing rather than a zero-percent row.
+        discountType: l.discountType && Number(l.discountValue) > 0 ? l.discountType : null,
+        discountValue: Number(l.discountValue) || 0,
       }));
 
     if (items.length === 0 && checked.size === 0) {
@@ -165,6 +212,9 @@ export function InvoiceComposer({
       issueDate: issueDate || null,
       dueDate: dueDate || null,
       items,
+      discountType: discountType && Number(discountValue) > 0 ? discountType : null,
+      discountValue: Number(discountValue) || 0,
+      discountLabel: discountLabel.trim() || null,
       // Only charges still visible in the current currency — switching currency unticks the rest.
       chargeIds: [...checked].filter((id) => available.some((c) => c.id === id)),
     };
@@ -307,7 +357,7 @@ export function InvoiceComposer({
                   onChange={(e) => setLine(line.key, { quantity: e.target.value })}
                 />
               </div>
-              <div className="w-32">
+              <div className="w-28">
                 <label className="mb-1 block text-xs text-muted-foreground">
                   Unit price ({currency === "USD" ? "$" : "₵"})
                 </label>
@@ -319,11 +369,46 @@ export function InvoiceComposer({
                   onChange={(e) => setLine(line.key, { unitPrice: e.target.value })}
                 />
               </div>
-              <div className="w-24 text-right text-sm">
+              {/* This line's own discount. The price above stays at list, so the client sees
+                  what the work costs and what they are being charged for it. */}
+              <div className="w-28">
+                <label className="mb-1 block text-xs text-muted-foreground">Discount</label>
+                <Select
+                  value={line.discountType}
+                  onChange={(e) =>
+                    setLine(line.key, { discountType: e.target.value as DraftDiscount })
+                  }
+                >
+                  <option value="">None</option>
+                  <option value="percent">Percent</option>
+                  <option value="amount">Amount</option>
+                </Select>
+              </div>
+              {line.discountType && (
+                <div className="w-24">
+                  <label className="mb-1 block text-xs text-muted-foreground">
+                    {line.discountType === "percent" ? "Off (%)" : `Off (${currency === "USD" ? "$" : "₵"})`}
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={line.discountType === "percent" ? 100 : undefined}
+                    step="0.01"
+                    value={line.discountValue}
+                    onChange={(e) => setLine(line.key, { discountValue: e.target.value })}
+                  />
+                </div>
+              )}
+              <div className="w-28 text-right text-sm">
                 <div className="mb-1 text-xs text-muted-foreground">Amount</div>
                 <div className="h-10 leading-10">
-                  {formatMoney((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), currency)}
+                  {formatMoney(draftGross(line) - draftDiscount(line), currency)}
                 </div>
+                {draftDiscount(line) > 0 && (
+                  <div className="-mt-2 text-xs text-muted-foreground">
+                    was {formatMoney(draftGross(line), currency)}
+                  </div>
+                )}
               </div>
               <Button
                 size="sm"
@@ -335,6 +420,68 @@ export function InvoiceComposer({
             </div>
           ))}
         </div>
+      </section>
+
+      {/* The invoice-wide discount. Separate from the lines because it answers a different
+          question: not "this thing is cheaper for you" but "this job is cheaper for you". */}
+      <section className="rounded-xl border border-border bg-surface p-6">
+        <h2 className="text-sm font-semibold">Discount on the total</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Taken off the subtotal, on top of anything the lines above already discount. The client
+          sees the full price and this reduction as separate rows.
+        </p>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <div className="w-36">
+            <label className="mb-1 block text-xs text-muted-foreground" htmlFor="discountType">
+              Type
+            </label>
+            <Select
+              id="discountType"
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value as DraftDiscount)}
+            >
+              <option value="">No discount</option>
+              <option value="percent">Percent</option>
+              <option value="amount">Fixed amount</option>
+            </Select>
+          </div>
+          {discountType && (
+            <>
+              <div className="w-28">
+                <label className="mb-1 block text-xs text-muted-foreground" htmlFor="discountValue">
+                  {discountType === "percent" ? "Off (%)" : `Off (${currency === "USD" ? "$" : "₵"})`}
+                </label>
+                <Input
+                  id="discountValue"
+                  type="number"
+                  min={0}
+                  max={discountType === "percent" ? 100 : undefined}
+                  step="0.01"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                />
+              </div>
+              <div className="min-w-55 flex-1">
+                <label className="mb-1 block text-xs text-muted-foreground" htmlFor="discountLabel">
+                  Reason (printed on the invoice)
+                </label>
+                <Input
+                  id="discountLabel"
+                  value={discountLabel}
+                  onChange={(e) => setDiscountLabel(e.target.value)}
+                  placeholder="e.g. Launch offer, Partner rate, Goodwill"
+                />
+              </div>
+            </>
+          )}
+        </div>
+        {discountType && !discountLabel.trim() && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Without a reason this prints as a plain &ldquo;Discount&rdquo;. Naming it is worth
+            doing: a reduction with a reason reads as a favour, one without reads as a price that
+            was never real.
+          </p>
+        )}
       </section>
 
       {/* The double-charge guard. The settlement rate already contains the bank and card cost,
@@ -376,6 +523,35 @@ export function InvoiceComposer({
           <div className="mt-1 font-display text-2xl font-semibold tracking-tight">
             {formatMoney(total, currency)}
           </div>
+          {/* The ladder exactly as the client will read it, so nothing about the discount is a
+              surprise at the point the PDF is generated. */}
+          {savings > 0 && (
+            <dl className="mt-3 space-y-1 text-sm">
+              <div className="flex justify-between gap-8">
+                <dt className="text-muted-foreground">Before discount</dt>
+                <dd className="tabular-nums">{formatMoney(grossSubtotal, currency)}</dd>
+              </div>
+              {itemDiscountTotal > 0 && (
+                <div className="flex justify-between gap-8">
+                  <dt className="text-muted-foreground">Discounts on lines</dt>
+                  <dd className="tabular-nums">- {formatMoney(itemDiscountTotal, currency)}</dd>
+                </div>
+              )}
+              {invoiceDiscount > 0 && (
+                <div className="flex justify-between gap-8">
+                  <dt className="text-muted-foreground">
+                    {discountLabel.trim() || "Discount"}
+                    {discountType === "percent" && ` (${Number(discountValue) || 0}%)`}
+                  </dt>
+                  <dd className="tabular-nums">- {formatMoney(invoiceDiscount, currency)}</dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-8 border-t border-border pt-1 font-medium">
+                <dt>Client saves</dt>
+                <dd className="tabular-nums">{formatMoney(savings, currency)}</dd>
+              </div>
+            </dl>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => router.back()} disabled={pending}>

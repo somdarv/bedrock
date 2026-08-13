@@ -1,9 +1,23 @@
-import { balance, effectiveTotal, type Milestone, type Payment, type WorkPackage } from "@/lib/api";
+import {
+  balance,
+  discountOn,
+  effectiveTotal,
+  lineGross,
+  lineNet,
+  packageDiscount,
+  subtotal as packageSubtotal,
+  savings as packageSavings,
+  type Milestone,
+  type Payment,
+  type WorkPackage,
+} from "@/lib/api";
 import { publicBaseUrl } from "@/lib/utils";
 import {
   BillingDocument,
+  discountRowLabel,
   fmtDate,
   fmtLongDate,
+  lineDiscountNote,
   money,
   type BillingLine,
   type BillingModel,
@@ -48,6 +62,10 @@ export function packageBillingModel({
   const isReceipt = variant === "receipt";
   const isFixed = pkg.pricingMode === "fixed";
   const total = effectiveTotal(pkg);
+  // The lines net of anything discounted on them, which is what the Amount column adds up to.
+  // The package-wide discount is taken off it in the ladder, not folded into the lines.
+  const subtotal = packageSubtotal(pkg);
+  const discountOff = packageDiscount(pkg);
   const settledPayments = pkg.payments.filter((p) => p.status === "success");
   const paid = settledPayments.reduce((sum, p) => sum + p.amount, 0);
   const due = Math.max(0, balance(pkg));
@@ -73,6 +91,8 @@ export function packageBillingModel({
   }
 
   // A fixed price prints as one line without qty/unit columns; anything itemised keeps them.
+  // Every branch prints the SUBTOTAL, never the discounted total: the ladder below is what
+  // takes the package discount off, and a line already net of it would deduct it twice.
   let lines: BillingLine[];
   if (isFixed) {
     lines = [
@@ -80,19 +100,28 @@ export function packageBillingModel({
         id: pkg.id,
         description: pkg.title,
         sub: pkg.lineItems.length > 0 ? pkg.lineItems.map((li) => li.description).join(" · ") : null,
-        amount: total,
+        amount: subtotal,
       },
     ];
   } else if (pkg.lineItems.length === 0) {
-    lines = [{ id: pkg.id, description: pkg.title, quantity: 1, unitPrice: total, amount: total }];
+    lines = [{ id: pkg.id, description: pkg.title, quantity: 1, unitPrice: subtotal, amount: subtotal }];
   } else {
-    lines = pkg.lineItems.map((li) => ({
-      id: li.id,
-      description: li.description,
-      quantity: li.quantity,
-      unitPrice: li.unitPrice,
-      amount: li.quantity * li.unitPrice,
-    }));
+    lines = pkg.lineItems.map((li) => {
+      const gross = lineGross(li);
+      return {
+        id: li.id,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        discountNote: lineDiscountNote(
+          gross,
+          discountOn(gross, li.discountType, li.discountValue),
+          li.discountType,
+          li.discountValue,
+        ),
+        amount: lineNet(li),
+      };
+    });
   }
 
   let subTable: BillingModel["subTable"] = null;
@@ -143,6 +172,15 @@ export function packageBillingModel({
     payUrl: !isReceipt && due > 0 ? portalUrl : null,
     itemised: !isFixed,
     lines,
+    subtotal,
+    discount:
+      discountOff > 0
+        ? {
+            label: discountRowLabel(pkg.discountLabel, pkg.discountType, pkg.discountValue),
+            amount: discountOff,
+          }
+        : null,
+    savings: packageSavings(pkg),
     total,
     paid,
     due,
