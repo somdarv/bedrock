@@ -210,3 +210,32 @@ stored copy to regenerate.
 which stores it for audit/re-send and fans it out over WhatsApp + email. It deliberately does **not**
 pass `reference`/`serial`: that parameter makes the documents endpoint write a *statement* row into
 the verification registry, and an invoice already has its own row from when it was issued.
+
+### A receipt travels with its invoice
+
+A receipt on its own proves money moved but not what for. So a receipt send carries **two** PDFs:
+the receipt, and the invoice it settles. The client gets the whole record in one email instead of
+having to find an older one.
+
+- **Email** carries both. `ClientEventMail` takes a list of files, not one.
+- **WhatsApp** carries the receipt alone. A template message has room for exactly one document
+  header, and two messages for one event reads like two events.
+- The pairing is a **checkbox in the send dialog**, ticked by default. Unticking is the deliberate
+  act, because the pair is what makes the record complete.
+- Nothing can invite a second payment: the invoice PDF only draws its Pay button while a balance
+  stands (`invoice-document.tsx`), and a receipt exists only once the balance is gone.
+
+Both files are stored as their own `ClientDocument`, so the client's history reads back exactly
+what was sent, both halves of it. The second one rides in the request as `related` (+ `relatedType`,
+`relatedTitle`), and `SendClientNotification` attaches it to the email leg only.
+
+The words come from `receipt_sent` in `config/notifications.php`. It points at the **same approved
+`document_sent` WhatsApp template** — Meta sees a document share either way — and only differs in
+the email copy, because "let us know your thoughts" is the wrong thing to say about a receipt.
+
+**Work packages send receipts the same way.** `sendPackageReceipt` renders `/p/{slug}/receipt` and
+`/p/{slug}/invoice` and posts the pair through the identical endpoint. The automatic
+`payment_complete` message already carries a receipt when the balance clears; this covers a
+deposit, a re-send, or a client who lost the email. It is offered only when the package has a
+successful payment **of its own**: a deferred package is paid on the invoice raised for it, so its
+receipt belongs to that invoice (see [DEFERRED-BILLING.md](./DEFERRED-BILLING.md)).

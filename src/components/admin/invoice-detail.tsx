@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { RecipientPicker } from "@/components/admin/recipient-picker";
+import { DocumentSendModal } from "@/components/admin/document-send-modal";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -503,95 +503,27 @@ function SendModal({
   onClose: () => void;
   onSent: (sentTo?: string) => void;
 }) {
-  // Default to every contact so primary + secondary are reached at once; operator can untick.
-  const [recipientIds, setRecipientIds] = React.useState<string[]>(() => contacts.map((c) => c.id));
-  const [replyName, setReplyName] = React.useState("");
-  const [replyMethod, setReplyMethod] = React.useState("whatsapp");
-  const [replyValue, setReplyValue] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
-  const [pending, startTransition] = React.useTransition();
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (recipientIds.length === 0) return setError("Pick at least one contact to send to.");
-    if (!replyName.trim()) return setError("Add a contact name for replies.");
-    if (!replyValue.trim()) return setError("Add the contact's number or email.");
-
-    startTransition(async () => {
-      const res = await sendInvoice(invoice.id, {
-        contactIds: recipientIds,
-        replyToName: replyName,
-        replyToMethod: replyMethod,
-        replyToValue: replyValue,
-        variant,
-      });
-      if (res.error) setError(res.error);
-      else onSent(res.sentTo);
-    });
-  }
+  const isReceipt = variant === "receipt";
 
   return (
-    <Modal
-      open
+    <DocumentSendModal
+      heading={isReceipt ? "Send receipt" : "Send invoice"}
+      description="Goes out over WhatsApp and email as a PDF attachment, and is filed in the client's document history."
+      contacts={contacts}
+      preview={{
+        href: `/i/${invoice.publicSlug}/${variant}`,
+        label: `Preview the ${variant} PDF`,
+      }}
+      // A receipt proves money moved; the invoice says what for. They belong in one email.
+      pair={
+        isReceipt && invoice.reference
+          ? { label: `Attach invoice ${invoice.reference}`, href: `/i/${invoice.publicSlug}/invoice` }
+          : null
+      }
+      send={(values) => sendInvoice(invoice.id, { ...values, variant })}
       onClose={onClose}
-      title={variant === "receipt" ? "Send receipt" : "Send invoice"}
-      description={`Goes out over WhatsApp and email as a PDF attachment, and is filed in the client's document history.`}
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <RecipientPicker contacts={contacts} selected={recipientIds} onChange={setRecipientIds} />
-
-        <Field label="Replies go to (name)" htmlFor="replyName" required>
-          <Input
-            id="replyName"
-            value={replyName}
-            onChange={(e) => setReplyName(e.target.value)}
-            placeholder="e.g. Richard"
-          />
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Reply by" htmlFor="replyMethod">
-            <Select id="replyMethod" value={replyMethod} onChange={(e) => setReplyMethod(e.target.value)}>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="call">Call</option>
-              <option value="email">Email</option>
-            </Select>
-          </Field>
-          <Field label="Number or email" htmlFor="replyValue" required>
-            <Input
-              id="replyValue"
-              value={replyValue}
-              onChange={(e) => setReplyValue(e.target.value)}
-              placeholder={replyMethod === "email" ? "name@example.com" : "+233 24 000 0000"}
-            />
-          </Field>
-        </div>
-
-        {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
-
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          {/* The same route the PDF is rendered from, so this is the document itself and not a
-              likeness of it. Read it before it reaches the client, not after. */}
-          <a
-            href={`/i/${invoice.publicSlug}/${variant}`}
-            target="_blank"
-            rel="noopener"
-            className="text-sm underline underline-offset-4 hover:no-underline"
-          >
-            Preview the {variant === "receipt" ? "receipt" : "invoice"} PDF
-          </a>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? <Spinner /> : null}
-              Send
-            </Button>
-          </div>
-        </div>
-      </form>
-    </Modal>
+      onSent={onSent}
+    />
   );
 }
 

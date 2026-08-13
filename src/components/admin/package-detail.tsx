@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { DeliverablesSection } from "@/components/admin/deliverables-section";
+import { DocumentSendModal } from "@/components/admin/document-send-modal";
 import { MilestonesSection } from "@/components/admin/milestones-section";
 import { PaymentsSection } from "@/components/admin/payments-section";
 import { LineItemModal } from "@/components/admin/line-item-modal";
@@ -20,6 +21,7 @@ import { PackageFormModal } from "@/components/admin/package-form-modal";
 import {
   balance,
   type ClientNotifyEvent,
+  type Contact,
   type DiscountType,
   effectiveTotal,
   grossSubtotal,
@@ -38,6 +40,7 @@ import {
   deletePackage,
   deleteLineItem,
   sendPackage,
+  sendPackageReceipt,
   sendStatement,
   setPackageDiscount,
   setPricingMode,
@@ -48,7 +51,15 @@ import { paidTotal } from "@/lib/payments";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { cn, formatCedis, publicBaseUrl } from "@/lib/utils";
 
-export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientName: string }) {
+export function PackageDetail({
+  pkg,
+  clientName,
+  contacts,
+}: {
+  pkg: WorkPackage;
+  clientName: string;
+  contacts: Contact[];
+}) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -57,6 +68,7 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   const [addingItem, setAddingItem] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<LineItem | null>(null);
   const [deletingItem, setDeletingItem] = React.useState<LineItem | null>(null);
+  const [sendingReceipt, setSendingReceipt] = React.useState(false);
 
   const [pendingMode, startMode] = React.useTransition();
   const [pendingItemDelete, startItemDelete] = React.useTransition();
@@ -85,6 +97,13 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
   const paid = paidTotal(pkg);
   const bal = balance(pkg);
   const publicUrl = `${publicBaseUrl()}/p/${pkg.publicSlug}`;
+  // The receipt is drawn from payments recorded on the package itself. A deferred package is
+  // paid on the invoice raised for it, so its receipt belongs to that invoice, not here.
+  const hasReceipt = pkg.payments.some((p) => p.status === "success");
+  const receiptBlockedReason =
+    (pkg.invoicedPaid ?? 0) > 0
+      ? "Paid on an invoice, so send the receipt from there"
+      : "No payment recorded on this package yet";
 
   function changeMode(mode: PricingMode) {
     if (mode === optimisticMode) return;
@@ -301,7 +320,7 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           <div>
             <div className="text-xs font-medium text-muted-foreground">Client messages</div>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Send a progress statement or a payment reminder over WhatsApp + email.
+              Send a progress statement, a payment reminder, or a receipt over WhatsApp + email.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -319,6 +338,16 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
               title={balance(pkg) <= 0 ? "No outstanding balance" : undefined}
             >
               Send reminder
+            </Button>
+            {/* The balance clearing already sends a receipt by itself. This covers everything
+                else: a deposit, a re-send, a client who cannot find the email. */}
+            <Button
+              variant="outline"
+              onClick={() => setSendingReceipt(true)}
+              disabled={pendingLifecycle || !hasReceipt}
+              title={hasReceipt ? undefined : receiptBlockedReason}
+            >
+              Send receipt
             </Button>
           </div>
         </div>
@@ -573,6 +602,23 @@ export function PackageDetail({ pkg, clientName }: { pkg: WorkPackage; clientNam
           fixed={isFixed}
           onClose={() => setEditingItem(null)}
           onDone={itemDone}
+        />
+      )}
+      {sendingReceipt && (
+        <DocumentSendModal
+          heading="Send receipt"
+          description="Goes out over WhatsApp and email as a PDF attachment, and is filed in the client's document history."
+          contacts={contacts}
+          preview={{ href: `${publicUrl}/receipt`, label: "Preview the receipt PDF" }}
+          // A receipt proves money moved; the invoice says what for. They belong in one email.
+          pair={{ label: "Attach the invoice for this project", href: `${publicUrl}/invoice` }}
+          send={(values) => sendPackageReceipt(pkg.id, values)}
+          onClose={() => setSendingReceipt(false)}
+          onSent={(sentTo) => {
+            setSendingReceipt(false);
+            toast(sentTo ? `Receipt sent to ${sentTo}.` : "Receipt sent.", "success");
+            router.refresh();
+          }}
         />
       )}
 

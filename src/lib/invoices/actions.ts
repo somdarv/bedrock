@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import {
   api,
   ApiError,
@@ -11,10 +10,9 @@ import {
   type InvoicePaymentInput,
 } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
+import { sendClientDocument } from "@/lib/documents/send";
 import { VERIFY_BASE_URL } from "@/lib/documents/registry";
 import { publicBaseUrl } from "@/lib/utils";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export interface InvoiceActionState {
   ok?: boolean;
@@ -168,13 +166,20 @@ export interface SendInvoiceInput {
   replyToValue: string;
   /** Send the receipt instead of the invoice (only once the invoice is settled). */
   variant?: "invoice" | "receipt";
+  /** Receipt sends only: attach the invoice it settles alongside it. Defaults to true. */
+  includeInvoice?: boolean;
 }
 
 /**
  * Send an issued invoice (or its receipt) to the client: render the PDF server-side, then hand it
  * to the client-documents endpoint (multipart), which stores it on R2 as a ClientDocument — so it
  * lands in the client's document history, auditable and re-sendable — and fans it out over
- * WhatsApp + email via `document_sent`. The same pipeline an infrastructure statement uses.
+ * WhatsApp + email.
+ *
+ * A **receipt** carries the invoice it settles as a second attachment: on its own it proves money
+ * moved but not what for, and the client should not have to dig out an older email to see the two
+ * halves together. It rides on the email only (WhatsApp has room for one document header), and it
+ * cannot invite a second payment — the invoice PDF only draws a Pay button while a balance stands.
  *
  * Note it deliberately does NOT send `reference`/`serial`. That parameter makes the documents
  * endpoint write a *statement* row into the verification registry, and this document already has
@@ -204,44 +209,51 @@ export async function sendInvoice(
     const contact = client.contacts.find((c) => c.isPrimary) ?? client.contacts[0];
     const base = publicBaseUrl() || VERIFY_BASE_URL;
 
-    const pdf = await renderInvoicePdf(invoice, variant, {
-      billTo: {
-        name: client.name,
-        contactName: contact?.name ?? null,
-        email: contact?.email ?? null,
-        phone: contact?.phone ?? contact?.whatsapp ?? null,
-      },
-      payUrl: base ? `${base}/i/${invoice.publicSlug}` : null,
+    const render = (of: "invoice" | "receipt") =>
+      renderInvoicePdf(invoice, of, {
+        billTo: {
+          name: client.name,
+          contactName: contact?.name ?? null,
+          email: contact?.email ?? null,
+          phone: contact?.phone ?? contact?.whatsapp ?? null,
+        },
+        payUrl: base ? `${base}/i/${invoice.publicSlug}` : null,
+      });
+
+    const label = (of: "invoice" | "receipt") => {
+      const ref = (of === "receipt" ? invoice.receiptReference : invoice.reference) ?? invoiceId;
+      return {
+        type: of,
+        filename: `${ref.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`,
+        title: `${of === "receipt" ? "Receipt" : "Invoice"} ${ref} for ${invoice.title}`,
+      };
+    };
+
+    const file = async (of: "invoice" | "receipt") => ({ ...label(of), pdf: await render(of) });
+
+    // Only an issued invoice has a document to pair with, and only a receipt needs the pairing.
+    const pairInvoice =
+      variant === "receipt" && (input.includeInvoice ?? true) && Boolean(invoice.reference);
+
+    const res = await sendClientDocument({
+      clientId: invoice.clientId,
+      document: await file(variant),
+      related: pairInvoice ? await file("invoice") : null,
+      contactIds: input.contactIds,
+      replyToName: input.replyToName,
+      replyToMethod: input.replyToMethod,
+      replyToValue: input.replyToValue,
+      // The words differ for a receipt ("thank you for your payment", not "let us know your
+      // thoughts"); the approved WhatsApp template behind both events is the same one.
+      event: variant === "receipt" ? "receipt_sent" : undefined,
+      failure: `Could not send the ${variant}.`,
     });
 
-    const ref = (variant === "receipt" ? invoice.receiptReference : invoice.reference) ?? invoiceId;
-    const safe = ref.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    if (res.error) return { error: res.error };
 
-    const fd = new FormData();
-    fd.append("file", new Blob([new Uint8Array(pdf)], { type: "application/pdf" }), `${safe}.pdf`);
-    fd.append("type", variant === "receipt" ? "receipt" : "invoice");
-    fd.append("title", `${variant === "receipt" ? "Receipt" : "Invoice"} ${ref} — ${invoice.title}`);
-    (input.contactIds ?? []).forEach((id) => fd.append("contactIds[]", id));
-    fd.append("replyToName", input.replyToName.trim());
-    fd.append("replyToMethod", input.replyToMethod);
-    fd.append("replyToValue", input.replyToValue.trim());
-
-    const token = (await cookies()).get("bedrock_token")?.value;
-    const res = await fetch(`${BASE_URL}/api/admin/clients/${invoice.clientId}/documents`, {
-      method: "POST",
-      headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: fd,
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      return { error: body.message ?? "Could not send the invoice." };
-    }
-
-    const body = (await res.json()) as { sentTo?: string };
     revalidateInvoices(invoice.clientId, invoiceId);
-    return { ok: true, sentTo: body.sentTo };
+    return { ok: true, sentTo: res.sentTo };
   } catch (e) {
-    return fail(e, "Could not send the invoice.");
+    return fail(e, `Could not send the ${variant}.`);
   }
 }

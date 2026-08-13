@@ -11,5 +11,11 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
   });
   const client = await api.clients.get(pkg.clientId).catch(() => null);
 
-  return <PackageDetail pkg={pkg} clientName={client?.name ?? "Unknown client"} />;
+  return (
+    <PackageDetail
+      pkg={pkg}
+      clientName={client?.name ?? "Unknown client"}
+      contacts={client?.contacts ?? []}
+    />
+  );
 }

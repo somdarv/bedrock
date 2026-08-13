@@ -16,6 +16,9 @@ import {
   type WorkPackageInput,
   type WorkPackageStatus,
 } from "@/lib/api";
+import { packageDocumentRefs } from "@/lib/documents/package-refs";
+import { sendClientDocument } from "@/lib/documents/send";
+import { renderPackagePdf } from "@/lib/pdf/render";
 
 function revalidatePackage(id: string) {
   revalidatePath("/admin/packages");
@@ -290,6 +293,84 @@ export async function sendStatement(
   }
   revalidatePackage(id);
   return { ok: true };
+}
+
+export interface SendReceiptInput {
+  /** Contacts to send to. Empty → the API falls back to the client's primary contact. */
+  contactIds?: string[];
+  replyToName: string;
+  replyToMethod: string;
+  replyToValue: string;
+  /** Attach the package's invoice beside the receipt. Defaults to true. */
+  includeInvoice?: boolean;
+  /** Set by the action: who it actually went to. */
+  sentTo?: string;
+}
+
+/**
+ * Send a work package's receipt by hand, with its invoice attached.
+ *
+ * The automatic `payment_complete` message already carries a receipt when the balance clears,
+ * but nothing covers a deposit, a re-send, or a client who lost the email. Both PDFs are
+ * rendered from the same public routes the client reads (`/p/{slug}/receipt` and `/invoice`),
+ * so what is sent is the document itself and not a likeness of it.
+ */
+export async function sendPackageReceipt(
+  id: string,
+  input: SendReceiptInput,
+): Promise<ActionState & { sentTo?: string }> {
+  if (!input.replyToName.trim()) return { error: "Add a contact name for replies." };
+  if (!input.replyToValue.trim()) return { error: "Add the reply contact's number or email." };
+
+  try {
+    const pkg = await api.packages.get(id);
+
+    if (pkg.status === "draft") {
+      return { error: "Send this package to the client before sending a receipt for it." };
+    }
+    if (!pkg.payments.some((p) => p.status === "success")) {
+      // A deferred package is paid through the invoice raised for it, so its receipt is the
+      // invoice's receipt. Point there rather than sending a receipt with nothing on it.
+      return {
+        error: (pkg.invoicedPaid ?? 0) > 0
+          ? "This package was paid on an invoice. Send that invoice's receipt instead."
+          : "No payment has been recorded on this package yet.",
+      };
+    }
+
+    // The portal read is what the PDF routes use, and the only one carrying the bill-to block.
+    const portal = await api.packages.getBySlug(pkg.publicSlug);
+
+    const file = async (variant: "invoice" | "receipt") => {
+      const refs = packageDocumentRefs(pkg.publicSlug, variant);
+      return {
+        type: variant,
+        pdf: await renderPackagePdf(portal, variant),
+        filename: `${refs.reference.toLowerCase()}.pdf`,
+        title: `${variant === "receipt" ? "Receipt" : "Invoice"} ${refs.number} for ${pkg.title}`,
+      };
+    };
+
+    const res = await sendClientDocument({
+      clientId: pkg.clientId,
+      document: await file("receipt"),
+      related: (input.includeInvoice ?? true) ? await file("invoice") : null,
+      contactIds: input.contactIds,
+      replyToName: input.replyToName,
+      replyToMethod: input.replyToMethod,
+      replyToValue: input.replyToValue,
+      event: "receipt_sent",
+      failure: "Could not send the receipt.",
+    });
+
+    if (res.error) return { error: res.error };
+
+    revalidatePackage(id);
+    revalidatePath(`/admin/clients/${pkg.clientId}`);
+    return { ok: true, sentTo: res.sentTo };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not send the receipt." };
+  }
 }
 
 export async function changeStatus(
