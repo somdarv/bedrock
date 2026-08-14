@@ -2,6 +2,7 @@ import Link from "next/link";
 import { api, effectiveTotal, unbilled, type WorkPackage } from "@/lib/api";
 import { statusMeta } from "@/lib/status";
 import { outstandingCedis } from "@/lib/invoices/display";
+import { chargeCedis, outstandingTotals } from "@/lib/receivables";
 import { formatCedis, formatMoney } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -29,15 +30,26 @@ const pendingDeposit = (p: WorkPackage) => {
 const hasDepositSchedule = (p: WorkPackage) => p.milestones.some((m) => m.kind === "deposit");
 
 export default async function ReceivablesPage() {
-  const [packages, clients, infra, billed] = await Promise.all([
+  const [packages, clients, infra, billed, fx] = await Promise.all([
     api.packages.list(),
     api.clients.list(),
     api.infrastructure.chargesOutstanding().catch(() => ({ total: 0, items: [] })),
     // Issued invoices still owed. A charge billed on one drops out of `infra` above and shows
     // up here instead, so the same money is never counted in both.
     api.invoices.outstanding().catch(() => ({ total: 0, items: [] })),
+    // Today's billing rate, to restate dollar account fees in cedis.
+    api.invoices.fx().catch(() => null),
   ]);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
+  const rate = fx?.effectiveRate ?? null;
+
+  // The same roll-up the dashboard's Outstanding figure is struck from, so the two agree.
+  const totals = outstandingTotals({
+    packages,
+    charges: infra.items,
+    invoices: billed.items,
+    fxRate: rate,
+  });
 
   const awaitingDeposit = packages.filter((p) => DEPOSIT_STATUSES.includes(p.status));
   const underway = packages.filter((p) => UNDERWAY_STATUSES.includes(p.status));
@@ -47,23 +59,21 @@ export default async function ReceivablesPage() {
   const depositTotal = awaitingDeposit.reduce((s, p) => s + pendingDeposit(p), 0);
   const underwayTotal = underway.reduce((s, p) => s + owed(p), 0);
   const finalTotal = awaitingFinal.reduce((s, p) => s + owed(p), 0);
-  // Total to come in = every unpaid balance across accepted + live jobs (the full project sums
-  // still owed). The "Awaiting deposit" tile is the collect-now slice within this, so the total
-  // is usually larger than it: a deposit-stage job still owes its post-deposit balance too.
-  const committedTotal =
-    awaitingDeposit.reduce((s, p) => s + owed(p), 0) + underwayTotal + finalTotal;
-  // Proposals sent but not yet accepted — potential, deliberately kept out of the committed total.
+  // Proposals sent but not yet accepted — potential, deliberately kept out of every total.
   const proposalTotal = proposals.reduce((s, p) => s + effectiveTotal(p), 0);
 
-  // Invoice balances re-struck in cedis. The API totals `balance` in whatever each invoice is
+  // Invoice balances and account fees re-struck in cedis: the API totals each in whatever it is
   // priced in, so a dollar invoice would otherwise contribute its dollar figure to a cedi sum.
-  const billedTotal = billed.items.reduce((s, i) => s + outstandingCedis(i), 0);
+  const billedTotal = totals.invoices;
+  const accountsTotal = totals.accounts;
 
   const stats = [
     { label: "Awaiting deposit", value: formatCedis(depositTotal), hint: "accepted, not started" },
     { label: "Work underway", value: formatCedis(underwayTotal), hint: "in progress + review" },
     { label: "Awaiting final payment", value: formatCedis(finalTotal), hint: "work done, tail unpaid" },
-    { label: "Total to come in", value: formatCedis(committedTotal), hint: "all outstanding, accepted + live" },
+    // Everything owed, across all three routes below. The three tiles to its left are job-stage
+    // slices of one of those routes, so this is larger than their sum, not equal to it.
+    { label: "Total to come in", value: formatCedis(totals.total), hint: "jobs, fees & invoices" },
   ];
 
   return (
@@ -158,7 +168,7 @@ export default async function ReceivablesPage() {
           </div>
           <div className="text-right">
             <div className="font-display text-xl font-semibold tracking-tight">
-              {formatCedis(infra.total)}
+              {formatCedis(accountsTotal)}
             </div>
             <div className="text-[11px] text-subtle">
               {infra.items.length} {infra.items.length === 1 ? "charge" : "charges"}
@@ -170,6 +180,17 @@ export default async function ReceivablesPage() {
           Hosting, domain and other fees, billed separately from project work. Add or clear these on
           each client&apos;s page. Once a charge is billed on an invoice it moves to the Invoices
           section below.
+          {totals.unconvertedUsd > 0 && (
+            <>
+              {" "}
+              {formatMoney(totals.unconvertedUsd, "USD")} of these is billed in dollars with no
+              exchange rate set, so it is not in the cedi total.{" "}
+              <Link href="/admin/settings" className="underline underline-offset-4">
+                Set a rate
+              </Link>
+              .
+            </>
+          )}
         </p>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
@@ -179,28 +200,39 @@ export default async function ReceivablesPage() {
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {infra.items.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/admin/clients/${c.clientId}`}
-                    className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 md:px-6"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{c.description}</div>
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {c.clientName ?? "Unknown client"}
-                        {c.dueDate ? ` · due ${new Date(c.dueDate).toLocaleDateString()}` : ""}
+              {infra.items.map((c) => {
+                // Hosting and domains are bought in dollars, so a fee shows in the currency it
+                // is actually incurred in, with its cedi cost at today's billing rate underneath.
+                const cedis = chargeCedis(c, rate);
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/admin/clients/${c.clientId}`}
+                      className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 md:px-6"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{c.description}</div>
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {c.clientName ?? "Unknown client"}
+                          {c.dueDate ? ` · due ${new Date(c.dueDate).toLocaleDateString()}` : ""}
+                        </div>
                       </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-display text-sm font-semibold tracking-tight">
-                        {formatCedis(c.amount)}
+                      <div className="shrink-0 text-right">
+                        <div className="font-display text-sm font-semibold tracking-tight">
+                          {formatMoney(c.amount, c.currency ?? "GHS")}
+                        </div>
+                        <div className="text-[11px] text-subtle">
+                          {c.currency === "USD"
+                            ? cedis === null
+                              ? "no rate set"
+                              : `${formatCedis(cedis)} owed`
+                            : "owed"}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-subtle">owed</div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
