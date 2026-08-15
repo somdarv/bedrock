@@ -129,6 +129,18 @@ const s = StyleSheet.create({
   cellWide: { flex: 1, fontSize: 9.5, color: brand.ink, paddingRight: 14 },
   cellMid: { width: 128, fontSize: 9.5, color: brand.muted, paddingRight: 14 },
   thMid: { width: 128 },
+  // Summing line under a multi-row sub-table. Mirrors the totals ladder's settled row so the two
+  // read as the same kind of figure.
+  subFootRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: brand.ink,
+    paddingTop: 7,
+    marginTop: 1,
+  },
+  subFootLabel: { fontSize: 10, fontWeight: 600, color: brand.ink },
+  subFootValue: { fontFamily: "Sora", fontSize: 11, fontWeight: 600, color: brand.ink },
 
   // Scan-to-verify stamp. Kept deliberately compact: it sits in flow at the end of the
   // document, and a taller block would push itself onto a page of its own on longer invoices.
@@ -250,6 +262,11 @@ export interface BillingSubRow {
   sub?: string | null;
   middle: string;
   amount: number;
+  /**
+   * The row this document is actually about, when the table lists several. On a receipt showing
+   * a running payment history, this is the payment being acknowledged.
+   */
+  emphasis?: boolean;
 }
 
 export interface BillingModel {
@@ -297,7 +314,13 @@ export interface BillingModel {
   paid: number;
   due: number;
   /** Secondary table: schedule (invoice) or payment history (receipt). */
-  subTable?: { heading: string; columns: [string, string, string]; rows: BillingSubRow[] } | null;
+  subTable?: {
+    heading: string;
+    columns: [string, string, string];
+    rows: BillingSubRow[];
+    /** Summing line under the rows, e.g. "Paid to date" on a multi-payment receipt. */
+    footer?: { label: string; amount: number } | null;
+  } | null;
   /** Printed in the verify stamp as the issue date. */
   issuedDate?: string | null;
   verify: { reference: string; serial: string; qr: string };
@@ -502,16 +525,28 @@ export function BillingDocument({ model, logo }: { model: BillingModel; logo: st
               <View style={s.row} key={row.id} wrap={false}>
                 {row.sub ? (
                   <View style={s.cellDesc}>
-                    <Text style={s.desc}>{row.label}</Text>
+                    <Text style={[s.desc, { fontWeight: row.emphasis ? 600 : 400 }]}>
+                      {row.label}
+                    </Text>
                     <Text style={s.descSub}>{row.sub}</Text>
                   </View>
                 ) : (
-                  <Text style={s.cellWide}>{row.label}</Text>
+                  <Text style={[s.cellWide, { fontWeight: row.emphasis ? 600 : 400 }]}>
+                    {row.label}
+                  </Text>
                 )}
                 <Text style={s.cellMid}>{row.middle}</Text>
-                <Text style={s.cellAmt}>{amount(row.amount)}</Text>
+                <Text style={[s.cellAmt, { fontWeight: row.emphasis ? 600 : 400 }]}>
+                  {amount(row.amount)}
+                </Text>
               </View>
             ))}
+            {model.subTable.footer ? (
+              <View style={s.subFootRow} wrap={false}>
+                <Text style={s.subFootLabel}>{model.subTable.footer.label}</Text>
+                <Text style={s.subFootValue}>{amount(model.subTable.footer.amount)}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 

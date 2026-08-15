@@ -159,14 +159,29 @@ export function invoiceBillingModel({
   // with the cedis actually sent and the rate applied on the line beneath — the client needs to
   // recognise the figure that left their account.
   //
-  // A receipt for one payment lists only that payment: it is the record of a single transaction,
-  // and reprinting the client's whole payment history on it would restate money already
-  // receipted elsewhere.
-  const historyRows = receiptFor ? [receiptFor] : settledPayments;
+  // A receipt for one payment shows the payments made against this invoice UP TO AND INCLUDING
+  // that one. A part payment on its own tells the client almost nothing: "GHS 2,000 received,
+  // GHS 1,000 remains" leaves them to find their earlier receipt to see where the account
+  // actually stands. The running history answers it on the page in front of them.
+  //
+  // Payments AFTER this one are deliberately excluded, and that is the load-bearing part. The
+  // client is holding a printed copy with a verification QR on it, so the rows have to be the
+  // same rows on every reprint. Cutting the sequence at this payment makes the set immutable:
+  // everything before it is settled history that can never change.
+  const upToHere = receiptFor
+    ? settledPayments.slice(0, settledPayments.findIndex((p) => p.id === receiptFor.id) + 1)
+    : settledPayments;
+  // findIndex returns -1 for a payment not in the settled list (a pending or failed one), which
+  // would slice to empty. Fall back to the payment itself rather than printing no table at all.
+  const historyRows = receiptFor && upToHere.length === 0 ? [receiptFor] : upToHere;
+  const paidToDate = historyRows.reduce(
+    (sum, p) => sum + (isUsd ? (p.amountUsd ?? 0) : p.amount),
+    0,
+  );
   const subTable: BillingModel["subTable"] =
     isReceipt && historyRows.length > 0
       ? {
-          heading: receiptFor ? "This payment" : "Payment history",
+          heading: historyRows.length > 1 ? "Payments on this invoice" : "This payment",
           columns: ["Payment method", "Date", isUsd ? "Settled (USD)" : "Amount paid"],
           rows: historyRows.map<BillingSubRow>((p) => ({
             id: p.id,
@@ -178,7 +193,14 @@ export function invoiceBillingModel({
                 : null,
             middle: fmtDate(p.paidAt),
             amount: isUsd ? (p.amountUsd ?? 0) : p.amount,
+            // Which line this receipt is actually for. Without it a client reading three rows
+            // cannot tell which one the document in their hand acknowledges.
+            emphasis: receiptFor ? p.id === receiptFor.id : false,
           })),
+          // Only worth printing once there is more than one row to add up. It also stops the
+          // table contradicting the ladder above, where "Amount paid" is this payment alone.
+          footer:
+            historyRows.length > 1 ? { label: "Paid to date", amount: paidToDate } : null,
         }
       : null;
 
@@ -188,15 +210,18 @@ export function invoiceBillingModel({
   // "settles it in full" on a part payment would be a plain untruth, and saying nothing leaves
   // them to work it out from the totals ladder.
   const stillOwed = `${money(receiptDue, code)} remains outstanding on invoice ${invoice.reference ?? ""}`.trim();
+  // Once the table carries earlier payments too, "the payment below" no longer identifies
+  // anything — it sits above several rows. Point at the marked one instead.
+  const thisPayment = historyRows.length > 1 ? "the payment marked below" : "the payment below";
   const memo = isReceipt
     ? isUsd
       ? receiptDue > 0
         ? `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(receiptPaid, "USD")}. ${stillOwed}.`
         : `Thank you. GHS ${nf2.format(receivedGhs)} was received, settling ${money(receiptPaid, "USD")} on this invoice in full.`
       : receiptDue > 0
-        ? `Thank you. This receipt confirms the payment below. ${stillOwed}.`
+        ? `Thank you. This receipt confirms ${thisPayment}. ${stillOwed}.`
         : receiptFor
-          ? "Thank you. This receipt confirms the payment below, and settles the invoice it refers to in full."
+          ? `Thank you. This receipt confirms ${thisPayment}, and settles the invoice it refers to in full.`
           : "Thank you. This receipt confirms the payments listed below, and settles the invoice it refers to in full."
     : due > 0
       ? invoice.memo?.trim() ||
