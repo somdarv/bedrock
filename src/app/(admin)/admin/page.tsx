@@ -122,28 +122,24 @@ export default async function AdminDashboard() {
     {
       label: "Outstanding",
       value: formatCedis(owed.total),
-      sub: `${formatCedis(owed.jobs)} jobs · ${formatCedis(owed.invoices)} invoices · ${formatCedis(owed.accounts)} accounts`,
       hint: "everything owed, one figure",
       href: "/admin/receivables",
     },
     {
       label: "Active packages",
       value: String(active.length),
-      sub: null,
       hint: "in flight",
       href: "/admin/packages",
     },
     {
       label: "To chase",
       value: String(chase.length),
-      sub: null,
       hint: "jobs, invoices & fees",
       href: "/admin/receivables",
     },
     {
       label: "Clients",
       value: String(clients.length),
-      sub: null,
       hint: "on the books",
       href: "/admin/clients",
     },
@@ -179,7 +175,6 @@ export default async function AdminDashboard() {
             <div className="mt-6 font-display text-3xl font-semibold tracking-tightest md:text-4xl">
               {s.value}
             </div>
-            {s.sub && <div className="mt-1.5 text-xs text-muted-foreground">{s.sub}</div>}
             <div className="mt-1.5 text-xs text-subtle">{s.hint}</div>
           </Link>
         ))}

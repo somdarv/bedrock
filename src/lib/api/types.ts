@@ -32,6 +32,44 @@ export interface ReminderSettings {
   events: ClientNotifyEvent[];
 }
 
+/** `pending` = accrued but the cedis have not left the operating account yet. */
+export type SetAsideStatus = "pending" | "moved";
+
+/**
+ * One slice of one payment received, held back from operating money.
+ *
+ * `ratePercent` is the rate that applied the day the money landed, copied onto the row. Changing
+ * the rate in Settings decides what future payments accrue and never rewrites what is already
+ * here — an entry you have already moved money against must keep matching your bank.
+ */
+export interface SetAside {
+  id: string;
+  paymentId: string;
+  clientId: string | null;
+  clientName: string | null;
+  /** What the money was for, in words, written when it landed ("Invoice INV-0042"). */
+  source: string;
+  /** The cedis that arrived, which this slice was taken from. */
+  receivedAmount: number;
+  ratePercent: number;
+  amount: number;
+  status: SetAsideStatus;
+  receivedAt: string | null;
+  movedAt: string | null;
+  note: string | null;
+}
+
+/** The savings pot: what the rule has claimed, what has actually been moved, and the gap. */
+export interface SavingsState {
+  ratePercent: number;
+  accrued: number;
+  moved: number;
+  pending: number;
+  /** Total cedis the entries were sliced from — what the rate has been applied to so far. */
+  receivedTotal: number;
+  entries: SetAside[];
+}
+
 /** Result of a successful phone + OTP track verification. */
 export interface TrackResult {
   token: string;

@@ -14,6 +14,7 @@ import type {
   PaymentSession,
   PublicInvoice,
   ReminderSettings,
+  SavingsState,
   ServerMetrics,
   SessionUser,
   TestServerResult,
@@ -320,6 +321,21 @@ export const httpApi: BedrockApi = {
         method: "DELETE",
         body: JSON.stringify({ password }),
       }),
+  },
+  savings: {
+    get: () => request<SavingsState>(`/api/admin/savings`),
+    setRate: (ratePercent) =>
+      request<SavingsState>(`/api/admin/savings/rate`, {
+        method: "PUT",
+        body: JSON.stringify({ ratePercent }),
+      }),
+    move: (id, note) =>
+      request<SavingsState>(`/api/admin/savings/${id}/move`, {
+        method: "POST",
+        body: JSON.stringify({ note: note ?? null }),
+      }),
+    unmove: (id) => request<SavingsState>(`/api/admin/savings/${id}/unmove`, { method: "POST" }),
+    moveAll: () => request<SavingsState>(`/api/admin/savings/move-all`, { method: "POST" }),
   },
   settings: {
     getReminders: () => request<ReminderSettings>(`/api/admin/settings/reminders`),

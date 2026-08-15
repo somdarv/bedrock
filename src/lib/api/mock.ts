@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
 
@@ -714,6 +714,7 @@ export const mockApi: BedrockApi = {
         paidAt: new Date().toISOString(),
       };
       pkg.payments.push(payment);
+      accrueSetAside(payment, pkg.clientId, pkg.title);
       logActivity(pkg, "payment_received", `Payment of ${formatCedis(input.amount)} received.`);
 
       // Start gate: deposit (or full small-job payment) opens work.
@@ -790,7 +791,7 @@ export const mockApi: BedrockApi = {
       );
       if (milestone.status === "paid") throw new ApiError(409, "That milestone is already paid.");
 
-      pkg.payments.push({
+      const milestonePayment: Payment = {
         id: `pm_${crypto.randomUUID().slice(0, 8)}`,
         milestoneId: milestone.id,
         amount: milestone.amount,
@@ -799,7 +800,9 @@ export const mockApi: BedrockApi = {
         paystackReference: `ref_${crypto.randomUUID().slice(0, 10)}`,
         method,
         paidAt: new Date().toISOString(),
-      });
+      };
+      pkg.payments.push(milestonePayment);
+      accrueSetAside(milestonePayment, pkg.clientId, pkg.title);
       milestone.status = "paid";
       milestone.paidAt = new Date().toISOString();
       logActivity(pkg, "milestone_paid", `Milestone "${milestone.label}" paid (${formatCedis(milestone.amount)}).`);
@@ -1368,6 +1371,7 @@ export const mockApi: BedrockApi = {
         receiptSerial: mockSerial(),
       };
       invoice.payments.push(payment);
+      accrueSetAside(payment, invoice.clientId, `Invoice ${invoice.reference ?? invoice.title}`);
 
       const hydrated = hydrateInvoice(invoice);
       if (hydrated.balance <= 0 && hydrated.total > 0) {
@@ -1568,6 +1572,52 @@ export const mockApi: BedrockApi = {
       vaultEntries.length = 0;
     },
   },
+  savings: {
+    async get() {
+      await delay();
+      return savingsState();
+    },
+    async setRate(ratePercent) {
+      await delay();
+      if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 50) {
+        throw new ApiError(422, "Enter a rate between 0 and 50 percent.");
+      }
+      savingsRate = round2(ratePercent);
+      return savingsState();
+    },
+    async move(id, note) {
+      await delay();
+      const entry = found(
+        setAsides.find((s) => s.id === id),
+        "Set-aside",
+      );
+      entry.status = "moved";
+      entry.movedAt = new Date().toISOString();
+      if (note) entry.note = note;
+      return savingsState();
+    },
+    async unmove(id) {
+      await delay();
+      const entry = found(
+        setAsides.find((s) => s.id === id),
+        "Set-aside",
+      );
+      entry.status = "pending";
+      entry.movedAt = null;
+      return savingsState();
+    },
+    async moveAll() {
+      await delay();
+      const now = new Date().toISOString();
+      setAsides
+        .filter((s) => s.status === "pending")
+        .forEach((s) => {
+          s.status = "moved";
+          s.movedAt = now;
+        });
+      return savingsState();
+    },
+  },
   settings: {
     async getReminders() {
       await delay();
@@ -1604,6 +1654,59 @@ export const mockApi: BedrockApi = {
 
 let vaultKey: VaultKeyRecord | null = null;
 const vaultEntries: VaultEntryRecord[] = [];
+
+/* ------------------------------------------------------------------ savings */
+
+/**
+ * Mirrors App\Observers\PaymentObserver: a slice of every payment that reaches `success`.
+ * Zero by default, as on the API — nothing accrues until a rate is set in Settings.
+ */
+let savingsRate = 0;
+const setAsides: SetAside[] = [];
+
+/** Accrue one entry. Idempotent per payment, like the unique index on the real table. */
+function accrueSetAside(payment: Payment, clientId: string | null, source: string) {
+  if (savingsRate <= 0 || payment.status !== "success" || payment.amount <= 0) return;
+  if (setAsides.some((s) => s.paymentId === payment.id)) return;
+
+  const amount = round2(payment.amount * (savingsRate / 100));
+  if (amount <= 0) return;
+
+  setAsides.push({
+    id: `sa_${crypto.randomUUID().slice(0, 8)}`,
+    paymentId: payment.id,
+    clientId,
+    clientName: clients.find((c) => c.id === clientId)?.name ?? null,
+    source,
+    receivedAmount: payment.amount,
+    // Frozen at the rate that applied when the money landed, never recomputed.
+    ratePercent: savingsRate,
+    amount,
+    status: "pending",
+    receivedAt: payment.paidAt,
+    movedAt: null,
+    note: null,
+  });
+}
+
+function savingsState(): SavingsState {
+  const sum = (status: SetAsideStatus) =>
+    round2(setAsides.filter((s) => s.status === status).reduce((n, s) => n + s.amount, 0));
+  const pending = sum("pending");
+  const moved = sum("moved");
+
+  return {
+    ratePercent: savingsRate,
+    accrued: round2(pending + moved),
+    moved,
+    pending,
+    receivedTotal: round2(setAsides.reduce((n, s) => n + s.receivedAmount, 0)),
+    entries: [...setAsides].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
+      return (b.receivedAt ?? "").localeCompare(a.receivedAt ?? "");
+    }),
+  };
+}
 
 let reminderRules: ReminderRule[] = [
   { id: "rr_seed1", dayOfMonth: 25, event: "payment_reminder", enabled: true },

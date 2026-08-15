@@ -33,6 +33,8 @@ function revalidateInvoices(clientId?: string, invoiceId?: string) {
   revalidatePath("/admin/invoices");
   revalidatePath("/admin/receivables");
   revalidatePath("/admin/infrastructure");
+  // A payment against an invoice accrues a savings set-aside on the API side.
+  revalidatePath("/admin/savings");
 }
 
 /**

@@ -23,6 +23,7 @@ import {
   voidInvoice,
 } from "@/lib/invoices/actions";
 import { cedisFor, invoiceStatusMeta, outstandingCedis } from "@/lib/invoices/display";
+import { setAsideNotice, setAsideOf } from "@/lib/savings/display";
 import { formatCedis, formatMoney, formatRate } from "@/lib/utils";
 
 const METHODS = ["bank transfer", "mobile money", "cash", "cheque", "card"];
@@ -38,10 +39,13 @@ export function InvoiceDetail({
   invoice,
   contacts,
   clientName,
+  savingsRate,
 }: {
   invoice: Invoice;
   contacts: Contact[];
   clientName: string | null;
+  /** Percentage of each payment held back for savings. 0 = the feature is off. */
+  savingsRate: number;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -456,10 +460,12 @@ export function InvoiceDetail({
       {paying && (
         <PaymentModal
           invoice={invoice}
+          savingsRate={savingsRate}
           onClose={() => setPaying(false)}
-          onDone={() => {
+          onDone={(paid) => {
             setPaying(false);
-            toast("Payment recorded.", "success");
+            // Say what this money owes savings while it is still in front of the operator.
+            toast(setAsideNotice(paid, savingsRate) ?? "Payment recorded.", "success");
             router.refresh();
           }}
         />
@@ -570,12 +576,14 @@ function SendModal({
 
 function PaymentModal({
   invoice,
+  savingsRate,
   onClose,
   onDone,
 }: {
   invoice: Invoice;
+  savingsRate: number;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (amount: number) => void;
 }) {
   const isUsd = invoice.currency === "USD";
   // On a dollar invoice the operator enters the cedis that arrived; the rate turns that into the
@@ -596,6 +604,9 @@ function PaymentModal({
   const rateValue = Number(rate);
   const settlesUsd =
     isUsd && rateValue > 0 ? Math.round((Number(amount) / rateValue) * 100) / 100 : null;
+  // Savings is a slice of the cedis that actually arrive, so it reads the same field on a dollar
+  // invoice as on a cedi one.
+  const slice = setAsideOf(Number(amount), savingsRate);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -615,7 +626,7 @@ function PaymentModal({
         fxRate: isUsd ? rateValue : null,
       });
       if (res.error) setError(res.error);
-      else onDone();
+      else onDone(value);
     });
   }
 
@@ -679,6 +690,13 @@ function PaymentModal({
             Settles <span className="font-semibold">{formatMoney(settlesUsd, "USD")}</span> of the{" "}
             {formatMoney(invoice.balance, "USD")} outstanding
             {settlesUsd >= invoice.balance ? ". This clears the invoice." : "."}
+          </p>
+        )}
+
+        {slice > 0 && (
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+            {formatCedis(slice)} of this goes to savings ({savingsRate}%). It is added to the
+            ledger automatically; move the money when you can.
           </p>
         )}
 

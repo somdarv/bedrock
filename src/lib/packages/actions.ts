@@ -406,6 +406,8 @@ export interface PaymentFormState {
   ok?: boolean;
   error?: string;
   fieldErrors?: { amount?: string };
+  /** What was actually recorded, so the caller can report the savings slice it accrued. */
+  amount?: number;
 }
 
 export async function recordPayment(
@@ -427,7 +429,10 @@ export async function recordPayment(
     return { error: e instanceof ApiError ? e.message : "Could not record payment." };
   }
   revalidatePackage(packageId);
-  return { ok: true };
+  // The savings ledger accrued its slice of this on the API side; the page shows what was held
+  // back rather than sending the operator to look for it.
+  revalidatePath("/admin/savings");
+  return { ok: true, amount };
 }
 
 // ----- Deliverables -----

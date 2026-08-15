@@ -34,6 +34,12 @@ export const api: BedrockApi = {
   // Vault rides the auth switch: it is per-user data keyed to the logged-in account, so it
   // only makes sense against the same backend that issued the session.
   vault: isLive("vault") || isLive("auth") ? httpApi.vault : mockApi.vault,
+  // Savings accrue off real payments, so the ledger has to sit on whichever backend is recording
+  // them — a live payment with a mock ledger would silently save nothing.
+  savings:
+    isLive("savings") || isLive("invoices") || isLive("packages") || isLive("clients")
+      ? httpApi.savings
+      : mockApi.savings,
   // Settings ride the packages switch (same admin surface) unless flipped on their own.
   settings: isLive("settings") || isLive("packages") ? httpApi.settings : mockApi.settings,
   // Track (public phone+OTP) rides the packages switch too.

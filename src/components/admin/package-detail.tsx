@@ -55,10 +55,13 @@ export function PackageDetail({
   pkg,
   clientName,
   contacts,
+  savingsRate,
 }: {
   pkg: WorkPackage;
   clientName: string;
   contacts: Contact[];
+  /** Percentage of each payment held back for savings, for the record-payment prompt. */
+  savingsRate: number;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -558,7 +561,7 @@ export function PackageDetail({
       <MilestonesSection pkg={pkg} />
 
       {/* Payments & gates */}
-      <PaymentsSection pkg={pkg} />
+      <PaymentsSection pkg={pkg} savingsRate={savingsRate} />
 
       {/* Deliverables */}
       <DeliverablesSection pkg={pkg} />

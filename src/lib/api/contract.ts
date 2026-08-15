@@ -25,6 +25,7 @@ import type {
   PaymentSession,
   ReminderRuleInput,
   ReminderSettings,
+  SavingsState,
   ServerMetrics,
   SessionUser,
   TestServerInput,
@@ -172,6 +173,23 @@ export interface BedrockApi {
     /** The USD to GHS rate and margin dollar invoices are billed at. */
     fx(): Promise<FxState>;
     saveFx(input: FxInput): Promise<FxState>;
+  };
+  /**
+   * The savings pot — a fixed slice of every payment received, held back from operating money.
+   * Entries accrue automatically on the API side whenever a payment reaches `success`; nothing
+   * here creates them. What this surface does is set the rate and record the one fact the system
+   * cannot observe: whether the cedis were actually moved.
+   */
+  savings: {
+    get(): Promise<SavingsState>;
+    /** Applies to money received from now on; entries already accrued keep their own rate. */
+    setRate(ratePercent: number): Promise<SavingsState>;
+    /** Tick one entry off as actually transferred to the savings account. */
+    move(id: string, note?: string | null): Promise<SavingsState>;
+    /** Undo a move — the transfer bounced, or it was ticked by mistake. */
+    unmove(id: string): Promise<SavingsState>;
+    /** One transfer covering every outstanding slice, which is the usual shape. */
+    moveAll(): Promise<SavingsState>;
   };
   settings: {
     /** The reminder calendar + the list of events that may be scheduled. */

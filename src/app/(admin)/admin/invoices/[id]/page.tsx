@@ -17,12 +17,22 @@ export default async function InvoiceDetailPage({
     throw e;
   });
 
-  const client = await api.clients.get(invoice.clientId).catch(() => null);
+  // The savings rate only drives the record-payment prompt, so a savings outage must not take
+  // the invoice page down with it.
+  const [client, savings] = await Promise.all([
+    api.clients.get(invoice.clientId).catch(() => null),
+    api.savings.get().catch(() => null),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <BackButton href="/admin/invoices" label="Invoices" />
-      <InvoiceDetail invoice={invoice} contacts={client?.contacts ?? []} clientName={client?.name ?? invoice.clientName} />
+      <InvoiceDetail
+        invoice={invoice}
+        contacts={client?.contacts ?? []}
+        clientName={client?.name ?? invoice.clientName}
+        savingsRate={savings?.ratePercent ?? 0}
+      />
     </div>
   );
 }

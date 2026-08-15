@@ -9,13 +9,19 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   });
-  const client = await api.clients.get(pkg.clientId).catch(() => null);
+  // The savings rate is only needed to tell the operator what a payment will hold back, so a
+  // savings outage must not take the package page down with it.
+  const [client, savings] = await Promise.all([
+    api.clients.get(pkg.clientId).catch(() => null),
+    api.savings.get().catch(() => null),
+  ]);
 
   return (
     <PackageDetail
       pkg={pkg}
       clientName={client?.name ?? "Unknown client"}
       contacts={client?.contacts ?? []}
+      savingsRate={savings?.ratePercent ?? 0}
     />
   );
 }

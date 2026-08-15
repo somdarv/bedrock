@@ -22,9 +22,17 @@ import {
   startGateOpen,
 } from "@/lib/payments";
 import { billPackage, recordPayment, type PaymentFormState } from "@/lib/packages/actions";
+import { setAsideNotice, setAsideOf } from "@/lib/savings/display";
 import { formatCedis } from "@/lib/utils";
 
-export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
+export function PaymentsSection({
+  pkg,
+  savingsRate,
+}: {
+  pkg: WorkPackage;
+  /** Percentage of each payment held back for savings. 0 = the feature is off. */
+  savingsRate: number;
+}) {
   const [recording, setRecording] = React.useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -46,9 +54,11 @@ export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
       ? { kind: (plan.rule === "full" ? "full" : "deposit") as PaymentKind, amount: plan.depositDue }
       : { kind: "final" as PaymentKind, amount: Math.max(bal, 0) };
 
-  function handleDone() {
+  function handleDone(paid: number) {
     setRecording(false);
-    toast("Payment recorded.", "success");
+    // Say what the money owes savings while the operator is still looking at it — that is the
+    // moment they can act on it, not whenever they next open the ledger.
+    toast(setAsideNotice(paid, savingsRate) ?? "Payment recorded.", "success");
     router.refresh();
   }
 
@@ -181,6 +191,7 @@ export function PaymentsSection({ pkg }: { pkg: WorkPackage }) {
         <RecordPaymentModal
           packageId={pkg.id}
           suggested={suggested}
+          savingsRate={savingsRate}
           onClose={() => setRecording(false)}
           onDone={handleDone}
         />
@@ -259,19 +270,24 @@ const initial: PaymentFormState = {};
 function RecordPaymentModal({
   packageId,
   suggested,
+  savingsRate,
   onClose,
   onDone,
 }: {
   packageId: string;
   suggested: { kind: PaymentKind; amount: number };
+  savingsRate: number;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (amount: number) => void;
 }) {
   const action = React.useMemo(() => recordPayment.bind(null, packageId), [packageId]);
   const [state, formAction, pending] = React.useActionState(action, initial);
+  // Tracked so the set-aside can be previewed against what is actually typed, before submitting.
+  const [amount, setAmount] = React.useState(String(suggested.amount || ""));
+  const slice = setAsideOf(Number(amount), savingsRate);
 
   React.useEffect(() => {
-    if (state.ok) onDone();
+    if (state.ok) onDone(state.amount ?? 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ok]);
 
@@ -290,7 +306,8 @@ function RecordPaymentModal({
             type="number"
             min={0}
             step="0.01"
-            defaultValue={suggested.amount || ""}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             required
           />
         </Field>
@@ -310,6 +327,13 @@ function RecordPaymentModal({
             ))}
           </Select>
         </Field>
+
+        {slice > 0 && (
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+            {formatCedis(slice)} of this goes to savings ({savingsRate}%). It is added to the
+            ledger automatically; move the money when you can.
+          </p>
+        )}
 
         {state.error && (
           <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{state.error}</p>
