@@ -15,10 +15,11 @@ export function DocumentFooter({ record }: { record: DocumentRecord }) {
   const ready = status === "ready" && prepared;
 
   return (
-    <div className="mt-10 flex items-end justify-between gap-6 border-t border-gray-300 pt-6">
-      <div className="text-xs text-gray-600">
+    // Stacks on a phone so the long document ID is not squeezed against the QR stamp.
+    <div className="mt-10 flex flex-col gap-6 border-t border-gray-300 pt-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 text-xs text-gray-600">
         <p>Approved by: {record.approver.name}</p>
-        <p className="mt-2 text-gray-500">Document ID: {record.id}</p>
+        <p className="mt-2 break-all text-gray-500">Document ID: {record.id}</p>
         <p className="text-gray-500">Generated on System: {record.system}</p>
         <p className="text-gray-500">
           Time: {ready ? prepared!.preparedAt : "— pending preparation —"}

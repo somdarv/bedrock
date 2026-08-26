@@ -9,9 +9,11 @@ import { DocumentFooter } from "./document-footer";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-6 border-b border-gray-100 py-3 text-base last:border-b-0">
+    // Stacks on a phone: several of these values are a full sentence of pricing, and
+    // squeezed into a right-hand column they wrap to three or four ragged lines.
+    <div className="flex flex-col gap-0.5 border-b border-gray-100 py-3 text-base last:border-b-0 sm:flex-row sm:justify-between sm:gap-6">
       <span className="text-gray-500">{label}</span>
-      <span className="text-right font-semibold text-gray-800">{value}</span>
+      <span className="font-semibold text-gray-800 sm:text-right">{value}</span>
     </div>
   );
 }
@@ -53,16 +55,17 @@ function OptionCard({
 }) {
   return (
     <div
-      className={`avoid-break mb-8 rounded-lg border p-6 ${
+      className={`avoid-break mb-8 rounded-lg border p-5 sm:p-6 ${
         featured ? "border-primary/30 bg-primary/5" : "border-gray-200 bg-white"
       }`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-6">
+      {/* Name above the price on a phone, side by side from small up. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <Eyebrow>{label}</Eyebrow>
           <p className="mt-2 text-2xl font-semibold leading-tight text-gray-900">{name}</p>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="sm:shrink-0 sm:text-right">
           <p className="text-3xl font-bold leading-none tabular-nums text-gray-900">{headline}</p>
           <p className="mt-1.5 text-sm text-gray-600">{sub}</p>
           <p className="mt-3 text-lg font-semibold tabular-nums text-primary">{recurring}</p>
@@ -128,9 +131,9 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       </p>
 
       {/* Letterhead */}
-      <div className="mb-8 flex items-start justify-between gap-6 rounded-lg bg-primary/10 p-6">
+      <div className="mb-8 flex flex-col gap-5 rounded-lg bg-primary/10 p-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
         <div>
-          <h1 className="mb-4 text-3xl font-semibold leading-none text-black">
+          <h1 className="mb-4 text-2xl font-semibold leading-tight text-black sm:text-3xl sm:leading-none">
             Saharabase Technologies
           </h1>
           <p className="text-sm text-gray-600">17 Alhaji Sulley Road,</p>
@@ -140,7 +143,8 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
           </p>
           <p className="mt-1 text-sm text-gray-600">www.saharabasetech.com</p>
         </div>
-        <div className="w-64 text-right">
+        {/* Full width and left-aligned on a phone; the fixed 16rem column only from small up. */}
+        <div className="w-full border-t border-primary/15 pt-4 sm:w-64 sm:border-0 sm:pt-0 sm:text-right">
           <h2 className="mb-2 whitespace-nowrap text-xl font-semibold text-gray-800">
             {record.type}
           </h2>
@@ -158,7 +162,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         <p className="mt-2 text-lg font-semibold text-gray-900">Shammah Preparatory School</p>
         <p className="text-base text-gray-600">Preparatory School, Tamale, Northern Region</p>
 
-        <div className="mt-4 rounded-lg border border-primary/10 bg-white p-5">
+        <div className="mt-4 rounded-lg border border-primary/10 bg-white p-4 sm:p-5">
           <DetailRow label="What we are offering" value="A computer system to run the school" />
           <DetailRow label="Option 1, Foundation" value="GHS 6,000 to build, GHS 2,000 a term" />
           <DetailRow label="Option 2, Complete" value="GHS 18,000 to build, GHS 4,000 a term" />
@@ -446,7 +450,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
           </Bullet>
         </ul>
 
-        <div className="mt-5 rounded-lg border border-primary/20 bg-white p-5">
+        <div className="mt-5 rounded-lg border border-primary/20 bg-white p-4 sm:p-5">
           <p className="text-sm font-semibold text-gray-900">You can buy it later if you want to</p>
           <p className="mt-1.5 text-base leading-7 text-gray-700">
             If you decide to own the system instead, we take a third of everything you have already
@@ -462,7 +466,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       </OptionCard>
 
       {/* Care plan explained */}
-      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-6">
+      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-5 sm:p-6">
         <Eyebrow>About The Care Plan</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
           Why there is still a termly fee on a system you own
@@ -502,7 +506,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       </div>
 
       {/* Which costs less */}
-      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-6">
+      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-5 sm:p-6">
         <Eyebrow>Which Costs Less</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
           Renting is cheaper at first. Buying is cheaper if you stay long enough
@@ -512,39 +516,40 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
           numbers, for a school of 300 pupils. Your own figures will differ.
         </p>
 
-        <div className="mt-4 overflow-hidden rounded border border-gray-200">
-          <table className="w-full text-sm">
+        {/* Scrolls sideways on a phone rather than crushing three money columns. */}
+        <div className="mt-4 overflow-x-auto rounded border border-gray-200">
+          <table className="w-full min-w-[420px] text-sm">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="px-4 py-2.5 font-semibold text-gray-700">Total paid by the end of</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Renting</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Buying</th>
+                <th className="px-3 py-2.5 sm:px-4 font-semibold text-gray-700">Total paid by the end of</th>
+                <th className="px-3 py-2.5 sm:px-4 text-right font-semibold text-gray-700">Renting</th>
+                <th className="px-3 py-2.5 sm:px-4 text-right font-semibold text-gray-700">Buying</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year 1</td>
-                <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
+                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 1</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
                   GHS 18,000
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 30,000</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 30,000</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year 2</td>
-                <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
+                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 2</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
                   GHS 36,000
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 42,000</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 42,000</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year 3</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 54,000</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 54,000</td>
+                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 3</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 54,000</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 54,000</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year 4</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 72,000</td>
-                <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
+                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 4</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 72,000</td>
+                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
                   GHS 66,000
                 </td>
               </tr>
@@ -592,7 +597,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       </div>
 
       {/* Moving up */}
-      <div className="avoid-break mb-10 rounded-lg bg-gray-50 p-6">
+      <div className="avoid-break mb-10 rounded-lg bg-gray-50 p-5 sm:p-6">
         <Eyebrow>Moving Up Later</Eyebrow>
         <p className="mt-2.5 text-base leading-8 text-gray-700">
           If you start on the Foundation and later want the Complete System, you pay the difference,
@@ -632,7 +637,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       </div>
 
       {/* Next steps */}
-      <div className="avoid-break mb-12 rounded-lg bg-primary/5 p-6">
+      <div className="avoid-break mb-12 rounded-lg bg-primary/5 p-5 sm:p-6">
         <Eyebrow>What Happens Next</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
           One meeting, then we start
@@ -642,9 +647,11 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
           office once and go through your classes, your fees, your report card and how you talk to
           parents today. That meeting costs nothing and it is what we build from.
         </p>
-        <p className="mt-4 text-base font-semibold text-gray-900">
-          059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584&nbsp;&nbsp;·&nbsp;&nbsp;contact@saharabasetech.com
-        </p>
+        <div className="mt-4 flex flex-col gap-1 text-base font-semibold text-gray-900 sm:flex-row sm:gap-4">
+          <span>059 212 3054</span>
+          <span>050 988 6584</span>
+          <span className="break-all">contact@saharabasetech.com</span>
+        </div>
       </div>
 
       {/* ── APPENDIX A ───────────────────────────────────────────── */}
