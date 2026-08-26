@@ -2,6 +2,7 @@ import type { DocumentRecord } from "@/lib/documents/registry";
 import { DeiGratiaFeeSchedule } from "./dei-gratia-fee-schedule";
 import { DropynFeeSchedule } from "./dropyn-fee-schedule";
 import { GreaterHeightsProposal } from "./greater-heights-proposal";
+import { ShammahSchoolMisProposal } from "./shammah-school-mis-proposal";
 import { ZenithFeeSchedule } from "./zenith-fee-schedule";
 import { ZenithSchoolProposal } from "./zenith-school-proposal";
 
@@ -16,6 +17,7 @@ const BODIES: Record<string, (record: DocumentRecord) => React.ReactNode> = {
   "SAH-BD-20260706-PRO-ZEN-54": (record) => <ZenithSchoolProposal record={record} />,
   "SAH-BD-20260709-BIL-ZEN-55": (record) => <ZenithFeeSchedule record={record} />,
   "SAH-BD-20260714-BIL-DEIG-56": (record) => <DeiGratiaFeeSchedule record={record} />,
+  "SAH-BD-20260826-PRO-SHM-57": (record) => <ShammahSchoolMisProposal record={record} />,
 };
 
 export function hasDocumentBody(id: string): boolean {
