@@ -99,25 +99,59 @@ function ControlBar({ filename }: { filename?: string }) {
   );
 }
 
+/** The client-facing bar: no issuing controls, just a way to save the PDF. */
+function ReadBar({ filename }: { filename?: string }) {
+  const print = () => {
+    if (filename) {
+      const prev = document.title;
+      document.title = filename;
+      window.print();
+      setTimeout(() => (document.title = prev), 500);
+    } else {
+      window.print();
+    }
+  };
+
+  return (
+    <div className="no-print mx-auto mb-4 flex max-w-[8.27in] items-center justify-end">
+      <button
+        onClick={print}
+        className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+      >
+        <DownloadIcon />
+        Download PDF
+      </button>
+    </div>
+  );
+}
+
 /**
- * Print scaffolding shared by every document. Provides the prepare/download gate and
- * renders the authored body inside an A4 `.doc-sheet`. Download = native print → PDF.
+ * Print scaffolding shared by every document. Renders the authored body inside an A4
+ * `.doc-sheet`. Download = native print → PDF.
+ *
+ * Two modes, because the same document has two audiences. `issue` is ours: the
+ * prepare/download gate and the stamping checklist. `read` is the client's: the
+ * document and a download button, nothing else. A recipient should never be shown
+ * "Prepare document" — it is our internal action, it mints the verification serial,
+ * and the endpoint behind it is currently unauthenticated.
  */
 export function DocumentFrame({
   documentId,
   initialPrepared = null,
   children,
   filename,
+  mode = "issue",
 }: {
   documentId: string;
   initialPrepared?: PreparedDocument | null;
   children: React.ReactNode;
   filename?: string;
+  mode?: "issue" | "read";
 }) {
   return (
     <DocumentProvider documentId={documentId} initialPrepared={initialPrepared}>
       <div className="doc-page">
-        <ControlBar filename={filename} />
+        {mode === "read" ? <ReadBar filename={filename} /> : <ControlBar filename={filename} />}
         <div className="doc-sheet">{children}</div>
       </div>
     </DocumentProvider>
