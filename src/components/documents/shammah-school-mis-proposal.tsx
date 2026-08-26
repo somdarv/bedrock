@@ -1,4 +1,10 @@
 import { VERIFY_BASE_URL, type DocumentRecord } from "@/lib/documents/registry";
+import {
+  completeAddsList,
+  countIn,
+  foundationList,
+  type PackageListSection,
+} from "@/lib/school-mis/packages";
 import { DocumentFooter } from "./document-footer";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -22,30 +28,6 @@ function Bullet({ children }: { children: React.ReactNode }) {
       <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
       <span>{children}</span>
     </li>
-  );
-}
-
-function MiniBullet({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex gap-2.5 text-sm leading-6 text-gray-600">
-      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-gray-400" />
-      <span>{children}</span>
-    </li>
-  );
-}
-
-/** A lead point: soft number badge, warm title, short line. */
-function LeadPoint({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <div className="avoid-break flex gap-4 py-4">
-      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-semibold tabular-nums text-primary">
-        {n}
-      </span>
-      <div>
-        <p className="text-lg font-semibold text-gray-900">{title}</p>
-        <p className="mt-1 text-base leading-7 text-gray-600">{children}</p>
-      </div>
-    </div>
   );
 }
 
@@ -92,23 +74,53 @@ function OptionCard({
   );
 }
 
+/** The appendix lists. Generated from the catalogue so they cannot drift from what we build. */
+function FeatureList({ sections }: { sections: PackageListSection[] }) {
+  return (
+    <div className="mt-5 space-y-5">
+      {sections.map((section) => (
+        <div key={section.name} className="avoid-break">
+          <p className="text-sm font-semibold text-gray-900">{section.name}</p>
+          <ul className="mt-1.5 space-y-1">
+            {section.items.map((item) => (
+              <li key={item} className="flex gap-2 text-[13px] leading-5 text-gray-600">
+                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
- * Shammah Preparatory School, School Management System proposal.
+ * Shammah Preparatory School, school management system proposal.
  *
- * Three ways to take the same system, deliberately: a Foundation build at GHS 6,000
- * that runs the school from day one, the Complete system bought outright at GHS 18,000,
- * and the Complete system rented at GHS 15 per pupil per term with no build fee at all.
+ * Three ways to take one system: a GHS 6,000 Foundation build with GHS 2,000 a term,
+ * the Complete system bought at GHS 18,000 with GHS 4,000 a term, or the Complete
+ * system rented at GHS 20 a pupil a term with no build fee at all.
  *
- * Two decisions worth remembering. Care is billed **per term, not per month**, because a
- * school receives money three times a year and is empty in August. And the rented option
- * is metered **per pupil only, never per staff member** — metering staff would push the
- * school to keep teachers out of the system, which would kill attendance, payroll,
- * teaching load and appraisals. Never meter what you want them to use more of.
+ * Decisions worth remembering, because each one was reached the hard way:
  *
- * Bespoke body authored locally; system metadata (ID, dates, system, timestamp, verify QR)
- * is driven by the registry record so it stays in sync with what /verify/{id} confirms.
+ *  - Care is billed per term, never per month. A school receives money three times a
+ *    year and is empty through August, so monthly billing means chasing during vacation.
+ *  - The rental meters pupils only, never staff. Charging per staff member would push
+ *    the school to keep teachers off the system, killing attendance, payroll and leave.
+ *  - The buy-out credits ONE THIRD of what has been paid, not all of it. At full credit
+ *    a renting school owns the system outright inside a year and the rental collapses.
+ *  - No figure in here estimates anything about this school. We have not been told its
+ *    enrolment, so the only worked example is explicitly a round-number illustration.
+ *
+ * Language is deliberately plain: short sentences, no jargon, nothing a proprietor
+ * would need explained. The appendix lists are generated from the feature catalogue
+ * (lib/school-mis/packages.ts) so the list the school reads is the list we build from.
  */
 export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord }) {
+  const foundation = foundationList();
+  const completeAdds = completeAddsList();
+
   return (
     <>
       <p className="my-2 break-all text-[10px] tracking-wide text-gray-400">
@@ -147,77 +159,62 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         <p className="text-base text-gray-600">Preparatory School, Tamale, Northern Region</p>
 
         <div className="mt-4 rounded-lg border border-primary/10 bg-white p-5">
-          <DetailRow label="What we propose" value="A school management system, built for the school" />
-          <DetailRow label="Foundation build" value="GHS 6,000, one time" />
-          <DetailRow label="Foundation care plan" value="GHS 2,000 per term" />
-          <DetailRow label="Complete system, bought" value="GHS 18,000 build, GHS 4,000 per term" />
-          <DetailRow label="Complete system, rented" value="No build fee, GHS 15 per pupil per term" />
-          <DetailRow label="This offer holds" value="21 days from the issue date above" />
+          <DetailRow label="What we are offering" value="A computer system to run the school" />
+          <DetailRow label="Option 1, Foundation" value="GHS 6,000 to build, GHS 2,000 a term" />
+          <DetailRow label="Option 2, Complete" value="GHS 18,000 to build, GHS 4,000 a term" />
+          <DetailRow label="Option 3, Complete, rented" value="Nothing to build, GHS 20 a pupil a term" />
+          <DetailRow label="This offer holds for" value="21 days from the date above" />
         </div>
       </div>
 
       {/* Opening */}
       <div className="mb-10">
         <p className="text-base leading-8 text-gray-700">
-          Shammah Preparatory School already runs well. What is changing is the JHS. That means a
-          second set of subjects, a second report card format, a second fee structure, and in three
-          years a first BECE cohort. All of it on the same children, who must carry one record from
-          KG through to the day they leave.
+          Shammah Preparatory School is opening a JHS. That means new subjects, a new report card,
+          a new fee structure, and in three years your first BECE class.
         </p>
         <p className="mt-4 text-base leading-8 text-gray-700">
-          That is the moment a paper system stops holding. Not because anyone is doing it badly, but
-          because the same pupil now exists in more registers, more mark sheets and more fee books
-          than one office can reconcile by hand at the end of every term.
+          It also means the same child now appears in more registers, more mark sheets and more fee
+          books than one office can check by hand at the end of every term. That is not anybody
+          doing the job badly. It is simply what happens when a school grows.
         </p>
         <p className="mt-4 text-base leading-8 text-gray-700">
-          We would like to build you the system that carries it. Below are three ways to take it,
-          priced so that the school can start at a level it is comfortable with and move up when it
-          chooses to.
+          We would like to build you the system that carries it. There are three ways to take it.
+          Pick the one that suits the school now. You can always move up later.
         </p>
       </div>
 
-      {/* What the system rests on */}
+      {/* Promises */}
       <div className="mb-10">
-        <Eyebrow>What The System Rests On</Eyebrow>
+        <Eyebrow>Four Promises</Eyebrow>
         <h3 className="mt-2 text-2xl font-semibold leading-snug text-gray-900">
-          Four commitments, whichever option you choose
+          True whichever option you pick
         </h3>
-        <div className="mt-2 divide-y divide-gray-100">
-          <LeadPoint n={1} title="One record, one lifetime">
-            A pupil is created once at application and the same record carries them through every
-            class, term, payment and report card, out to graduation or transfer. Basic 6 becomes JHS
-            1 without a re-admission: same ID, same file. Nothing is re-keyed and nothing is
-            orphaned.
-          </LeadPoint>
-          <LeadPoint n={2} title="No structural limits, and no structural billing">
-            The school defines its own sections, levels and classes without limit. Preschool,
-            Primary, the new JHS, and anything you add in ten years. Opening the JHS is a
-            configuration change you make yourself, not something you buy from us.
-          </LeadPoint>
-          <LeadPoint n={3} title="Built for Tamale, not for a brochure">
-            A dropped connection never loses a save. The register is marked in under a minute. Every
-            printed report follows GES practice, with SBA continuous assessment, familiar terminal
-            report formats, Mobile Money, SSNIT and PAYE, and compliance with the Data Protection
-            Act, 2012 (Act 843).
-          </LeadPoint>
-          <LeadPoint n={4} title="The school owns its data, always">
-            Every record can be exported in full, at any time, without asking us. That is true on
-            the day you start and on the day you might leave.
-          </LeadPoint>
-        </div>
+        <ul className="mt-4 space-y-3">
+          <Bullet>
+            <strong>A child is entered once.</strong> From the day they apply to the day they
+            leave, it is the same file. Basic 6 becomes JHS 1 with the same number and the same
+            record. Nobody types anything twice.
+          </Bullet>
+          <Bullet>
+            <strong>No limits, and no extra charge for growing.</strong> Add as many sections,
+            classes and streams as you want. Opening the JHS is something you do yourself. You do
+            not buy it from us.
+          </Bullet>
+          <Bullet>
+            <strong>It works here.</strong> If the network drops, nothing you typed is lost. A
+            register is marked in under a minute. Report cards come out the way GES expects them.
+          </Bullet>
+          <Bullet>
+            <strong>Your records are yours.</strong> You can download everything, any day, without
+            asking us. That is true on your first day and on your last.
+          </Bullet>
+        </ul>
       </div>
 
       {/* THE OPTIONS */}
       <div className="mb-6">
-        <Eyebrow>The Three Ways To Take It</Eyebrow>
-        <h3 className="mt-2 text-2xl font-semibold leading-snug text-gray-900">
-          Start where you are comfortable
-        </h3>
-        <p className="mt-3 text-base leading-8 text-gray-700">
-          The same system underneath, offered three ways. Option one is a complete, working school
-          system at a price a school can decide on this term. Option two is everything we build.
-          Option three is everything we build, with nothing to pay for the build at all.
-        </p>
+        <Eyebrow>The Three Options</Eyebrow>
       </div>
 
       {/* Option 1 */}
@@ -225,117 +222,85 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         label="Option One"
         name="The Foundation"
         headline="GHS 6,000"
-        sub="one time, to build"
+        sub="once, to build it"
         recurring="GHS 2,000"
-        recurringNote="per term thereafter"
+        recurringNote="a term after that"
       >
         <p className="text-base leading-7 text-gray-700">
-          Everything needed to run Shammah from the first day of next term, including the JHS. This
-          is not a trial or a cut-down version. It is a whole school system.
+          Enough to run the whole school from the first day of next term, JHS included. This is not
+          a trial or a small version. It is a working school system.
         </p>
         <ul className="mt-4 space-y-2">
           <Bullet>
-            <strong>Pupils and guardians.</strong> One file per child holding biodata, photograph,
-            enrolment history across every year, documents, emergency contacts and authorised
-            pick-up persons, and a critical medical alert for allergies and conditions staff must
-            know about. Several guardians per child, with the primary contact, the fee payer and the
-            emergency contact allowed to be three different people.
+            <strong>Pupils.</strong> One file per child. Photo, details, every class they have been
+            in, their documents, who to call in an emergency, who is allowed to collect them, and a
+            warning note for any allergy or condition staff must know about.
           </Bullet>
           <Bullet>
-            <strong>Admissions to enrolment.</strong> Online or paper application, document upload,
-            and one-click conversion of an applicant into a pupil carrying every field forward.
-            Admission numbers generated automatically in your own format.
+            <strong>Parents.</strong> More than one guardian per child. The person you call, the
+            person who pays, and the person to reach in an emergency can be three different people.
           </Bullet>
           <Bullet>
-            <strong>Classes, subjects and the calendar.</strong> Unlimited sections, levels and
-            streams. Subjects mapped per level so JHS subjects differ from Primary automatically.
-            Period structures that differ between Creche and JHS. A full three-term calendar.
+            <strong>Admissions.</strong> Apply online or on paper. One click turns an applicant
+            into a pupil, carrying everything across. Admission numbers are created for you.
           </Bullet>
           <Bullet>
-            <strong>Attendance.</strong> A class register marked in under a minute, with the term
-            percentage carried onto the report card by itself.
+            <strong>Classes and the calendar.</strong> Your sections, levels, streams and subjects,
+            set up your way. JHS subjects are different from Primary automatically. A full
+            three-term calendar.
           </Bullet>
           <Bullet>
-            <strong>Assessment and report cards.</strong> SBA continuous assessment plus end-of-term
-            examination with your own weightings. Automatic totals, averages, grades and positions.
-            Terminal report cards on your letterhead with both teachers&rsquo; remarks, attendance,
-            position, the reopening date and the fee balance. Bulk printing for a whole class, and a
-            broadsheet for the head teacher.
+            <strong>Attendance.</strong> Mark a class in under a minute. The term percentage goes
+            onto the report card by itself.
           </Bullet>
           <Bullet>
-            <strong>Fees.</strong> Fee structures per level per term with unlimited items, automatic
-            termly billing that carries arrears forward, payments recorded by cash, Mobile Money,
-            bank transfer, cheque or POS, receipts with numbers that can never be reused, per-pupil
-            statements, a debtors list by class, and one consolidated balance for a family with
-            several children.
+            <strong>Marks and report cards.</strong> Class work and exams with your own weightings.
+            Totals, averages, grades and positions worked out for you. Report cards on your
+            letterhead with both teachers&rsquo; remarks, attendance, position, the reopening date
+            and the fee balance. Print a whole class at once.
           </Bullet>
           <Bullet>
-            <strong>Parent communication.</strong> Bulk SMS to the whole school, a section, a class,
-            or a filtered group such as every debtor. Individual messages logged against the
-            pupil&rsquo;s file, saved templates, and a full communication history.
+            <strong>Fees.</strong> Your fee structure per class per term. Bills go out
+            automatically and last term&rsquo;s balance carries forward. Record cash, Mobile Money,
+            bank, cheque or POS. Receipts with numbers that cannot be reused. A debtors list by
+            class. One total for a family with several children.
           </Bullet>
           <Bullet>
-            <strong>Staff.</strong> Full staff records, roles, contracts, bank and MoMo details,
-            class and subject assignments, teaching load, and daily staff attendance.
+            <strong>Messages to parents.</strong> Send SMS to the whole school, one class, or just
+            the parents who owe. Every message is saved on the child&rsquo;s file.
           </Bullet>
           <Bullet>
-            <strong>Behaviour and exit.</strong> An incident log, a conduct summary on reports and
-            leaving certificates, transfer letters, testimonials, and end-of-year bulk promotion,
-            repetition and graduation.
+            <strong>Staff.</strong> Staff records, roles, contracts, bank details, who teaches what,
+            and daily staff attendance.
           </Bullet>
           <Bullet>
-            <strong>Control and safety.</strong> Separate accounts for the Proprietor, Head Teacher,
-            Class Teachers, the Accountant and the Front Desk, with permissions so an accountant
-            cannot edit marks and a teacher cannot see salaries. Automated encrypted backups. An
-            immutable financial log where a payment can be voided with a reason but never silently
-            deleted.
+            <strong>Timetable.</strong> Build it and the system warns you if a teacher or room is
+            booked twice. Print it for each class and each teacher.
           </Bullet>
-        </ul>
-
-        <p className="mt-5 text-base font-semibold text-gray-900">Also included at this level</p>
-        <ul className="mt-2 space-y-1.5">
-          <MiniBullet>
-            Timetable builder with clash detection, so no teacher or room is double-booked, plus
-            per-class, per-teacher and whole-school printable timetables.
-          </MiniBullet>
-          <MiniBullet>
-            Curriculum tagging, so KG to Basic 6 follows the Standards-Based Curriculum and JHS
-            follows the Common Core Programme, and report formats follow the level automatically.
-          </MiniBullet>
-          <MiniBullet>Subject and period attendance for the JHS.</MiniBullet>
-          <MiniBullet>Mid-term and mock examination cycles.</MiniBullet>
-          <MiniBullet>
-            Report card release control, so the head teacher approves before parents see anything.
-          </MiniBullet>
-          <MiniBullet>
-            A cumulative transcript covering a pupil&rsquo;s entire time at the school.
-          </MiniBullet>
-          <MiniBullet>
-            Preschool developmental checklists instead of marks, for the youngest classes.
-          </MiniBullet>
-          <MiniBullet>
-            SMS delivery reports, automated fee reminders and report-card-ready alerts.
-          </MiniBullet>
-          <MiniBullet>Fee ageing analysis and printable class and contact lists.</MiniBullet>
-          <MiniBullet>
-            Cloning a whole year&rsquo;s structure into the next year in a single action.
-          </MiniBullet>
-          <MiniBullet>
-            Data Protection Act alignment, session timeouts and login history.
-          </MiniBullet>
+          <Bullet>
+            <strong>Who sees what.</strong> Separate logins for you, the head teacher, teachers, the
+            accountant and the front desk. The accountant cannot change marks. A teacher cannot see
+            salaries. Backups run on their own.
+          </Bullet>
         </ul>
 
         <div className="mt-5 rounded border border-gray-200 bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-900">
-            The GHS 6,000 also covers the work around the software
-          </p>
+          <p className="text-sm font-semibold text-gray-900">The GHS 6,000 also covers</p>
           <p className="mt-1.5 text-sm leading-6 text-gray-600">
-            Moving your existing pupil, staff and fee records off the current registers and
-            spreadsheets, setting up your sections, levels, classes, subjects and fee structures,
-            loading your letterhead, stamp and signature, and training your staff until they are
-            using it without us in the room.
+            Moving your current pupil, staff and fee records into the system. Setting up your
+            classes, subjects and fees. Putting your letterhead, stamp and signature in. Training
+            your staff until they can use it without us in the room.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            <strong className="text-gray-900">Hosting is separate on this option.</strong> The
+            system runs on a computer online, and that costs a small amount each year. We set it up
+            for you and you pay for it directly, at cost. We do not add anything on top.
           </p>
         </div>
+
+        <p className="mt-4 text-sm text-gray-500">
+          The full list of everything in the Foundation is at the end of this document.
+        </p>
       </OptionCard>
 
       {/* Option 2 */}
@@ -343,95 +308,88 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         label="Option Two"
         name="The Complete System"
         headline="GHS 18,000"
-        sub="one time, to build"
+        sub="once, to build it"
         recurring="GHS 4,000"
-        recurringNote="per term thereafter"
+        recurringNote="a term after that"
       >
         <p className="text-base leading-7 text-gray-700">
-          Everything in the Foundation, and everything else we build. Bought outright, so the system
-          is yours.
+          Everything in the Foundation, plus everything else we build. It costs more because there
+          is a lot more in it, and several parts of it connect to outside services like the mobile
+          money networks. Hosting is included in the termly fee, so there is nothing else to pay.
         </p>
         <ul className="mt-4 space-y-2">
           <Bullet>
-            <strong>Mobile Money, integrated.</strong> MTN MoMo, Telecel Cash and AT Money matched
-            automatically to a pupil&rsquo;s account by payment reference, so the office stops
-            reconciling by hand.
+            <strong>Mobile Money, connected.</strong> MTN, Telecel and AT payments land against the
+            right child on their own. The office stops matching payments by hand.
           </Bullet>
           <Bullet>
-            <strong>A parent portal and app.</strong> One login for a parent covering every one of
-            their children across every level. Attendance, results, fee balance, pay online,
-            download report cards. Two-way messages landing in a staff inbox, and parent-teacher
-            meeting booking.
+            <strong>A parent app.</strong> One login per parent covering all their children.
+            Attendance, results, fee balance, pay online, download report cards. Parents can reply,
+            and replies land in a staff inbox.
           </Bullet>
           <Bullet>
-            <strong>WhatsApp.</strong> Notices, reminders and report card alerts delivered on
-            WhatsApp Business, alongside SMS rather than instead of it.
+            <strong>WhatsApp.</strong> Send notices and reminders on WhatsApp as well as SMS.
           </Bullet>
           <Bullet>
-            <strong>Fees, in full.</strong> Sibling, staff-child and bursary discounts with a reason
-            and an approver, agreed instalment plans per family, printable family statements, and
-            bank deposit reconciliation.
+            <strong>More on fees.</strong> Discounts for siblings, staff children and bursaries,
+            with a reason and who approved it. Agreed payment plans for a family. A printed
+            statement covering all a parent&rsquo;s children. Bank slips matched up.
           </Bullet>
           <Bullet>
-            <strong>The books.</strong> Expenses, petty cash with float and retirement, suppliers
-            and payables, requisitions and approvals, budgets against actuals, cash book, and an
-            income statement, balance sheet and cash flow for the board.
+            <strong>Money going out.</strong> Expenses, petty cash, suppliers, requests and
+            approvals, budgets against what was actually spent, and accounts for the board.
           </Bullet>
           <Bullet>
-            <strong>Payroll, properly.</strong> SSNIT Tier 1 and 2 and PAYE on current GRA bands,
-            salary advances recovered automatically, payroll posted to expenses, and a bulk bank or
-            MoMo payment file.
+            <strong>Payroll.</strong> Payslips, SSNIT, PAYE worked out on current GRA rates, salary
+            advances recovered automatically, and a single file to pay everyone at once.
           </Bullet>
           <Bullet>
-            <strong>The road to BECE.</strong> The candidate register with index numbers, subject
-            entries and photographs, continuous assessment portfolios, predicted grades and
-            intervention flags, BECE results captured against the alumni record, and SHS placement
-            tracking.
+            <strong>BECE.</strong> The candidate register with index numbers, subjects and photos.
+            Results recorded afterwards. SHS placement tracked.
           </Bullet>
           <Bullet>
-            <strong>Automatic repetition candidates.</strong> Set your promotion criteria and the
-            system flags the pupils who fall below them at year end. The head teacher confirms,
-            overrides or clears each one. The system never repeats a child by itself.
+            <strong>Who should repeat.</strong> Set your own pass rules and the system shows you
+            which children fall below them at year end. The head teacher decides. The system never
+            repeats a child by itself.
           </Bullet>
           <Bullet>
-            <strong>Attendance that reaches the parent.</strong> Automatic SMS on an unexplained
-            absence, chronic absence pattern flags, and card or biometric check-in at the gate with
-            arrival and departure messages.
+            <strong>Absence messages.</strong> A parent gets an SMS the same morning their child is
+            absent without a reason. The system also flags children who are absent too often.
           </Bullet>
           <Bullet>
-            <strong>Welfare and safeguarding.</strong> Full health records, special needs plans, the
-            sick bay and medication log, merits alongside sanctions, custody restrictions enforced
-            at pick-up, and safeguarding flags with tightly controlled visibility.
+            <strong>At the gate.</strong> Card or fingerprint check-in, with a message to the parent
+            when the child arrives and leaves.
           </Bullet>
           <Bullet>
-            <strong>Staff, in full.</strong> Qualifications, NTC licences, document collection,
-            onboarding checklists, leave with approvals and balances, duty rosters, appraisals,
-            lesson observation, CPD records and recruitment.
+            <strong>Health and welfare.</strong> Full health records, special needs plans, the sick
+            bay book, medicine given with parent consent, good conduct recorded as well as bad, and
+            custody rules enforced at pick-up.
           </Bullet>
           <Bullet>
-            <strong>Teaching operations.</strong> Extra and vacation classes enrolled and billed
-            separately from term fees, automatic substitute cover listing the day&rsquo;s affected
-            periods, and lesson plan approval.
+            <strong>More on staff.</strong> Certificates, licences, leave requests and approvals,
+            duty rosters, appraisals, lesson observation, and hiring.
           </Bullet>
           <Bullet>
-            <strong>The library.</strong> Book catalogue, issue and return, termly textbook issue
-            and vacation return, overdue reminders, and fines that land on the fee account.
+            <strong>Extra classes.</strong> Run and charge for after-school and vacation classes
+            separately from term fees. Arrange cover when a teacher is absent.
           </Bullet>
           <Bullet>
-            <strong>Insight.</strong> Year-on-year enrolment trends, teacher and subject performance
-            across terms, attendance analytics, board financial summaries, a custom report builder,
-            and a dashboard on the proprietor&rsquo;s phone.
+            <strong>The library.</strong> Books in and out, textbooks issued each term and returned
+            at vacation, and fines that go onto the fee account.
           </Bullet>
           <Bullet>
-            <strong>Control.</strong> A full audit trail viewer showing who changed which field and
-            when, with before and after values, two-factor authentication on finance, custom fields
-            you add yourself, and support for a second campus.
+            <strong>Reports for you.</strong> Enrolment year on year, how classes and teachers are
+            performing, attendance patterns, money summaries for the board, and a dashboard on your
+            phone.
           </Bullet>
           <Bullet>
-            <strong>Works with no network at all.</strong> Registers marked and marks entered
-            offline, syncing when the connection returns. Offline fee collection on one designated
-            device holding a reserved block of receipt numbers, so two receipts can never share a
-            number.
+            <strong>Extra safety.</strong> A record of who changed what and when. An extra code on
+            top of the password for anyone touching money.
+          </Bullet>
+          <Bullet>
+            <strong>Works with no network.</strong> Mark registers and enter marks with no internet
+            at all. It catches up when the connection returns. Fees can also be collected offline on
+            one chosen device.
           </Bullet>
         </ul>
       </OptionCard>
@@ -440,93 +398,118 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
       <OptionCard
         label="Option Three"
         name="The Complete System, Rented"
-        headline="No build fee"
-        sub="nothing to pay to start"
-        recurring="GHS 15"
-        recurringNote="per pupil, per term"
+        headline="GHS 20"
+        sub="per pupil, per term"
+        recurring="Nothing"
+        recurringNote="to build, and no hosting fee"
         featured
       >
         <p className="text-base leading-7 text-gray-700">
-          Exactly the Complete System described above, with every advanced feature. We carry the
-          entire cost of building it and of the infrastructure it runs on. The school pays nothing
-          for the build, and instead pays one termly subscription based on how many pupils are
-          actually enrolled.
+          The same Complete System described above, with nothing left out. We pay for building it
+          and we pay for keeping it running. The school pays nothing to start and instead pays once
+          a term, based on how many pupils are actually in the school.
         </p>
 
+        <ul className="mt-4 space-y-2">
+          <Bullet>
+            <strong>You pay GHS 20 for each pupil, each term.</strong> If pupil numbers go down, the
+            bill goes down. There is a minimum of GHS 3,500 a term, so the bill never falls below
+            that.
+          </Bullet>
+          <Bullet>
+            <strong>Staff are free.</strong> We only count pupils. Put every teacher, cleaner and
+            driver on the system. It does not change your bill.
+          </Bullet>
+          <Bullet>
+            <strong>Everything is included.</strong> Every feature, hosting, backups, support,
+            training and every update we make. There is no care plan on top. The termly fee is the
+            only bill.
+          </Bullet>
+          <Bullet>
+            <strong>How we count.</strong> The number we charge for is the number of pupils in the
+            system on the Friday of the third week of term, after new admissions and withdrawals
+            have settled. Neither of us guesses it.
+          </Bullet>
+          <Bullet>
+            <strong>A commitment fee of GHS 3,000 to start.</strong> This is not an extra charge. It
+            comes off your first termly payments. We ask for it because we are spending our own
+            money to build the system before you have paid anything.
+          </Bullet>
+          <Bullet>
+            <strong>Two school years to begin with.</strong> The school stays for six terms. After
+            that you are free to stop at the end of any term, with nothing to pay. We ask for six
+            terms because we paid for the build and need enough time to earn it back.
+          </Bullet>
+          <Bullet>
+            <strong>Your records stay yours.</strong> You can download everything at any time. The
+            system itself stays ours, and you use it for as long as you are paying.
+          </Bullet>
+        </ul>
+
         <div className="mt-5 rounded-lg border border-primary/20 bg-white p-5">
-          <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">
-            At today&rsquo;s enrolment
+          <p className="text-sm font-semibold text-gray-900">You can buy it later if you want to</p>
+          <p className="mt-1.5 text-base leading-7 text-gray-700">
+            If you decide to own the system instead, we take a third of everything you have already
+            paid off the GHS 18,000 price.
           </p>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <p className="text-3xl font-bold leading-none tabular-nums text-gray-900">
-                GHS 6,300
-              </p>
-              <p className="mt-1.5 text-sm text-gray-600">
-                per term, at 420 pupils. GHS 18,900 across the school year.
-              </p>
-            </div>
-            <p className="max-w-xs text-sm leading-6 text-gray-600">
-              That is roughly <strong className="text-gray-900">2% of the fees</strong> the school
-              already collects each term, and nothing at all to begin.
-            </p>
-          </div>
+          <p className="mt-3 text-base leading-7 text-gray-700">
+            <strong>An example, using round numbers.</strong> Say a school has 300 pupils, so it
+            pays GHS 6,000 a term. After three terms it has paid GHS 18,000. A third of that is GHS
+            6,000. So the price to buy the system drops from GHS 18,000 to GHS 12,000, and after
+            that there is no more termly rent, only the GHS 4,000 a term care plan.
+          </p>
         </div>
-
-        <p className="mt-5 text-base font-semibold text-gray-900">What the subscription covers</p>
-        <ul className="mt-2 space-y-1.5">
-          <MiniBullet>Every feature in the Complete System, with nothing held back.</MiniBullet>
-          <MiniBullet>
-            Hosting, encrypted backups, security, and every update we release, at no extra charge.
-          </MiniBullet>
-          <MiniBullet>
-            Support for your staff, and the statutory changes that arrive each year, such as new GRA
-            bands.
-          </MiniBullet>
-          <MiniBullet>
-            <strong>Unlimited staff accounts.</strong> We charge per pupil only. Teachers,
-            non-teaching staff and management are never counted, so nothing discourages the school
-            from putting every member of staff on the system.
-          </MiniBullet>
-          <MiniBullet>
-            No care plan on top. The subscription is the only recurring figure.
-          </MiniBullet>
-        </ul>
-
-        <p className="mt-5 text-base font-semibold text-gray-900">How the count is taken</p>
-        <ul className="mt-2 space-y-1.5">
-          <MiniBullet>
-            The billed figure is the number of <strong>active pupils the system itself records</strong>{" "}
-            on the Friday of week three of each term, once admissions have settled and withdrawals
-            have cleared. Neither party estimates it, and it is never in dispute.
-          </MiniBullet>
-          <MiniBullet>
-            A minimum of GHS 3,500 per term applies, whatever the enrolment.
-          </MiniBullet>
-          <MiniBullet>
-            The rental runs for a minimum of six terms, being two academic years, after which it
-            continues term by term.
-          </MiniBullet>
-          <MiniBullet>
-            The school owns its data throughout and can export all of it at any moment. The software
-            itself remains ours and is licensed to the school for as long as the subscription runs.
-          </MiniBullet>
-          <MiniBullet>
-            At any point the school may buy the system outright, and every subscription payment
-            already made is credited in full against the GHS 18,000 build fee.
-          </MiniBullet>
-        </ul>
       </OptionCard>
 
-      {/* Honest comparison */}
+      {/* Care plan explained */}
+      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-6">
+        <Eyebrow>About The Care Plan</Eyebrow>
+        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
+          Why there is still a termly fee on a system you own
+        </h3>
+        <p className="mt-3 text-base leading-8 text-gray-700">
+          It is a fair question, so here is the plain answer.
+        </p>
+        <p className="mt-3 text-base leading-8 text-gray-700">
+          <strong>Anything we get wrong, we fix free, for as long as you use the system.</strong>{" "}
+          That is not what the care plan is for. The care plan is for the things that are nobody&rsquo;s
+          mistake.
+        </p>
+        <ul className="mt-4 space-y-2">
+          <Bullet>
+            <strong>The rules change.</strong> GRA changes tax rates. GES changes the report card.
+            SSNIT changes its percentages. Every year something moves, and somebody has to do that
+            work so your system keeps up.
+          </Bullet>
+          <Bullet>
+            <strong>The school changes.</strong> A new fee item. A new class. A new accountant who
+            needs training. A teacher who forgets her password in the middle of exams week.
+          </Bullet>
+          <Bullet>
+            <strong>It has to keep running.</strong> The system sits on a computer online, backed up
+            every day and kept secure. That costs money every single month, whether anyone touches
+            it or not.
+          </Bullet>
+          <Bullet>
+            <strong>Small changes you ask for.</strong> A new report layout, a new user, a small
+            adjustment to how something works. These are included rather than quoted for one by one.
+          </Bullet>
+        </ul>
+        <p className="mt-4 text-base leading-8 text-gray-700">
+          The simplest way to think about it: you can buy a school bus outright and the bus is
+          yours. You still pay for fuel, servicing and a driver.
+        </p>
+      </div>
+
+      {/* Which costs less */}
       <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-6">
         <Eyebrow>Which Costs Less</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          Renting is cheaper for about two and a half years. After that, owning is
+          Renting is cheaper at first. Buying is cheaper if you stay long enough
         </h3>
-        <p className="mt-3 text-base leading-7 text-gray-700">
-          We would rather say this plainly than have you work it out later. Comparing the Complete
-          System bought against the Complete System rented, at 420 pupils:
+        <p className="mt-3 text-base leading-8 text-gray-700">
+          We would rather say this than have you work it out afterwards. Here it is with round
+          numbers, for a school of 300 pupils. Your own figures will differ.
         </p>
 
         <div className="mt-4 overflow-hidden rounded border border-gray-200">
@@ -534,80 +517,88 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-4 py-2.5 font-semibold text-gray-700">Total paid by the end of</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Rented</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Bought</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Renting</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">Buying</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year one</td>
+                <td className="px-4 py-2.5 text-gray-600">Year 1</td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 18,900
+                  GHS 18,000
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 30,000</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year two</td>
+                <td className="px-4 py-2.5 text-gray-600">Year 2</td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 37,800
+                  GHS 36,000
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 42,000</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 text-gray-600">Year three</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 56,700</td>
+                <td className="px-4 py-2.5 text-gray-600">Year 3</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 54,000</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 54,000</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2.5 text-gray-600">Year 4</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">GHS 72,000</td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 54,000
+                  GHS 66,000
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <p className="mt-4 text-base leading-7 text-gray-700">
-          If the school can find GHS 18,000 now and intends to keep the system for many years,
-          buying wins in the end. If it would rather keep that money in the school and start
-          immediately, renting costs less for the first two and a half years and asks for nothing up
-          front. Note also that the rented figure rises as the school grows: at 700 pupils it would
-          be GHS 10,500 a term. That is the honest trade, and it is why the buy-out credit above
-          exists.
+        <p className="mt-4 text-base leading-8 text-gray-700">
+          At that size the two come level after three years. Before then renting costs less and asks
+          for nothing up front. After then buying costs less. Remember also that the rent follows
+          your numbers: if the school grows, the rent grows with it.
         </p>
       </div>
 
-      {/* Not included */}
+      {/* Costs not included */}
       <div className="avoid-break mb-10">
-        <Eyebrow>What Is Not In These Figures</Eyebrow>
+        <Eyebrow>Costs That Are Not In These Prices</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          The costs that are metered, and are not ours to fix
+          Things charged by the message or by the transaction
         </h3>
-        <p className="mt-3 text-base leading-7 text-gray-700">
-          Some costs are charged per message or per transaction by the networks. We pass them to the
-          school at cost plus a small handling margin, and we do not fold them into a fixed fee,
-          because doing so would mean either overcharging you or absorbing a loss when the rates
-          move.
+        <p className="mt-3 text-base leading-8 text-gray-700">
+          A few things are charged each time they are used, so they cannot sit inside a fixed price.
         </p>
         <ul className="mt-4 space-y-2">
           <Bullet>
-            <strong>SMS credits</strong>, bought in blocks. At around 1,000 messages a month a school
-            of this size should budget roughly GHS 70 a month.
+            <strong>SMS.</strong> Bought in bundles. We will price this for you once we know how
+            many parents you have and how often you want to write to them.
           </Bullet>
           <Bullet>
-            <strong>Mobile Money charges</strong>, levied by the network on each collection, at
-            roughly 2% of the amount collected. Many schools choose to pass this to the parent
-            instead.
+            <strong>Paying online.</strong> A service charge of 3% applies to money collected
+            through the system. This is the normal charge people are already used to when paying by
+            Mobile Money. Many schools pass it on to the parent.
           </Bullet>
           <Bullet>
-            <strong>WhatsApp messages</strong>, where selected. Meta charges per delivered message
-            and revises its rate card every quarter, so the current per-message rate is given in a
-            separate annexe that can be updated without reissuing this proposal. Note that WhatsApp
-            also requires a dedicated phone number that cannot be used on the ordinary WhatsApp app,
-            and Meta business verification, both of which we will handle with you.
+            <strong>WhatsApp.</strong> Charged by Meta for each message delivered, and the rate
+            changes every few months, so it is quoted separately and kept up to date. WhatsApp also
+            needs its own phone number that cannot be used on the normal WhatsApp app. We handle
+            that setup with you.
           </Bullet>
           <Bullet>
-            <strong>Gate hardware</strong>, where card or biometric check-in is taken. Readers and
-            cards are quoted separately once the number of gates is known.
+            <strong>Gate equipment.</strong> If you want card or fingerprint check-in, the readers
+            and cards are quoted separately once we know how many gates.
           </Bullet>
         </ul>
+      </div>
+
+      {/* Moving up */}
+      <div className="avoid-break mb-10 rounded-lg bg-gray-50 p-6">
+        <Eyebrow>Moving Up Later</Eyebrow>
+        <p className="mt-2.5 text-base leading-8 text-gray-700">
+          If you start on the Foundation and later want the Complete System, you pay the difference,
+          GHS 12,000. Nothing you have already paid is lost, and nothing already in the system has to
+          be entered again. The termly fee then moves from GHS 2,000 to GHS 4,000.
+        </p>
       </div>
 
       {/* Terms */}
@@ -615,58 +606,74 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         <Eyebrow>Terms</Eyebrow>
         <ul className="mt-3 space-y-2">
           <Bullet>
-            <strong>To begin.</strong> On the Foundation or the Complete System, half of the build
-            fee begins the work and the balance falls due on handover. On the rented option there is
-            nothing to pay to begin; the first subscription falls due in week three of the first
-            term of use.
+            <strong>Starting.</strong> On Option 1 and Option 2, half the build fee starts the work
+            and the rest is due at handover. On Option 3 there is no build fee, only the GHS 3,000
+            commitment fee, which comes back to you against your first payments.
           </Bullet>
           <Bullet>
-            <strong>Care plans</strong> are billed per term, not per month, so they fall due when
-            school fees do. They begin the term after handover, never during the build.
+            <strong>Care plans</strong> are billed each term, not each month, so they fall due when
+            school fees do. We will agree the exact start of the first one with you.
           </Bullet>
           <Bullet>
-            <strong>Delivery.</strong> The Foundation is delivered within eight weeks of the
-            discovery session, in stages you can see. The Complete System is delivered in two
-            phases, with everything in the Foundation live first so the school is never waiting on
-            the whole thing before it can use any of it.
+            <strong>Delivery.</strong> The Foundation is ready within about eight weeks of our first
+            planning meeting. The Complete System comes in two stages, with the Foundation working
+            first, so you are never waiting for everything before you can use anything.
           </Bullet>
           <Bullet>
-            <strong>Your data is yours.</strong> Under every option, the school can export all of
-            its records at any time without asking us, and nothing is ever held hostage to an
-            invoice.
+            <strong>Your records.</strong> Whichever option you choose, you can download all of your
+            records at any time. Nothing is ever held back over a bill.
           </Bullet>
           <Bullet>
-            <strong>Moving up.</strong> A school that starts on the Foundation can move to the
-            Complete System at any time for the difference of GHS 12,000. Nothing already paid is
-            lost, and nothing already entered is re-keyed.
-          </Bullet>
-          <Bullet>
-            <strong>This offer</strong> holds for 21 days from the issue date shown above. Final
-            scope is confirmed in one session with the head teacher and the accounts office before
-            anything is signed.
+            <strong>This offer</strong> holds for 21 days from the date at the top. Before anything
+            is signed we sit with the head teacher and the accounts office once, to agree exactly
+            what is being built.
           </Bullet>
         </ul>
       </div>
 
       {/* Next steps */}
-      <div className="avoid-break mb-10 rounded-lg bg-primary/5 p-6">
-        <Eyebrow>Next Steps</Eyebrow>
+      <div className="avoid-break mb-12 rounded-lg bg-primary/5 p-6">
+        <Eyebrow>What Happens Next</Eyebrow>
         <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          One conversation, then we begin
+          One meeting, then we start
         </h3>
-        <p className="mt-3 text-base leading-7 text-gray-700">
-          Tell us which of the three options fits the school, and we will sit with the head teacher
-          and the accounts office for one session. We will walk through your sections and levels,
-          your fee structure, your report card format and how you currently talk to parents. That
-          session is what we build from, and it costs nothing.
+        <p className="mt-3 text-base leading-8 text-gray-700">
+          Tell us which option suits the school. Then we sit with the head teacher and the accounts
+          office once and go through your classes, your fees, your report card and how you talk to
+          parents today. That meeting costs nothing and it is what we build from.
         </p>
         <p className="mt-4 text-base leading-8 text-gray-700">
-          If it would help to see the system before deciding, we will show you a working one, with
-          real report cards and a real register, on a screen, in Tamale.
+          If you would like to see a working system before deciding, we will bring one to Tamale and
+          show you, with real report cards and a real register on the screen.
         </p>
         <p className="mt-4 text-base font-semibold text-gray-900">
           059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584&nbsp;&nbsp;·&nbsp;&nbsp;contact@saharabasetech.com
         </p>
+      </div>
+
+      {/* ── APPENDIX A ───────────────────────────────────────────── */}
+      <div className="mb-10 border-t-2 border-gray-800 pt-6">
+        <Eyebrow>Appendix A</Eyebrow>
+        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
+          Everything in the Foundation
+        </h3>
+        <p className="mt-2 text-sm text-gray-600">
+          All {countIn(foundation)} items, listed in full, for GHS 6,000.
+        </p>
+        <FeatureList sections={foundation} />
+      </div>
+
+      {/* ── APPENDIX B ───────────────────────────────────────────── */}
+      <div className="mb-10 border-t-2 border-gray-800 pt-6">
+        <Eyebrow>Appendix B</Eyebrow>
+        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
+          What the Complete System adds
+        </h3>
+        <p className="mt-2 text-sm text-gray-600">
+          A further {countIn(completeAdds)} items on top of everything in Appendix A. Included in
+          Option 2 and in Option 3.
+        </p>
+        <FeatureList sections={completeAdds} />
       </div>
 
       <DocumentFooter record={record} />
