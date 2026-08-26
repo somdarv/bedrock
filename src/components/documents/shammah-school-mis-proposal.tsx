@@ -642,10 +642,6 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
           office once and go through your classes, your fees, your report card and how you talk to
           parents today. That meeting costs nothing and it is what we build from.
         </p>
-        <p className="mt-4 text-base leading-8 text-gray-700">
-          If you would like to see a working system before deciding, we will bring one to Tamale and
-          show you, with real report cards and a real register on the screen.
-        </p>
         <p className="mt-4 text-base font-semibold text-gray-900">
           059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584&nbsp;&nbsp;·&nbsp;&nbsp;contact@saharabasetech.com
         </p>
