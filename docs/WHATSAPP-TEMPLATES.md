@@ -92,6 +92,30 @@ Ongoing-account **organisation** — sent to each contact. **Body params:** `{{1
 **Header:** Media → Document (the invoice PDF; upload any PDF as the approval sample).
 **Button:** Visit website · Dynamic · `https://hub.saharabasetech.com/p/{{1}}` · label e.g. “View invoice”
 
+### 2b. `document_ready` — UTILITY · no button · **document header (PDF)**
+Ad-hoc document share: a proposal, fee schedule, quote, invoice or receipt the operator uploads
+from the admin. Also carries the `receipt_sent` event, which reuses this same template.
+**Body params:** `{{1}}` clientName · `{{2}}` documentType · `{{3}}` documentTitle ·
+`{{4}}` replyToName · `{{5}}` replyToMethod · `{{6}}` replyToValue
+
+> Hi {{1}}, your {{2}} is ready: *{{3}}*. It is attached to this message.
+>
+> If you have any questions about it, reply here or contact {{4}} via {{5}} at {{6}}. Thank you.
+
+**Header:** Media → Document (the uploaded file; upload any PDF as the approval sample).
+
+⚠️ **This copy is load-bearing. Do not make it friendlier.** It replaced `document_sent`, which
+Meta had categorised **MARKETING** because its body invited the reader to browse and reply
+("We've put together a … for you … let us know your thoughts"). Marketing templates are subject
+to Meta's **per-user frequency cap**, so for a capped recipient Meta accepts the send, issues a
+`wamid`, then silently drops it and reports `131049` on the status webhook. Four invoices and a
+receipt to one client vanished that way on 2026-08-26/27. Every `131049` in the send log has
+been on a MARKETING template; none on a UTILITY one. Keep this body factual and
+transaction-scoped, or Meta re-categorises it and the drops come back.
+
+The template was created with `allow_category_change: false`, so if an edit makes Meta disagree
+it is **rejected** rather than quietly re-filed as MARKETING. Leave that setting alone.
+
 ### 3. `deposit_received` — UTILITY · **URL button**
 **Body params:** `{{1}}` clientName · `{{2}}` amountPaid · `{{3}}` packageTitle
 
@@ -191,5 +215,10 @@ remaining piece, which would also resolve the HANDOFF §8 document-export pagina
 
 - Lead the body with text; the link lives in the **button**, not the body.
 - Keep UTILITY copy informational (no ALL-CAPS, minimal emoji) so Meta doesn't re-categorise it.
+- **Check the live category after any template change**, not just the approval status:
+  `GET /{waba_id}/message_templates?fields=name,category,status`. A template that quietly turns
+  MARKETING keeps sending and keeps reporting `sent`, and only some recipients stop receiving it.
+- Meta rejects a body whose first or last token is a variable (subcode `2388299`, "Leading or
+  trailing params not allowed"). End the body on real words.
 - Template name + language + button/header shape must match the code. Change a parameter's position →
   update `config/notifications.php` (or tell me and I will).
