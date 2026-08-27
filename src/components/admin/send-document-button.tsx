@@ -13,7 +13,7 @@ import type { Contact } from "@/lib/api";
 import { RecipientPicker } from "@/components/admin/recipient-picker";
 import { sendClientDocument } from "@/lib/clients/actions";
 
-const TYPE_OPTIONS = ["proposal", "fee schedule", "quote", "contract", "invoice", "document"];
+const TYPE_OPTIONS = ["proposal", "fee schedule", "quote", "contract", "invoice", "receipt", "document"];
 
 /**
  * "Send document" for a client — upload a proposal / fee schedule / quote from the machine and
@@ -71,6 +71,9 @@ function SendDocumentModal({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", type);
+    // A receipt says "thank you for your payment" rather than the neutral document share. Same
+    // approved WhatsApp template either way, so this only swaps the words.
+    if (type === "receipt") fd.append("event", "receipt_sent");
     fd.append("title", title.trim());
     recipientIds.forEach((id) => fd.append("contactIds[]", id));
     fd.append("replyToName", replyName.trim());
