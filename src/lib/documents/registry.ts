@@ -83,6 +83,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20260901-PRO-STE-58",
+    reference: "PRO-STE-58",
+    category: "proposals",
+    type: "Proposal",
+    title: "A School Management System for Stellar Edge School",
+    client: "Stellar Edge School",
+    project: "School Management System",
+    issueDate: "1 September 2026",
+    validUntil: "22 September 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260826-PRO-SHM-57",
     reference: "PRO-SHM-57",
     category: "proposals",

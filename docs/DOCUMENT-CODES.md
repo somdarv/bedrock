@@ -117,6 +117,8 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 | Greater Heights International School | `GHIS` |
 | Zenith School | `ZEN` |
 | Dei Gratia Medical Services | `DEIG` |
+| Shammah Preparatory School | `SHM` |
+| Stellar Edge School | `STE` |
 
 Assigned once per client and reused across their documents.
 

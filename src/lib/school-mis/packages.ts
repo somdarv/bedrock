@@ -63,6 +63,14 @@ export function completeAddsList(): PackageListSection[] {
   return listBy((item) => !isInFoundation(item));
 }
 
+/**
+ * The whole catalogue in one list, for proposals that offer a single system rather
+ * than a Foundation/Complete choice.
+ */
+export function fullList(): PackageListSection[] {
+  return listBy(() => true);
+}
+
 function listBy(predicate: (item: CatalogueItem) => boolean): PackageListSection[] {
   return CATALOGUE.map((category) => ({
     name: category.name,

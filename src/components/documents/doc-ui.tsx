@@ -332,43 +332,32 @@ export function Figure({
  * reference, dates and document type on the page are the ones /verify confirms.
  */
 export function Letterhead({ record }: { record: DocumentRecord }) {
-  const meta: [string, string][] = [
-    ["Reference", record.reference],
-    ["Issued", record.issueDate],
-    ...(record.validUntil ? ([["Valid until", record.validUntil]] as [string, string][]) : []),
-  ];
+  const label = "text-[length:var(--doc-t-sm)] whitespace-nowrap text-[var(--doc-ink-soft)]";
 
   return (
-    <Panel className="mb-10 flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+    // The original masthead layout, kept as it was: address stacked on the left, the
+    // document type and its Ref / Issue Date / Valid Until lines set right. Only the
+    // palette moved to the new fill and ink tokens.
+    <Panel className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="min-w-0">
-        <Heading size="h1" className="max-w-[9ch] leading-[1.02] tracking-[-0.035em]">
+        <h1 className="mb-4 text-[length:var(--doc-t-h2)] leading-tight font-semibold tracking-[-0.03em] text-[var(--doc-ink)] sm:text-[length:var(--doc-t-h1)] sm:leading-[1.05]">
           Saharabase Technologies
-        </Heading>
-        <div className="mt-5 space-y-0.5 text-[length:var(--doc-t-sm)] text-[var(--doc-ink-soft)]">
-          <p>17 Alhaji Sulley Road, Abelemkpe, Accra</p>
-          <p>059 212 3054 &nbsp;·&nbsp; 050 988 6584</p>
-          <p>www.saharabasetech.com</p>
-        </div>
+        </h1>
+        <p className={label}>17 Alhaji Sulley Road,</p>
+        <p className={label}>Abelemkpe, Accra</p>
+        <p className={cn("mt-1", label)}>059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584</p>
+        <p className={cn("mt-1", label)}>www.saharabasetech.com</p>
       </div>
 
-      {/* Full width on a phone, a fixed column from small up. */}
-      <Inset className="w-full shrink-0 sm:w-[15.5rem]">
-        <p className="text-[length:var(--doc-t-lead)] leading-tight font-semibold text-[var(--doc-ink)]">
+      {/* Full width and left-aligned on a phone; the fixed column only from small up. */}
+      <div className="w-full sm:w-72 sm:text-right">
+        <h2 className="mb-2 text-[length:var(--doc-t-h3)] font-semibold whitespace-nowrap text-[var(--doc-ink)]">
           {record.type}
-        </p>
-        <dl className="mt-4 space-y-2.5">
-          {meta.map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-[length:var(--doc-t-micro)] tracking-[0.14em] text-[var(--doc-ink-soft)] uppercase">
-                {label}
-              </dt>
-              <dd className="text-[length:var(--doc-t-sm)] font-medium text-[var(--doc-ink)]">
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Inset>
+        </h2>
+        <p className={label}>Ref: {record.reference}</p>
+        <p className={label}>Issue Date: {record.issueDate}</p>
+        {record.validUntil && <p className={label}>Valid Until: {record.validUntil}</p>}
+      </div>
     </Panel>
   );
 }

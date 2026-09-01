@@ -660,7 +660,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             you talk to parents today. That meeting costs nothing and it is what we build from.
           </Lead>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-3">
-            {["059 212 3054", "050 988 6584", "contact@saharabasetech.com"].map((c) => (
+            {["059 212 3054", "050 988 6584", "admin@saharabasetech.com"].map((c) => (
               <span
                 key={c}
                 className="rounded-[var(--doc-r-chip)] bg-[var(--doc-fill-strong)] px-5 py-2.5 text-center text-[length:var(--doc-t-sm)] font-medium whitespace-nowrap text-[var(--doc-ink)]"

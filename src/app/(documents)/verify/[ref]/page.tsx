@@ -69,7 +69,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ ref: st
 
             <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground">
               Checked against SaharaBase&apos;s live records. If the details above do not match the document in
-              your hands, it has been altered — contact us at contact@saharabasetech.com.
+              your hands, it has been altered — contact us at admin@saharabasetech.com.
             </p>
           </div>
         ) : (
@@ -92,7 +92,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ ref: st
             </div>
 
             <p className="mt-5 text-[11px] leading-relaxed text-muted-foreground">
-              If you believe this is an error, contact SaharaBase Technologies at contact@saharabasetech.com to
+              If you believe this is an error, contact SaharaBase Technologies at admin@saharabasetech.com to
               confirm the document reference.
             </p>
           </div>
