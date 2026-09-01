@@ -1,37 +1,31 @@
-import { VERIFY_BASE_URL, type DocumentRecord } from "@/lib/documents/registry";
+import { type DocumentRecord } from "@/lib/documents/registry";
 import {
   completeAddsList,
   countIn,
   foundationList,
   type PackageListSection,
 } from "@/lib/school-mis/packages";
+import { cn } from "@/lib/utils";
 import { DocumentFooter } from "./document-footer";
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    // Stacks on a phone: several of these values are a full sentence of pricing, and
-    // squeezed into a right-hand column they wrap to three or four ragged lines.
-    <div className="flex flex-col gap-0.5 border-b border-gray-100 py-3 text-base last:border-b-0 sm:flex-row sm:justify-between sm:gap-6">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-semibold text-gray-800 sm:text-right">{value}</span>
-    </div>
-  );
-}
-
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{children}</p>
-  );
-}
-
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex gap-3 text-base leading-7 text-gray-700">
-      <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-      <span>{children}</span>
-    </li>
-  );
-}
+import {
+  Bullet,
+  BulletList,
+  Chip,
+  DetailList,
+  DetailRow,
+  Divider,
+  Eyebrow,
+  Figure,
+  Heading,
+  Inset,
+  Lead,
+  Letterhead,
+  Note,
+  P,
+  Panel,
+  Section,
+  VerifyLine,
+} from "./doc-ui";
 
 /** One of the three ways to take the system. */
 function OptionCard({
@@ -54,41 +48,74 @@ function OptionCard({
   featured?: boolean;
 }) {
   return (
-    <div
-      className={`avoid-break mb-8 rounded-lg border p-5 sm:p-6 ${
-        featured ? "border-primary/30 bg-primary/5" : "border-gray-200 bg-white"
-      }`}
-    >
+    <Panel tone={featured ? "strong" : "base"} className="mb-8">
       {/* Name above the price on a phone, side by side from small up. */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-6">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
         <div className="min-w-0">
-          <Eyebrow>{label}</Eyebrow>
-          <p className="mt-2 text-2xl font-semibold leading-tight text-gray-900">{name}</p>
+          <Chip tone={featured ? "ink" : "paper"}>{label}</Chip>
+          <Heading size="h2" className="mt-4">
+            {name}
+          </Heading>
         </div>
-        <div className="sm:shrink-0 sm:text-right">
-          <p className="text-3xl font-bold leading-none tabular-nums text-gray-900">{headline}</p>
-          <p className="mt-1.5 text-sm text-gray-600">{sub}</p>
-          <p className="mt-3 text-lg font-semibold tabular-nums text-primary">{recurring}</p>
-          <p className="text-sm text-gray-600">{recurringNote}</p>
+
+        {/*
+         * The price stacks two fills rather than splitting on a rule: the build fee on
+         * paper, the termly fee one tone below it. On the featured option the whole
+         * block flips to ink, which is the loudest the document ever gets.
+         */}
+        <div
+          className={cn(
+            "shrink-0 overflow-hidden rounded-[var(--doc-r-inset)] sm:w-[17rem]",
+            featured && "doc-invert",
+          )}
+        >
+          <div className="bg-[var(--doc-paper)] px-5 py-5">
+            <Figure value={headline} caption={sub} />
+          </div>
+          <div className="bg-[var(--doc-fill-quiet)] px-5 py-4">
+            <p className="text-[length:var(--doc-t-lead)] leading-none font-semibold text-[var(--doc-ink)] tabular-nums">
+              {recurring}
+            </p>
+            <p className="mt-1.5 text-[length:var(--doc-t-sm)] text-[var(--doc-ink-soft)]">
+              {recurringNote}
+            </p>
+          </div>
         </div>
       </div>
-      <div className="mt-5 border-t border-gray-200 pt-5">{children}</div>
-    </div>
+
+      <div className="mt-8">{children}</div>
+    </Panel>
   );
 }
 
 /** The appendix lists. Generated from the catalogue so they cannot drift from what we build. */
 function FeatureList({ sections }: { sections: PackageListSection[] }) {
   return (
-    <div className="mt-5 space-y-5">
+    <div className="mt-8 space-y-7">
       {sections.map((section) => (
-        <div key={section.name} className="avoid-break">
-          <p className="text-sm font-semibold text-gray-900">{section.name}</p>
-          <ul className="mt-1.5 space-y-1">
+        <div key={section.name}>
+          {/*
+           * A filled band rather than a boxed group: a category that runs past the
+           * bottom of a page still prints cleanly, because nothing is enclosed.
+           */}
+          <div className="avoid-break rounded-[var(--doc-r-chip)] bg-[var(--doc-fill)] px-5 py-2.5">
+            <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
+              {section.name}
+            </p>
+          </div>
+          <ul className="mt-3 pl-1 sm:columns-2 sm:gap-10">
             {section.items.map((item) => (
-              <li key={item} className="flex gap-2 text-[13px] leading-5 text-gray-600">
-                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
-                <span>{item}</span>
+              <li
+                key={item}
+                className="mb-2 flex break-inside-avoid gap-2.5 text-[length:var(--doc-t-xs)] leading-[1.6] text-[var(--doc-ink-body)]"
+              >
+                <span
+                  className="flex h-[1.6em] w-2 shrink-0 items-center justify-center"
+                  aria-hidden
+                >
+                  <span className="h-[3px] w-[3px] rounded-full bg-[var(--doc-ink-soft)]" />
+                </span>
+                <span className="min-w-0">{item}</span>
               </li>
             ))}
           </ul>
@@ -126,79 +153,57 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
 
   return (
     <>
-      <p className="my-2 break-all text-[10px] tracking-wide text-gray-400">
-        {VERIFY_BASE_URL.replace(/^https?:\/\//, "")}/verify/{record.id}
-      </p>
-
-      {/* Letterhead */}
-      <div className="mb-8 flex flex-col gap-5 rounded-lg bg-primary/10 p-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
-        <div>
-          <h1 className="mb-4 text-2xl font-semibold leading-tight text-black sm:text-3xl sm:leading-none">
-            Saharabase Technologies
-          </h1>
-          <p className="text-sm text-gray-600">17 Alhaji Sulley Road,</p>
-          <p className="text-sm text-gray-600">Abelemkpe, Accra</p>
-          <p className="mt-1 text-sm text-gray-600">
-            059 212 3054&nbsp;&nbsp;·&nbsp;&nbsp;050 988 6584
-          </p>
-          <p className="mt-1 text-sm text-gray-600">www.saharabasetech.com</p>
-        </div>
-        {/* Full width and left-aligned on a phone; the fixed 16rem column only from small up. */}
-        <div className="w-full border-t border-primary/15 pt-4 sm:w-64 sm:border-0 sm:pt-0 sm:text-right">
-          <h2 className="mb-2 whitespace-nowrap text-xl font-semibold text-gray-800">
-            {record.type}
-          </h2>
-          <p className="text-sm text-gray-600">Ref: {record.reference}</p>
-          <p className="text-sm text-gray-600">Issue Date: {record.issueDate}</p>
-          {record.validUntil && (
-            <p className="text-sm text-gray-600">Valid Until: {record.validUntil}</p>
-          )}
-        </div>
-      </div>
+      <VerifyLine record={record} />
+      <Letterhead record={record} />
 
       {/* Prepared For */}
-      <div className="mb-10">
+      <Section>
         <Eyebrow>Prepared For</Eyebrow>
-        <p className="mt-2 text-lg font-semibold text-gray-900">Shammah Preparatory School</p>
-        <p className="text-base text-gray-600">Preparatory School, Tamale, Northern Region</p>
+        <Heading size="h2" className="mt-3">
+          Shammah Preparatory School
+        </Heading>
+        <Note className="mt-2">Preparatory School, Tamale, Northern Region</Note>
 
-        <div className="mt-4 rounded-lg border border-primary/10 bg-white p-4 sm:p-5">
-          <DetailRow label="What we are offering" value="A computer system to run the school" />
-          <DetailRow label="Option 1, Foundation" value="GHS 6,000 to build, GHS 2,000 a term" />
-          <DetailRow label="Option 2, Complete" value="GHS 18,000 to build, GHS 4,000 a term" />
-          <DetailRow label="Option 3, Complete, rented" value="Nothing to build, GHS 20 a pupil a term" />
-          <DetailRow label="This offer holds for" value="21 days from the date above" />
+        <div className="mt-6">
+          <DetailList>
+            <DetailRow label="What we are offering" value="A computer system to run the school" />
+            <DetailRow label="Option 1, Foundation" value="GHS 6,000 to build, GHS 2,000 a term" />
+            <DetailRow label="Option 2, Complete" value="GHS 18,000 to build, GHS 4,000 a term" />
+            <DetailRow
+              label="Option 3, Complete, rented"
+              value="Nothing to build, GHS 20 a pupil a term"
+            />
+            <DetailRow label="This offer holds for" value="21 days from the date above" />
+          </DetailList>
         </div>
-      </div>
+      </Section>
 
       {/* Opening */}
-      <div className="mb-10">
-        <p className="text-base leading-8 text-gray-700">
-          Shammah Preparatory School is opening a JHS. That means new subjects, a new report card,
-          a new fee structure, and in three years your first BECE class.
-        </p>
-        <p className="mt-4 text-base leading-8 text-gray-700">
+      <Section>
+        <Lead>
+          Shammah Preparatory School is opening a JHS. That means new subjects, a new report card, a
+          new fee structure, and in three years your first BECE class.
+        </Lead>
+        <P className="mt-5">
           It also means the same child now appears in more registers, more mark sheets and more fee
           books than one office can check by hand at the end of every term. That is not anybody
           doing the job badly. It is simply what happens when a school grows.
-        </p>
-        <p className="mt-4 text-base leading-8 text-gray-700">
+        </P>
+        <P className="mt-5">
           We would like to build you the system that carries it. There are three ways to take it.
           Pick the one that suits the school now. You can always move up later.
-        </p>
-      </div>
+        </P>
+      </Section>
 
       {/* Promises */}
-      <div className="mb-10">
+      <Section>
         <Eyebrow>Four Promises</Eyebrow>
-        <h3 className="mt-2 text-2xl font-semibold leading-snug text-gray-900">
-          True whichever option you pick
-        </h3>
-        <ul className="mt-4 space-y-3">
+        <Heading className="mt-3">True whichever option you pick</Heading>
+        <BulletList className="mt-6">
           <Bullet>
-            <strong>A child is entered once.</strong> From the day they apply to the day they
-            leave, it is the same file. Basic 6 becomes JHS 1 with the same number and the same
-            record. Nobody types anything twice.
+            <strong>A child is entered once.</strong> From the day they apply to the day they leave,
+            it is the same file. Basic 6 becomes JHS 1 with the same number and the same record.
+            Nobody types anything twice.
           </Bullet>
           <Bullet>
             <strong>No limits, and no extra charge for growing.</strong> Add as many sections,
@@ -213,8 +218,8 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             <strong>Your records are yours.</strong> You can download everything, any day, without
             asking us. That is true on your first day and on your last.
           </Bullet>
-        </ul>
-      </div>
+        </BulletList>
+      </Section>
 
       {/* THE OPTIONS */}
       <div className="mb-6">
@@ -230,11 +235,11 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         recurring="GHS 2,000"
         recurringNote="a term after that"
       >
-        <p className="text-base leading-7 text-gray-700">
+        <P>
           Enough to run the whole school from the first day of next term, JHS included. This is not
           a trial or a small version. It is a working school system.
-        </p>
-        <ul className="mt-4 space-y-2">
+        </P>
+        <BulletList className="mt-6">
           <Bullet>
             <strong>Pupils.</strong> One file per child. Photo, details, every class they have been
             in, their documents, who to call in an emergency, who is allowed to collect them, and a
@@ -245,8 +250,8 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             person who pays, and the person to reach in an emergency can be three different people.
           </Bullet>
           <Bullet>
-            <strong>Admissions.</strong> Apply online or on paper. One click turns an applicant
-            into a pupil, carrying everything across. Admission numbers are created for you.
+            <strong>Admissions.</strong> Apply online or on paper. One click turns an applicant into
+            a pupil, carrying everything across. Admission numbers are created for you.
           </Bullet>
           <Bullet>
             <strong>Classes and the calendar.</strong> Your sections, levels, streams and subjects,
@@ -264,10 +269,10 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             and the fee balance. Print a whole class at once.
           </Bullet>
           <Bullet>
-            <strong>Fees.</strong> Your fee structure per class per term. Bills go out
-            automatically and last term&rsquo;s balance carries forward. Record cash, Mobile Money,
-            bank, cheque or POS. Receipts with numbers that cannot be reused. A debtors list by
-            class. One total for a family with several children.
+            <strong>Fees.</strong> Your fee structure per class per term. Bills go out automatically
+            and last term&rsquo;s balance carries forward. Record cash, Mobile Money, bank, cheque
+            or POS. Receipts with numbers that cannot be reused. A debtors list by class. One total
+            for a family with several children.
           </Bullet>
           <Bullet>
             <strong>Messages to parents.</strong> Send SMS to the whole school, one class, or just
@@ -286,25 +291,27 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             accountant and the front desk. The accountant cannot change marks. A teacher cannot see
             salaries. Backups run on their own.
           </Bullet>
-        </ul>
+        </BulletList>
 
-        <div className="mt-5 rounded border border-gray-200 bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-900">The GHS 6,000 also covers</p>
-          <p className="mt-1.5 text-sm leading-6 text-gray-600">
+        <Inset className="mt-7">
+          <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
+            The GHS 6,000 also covers
+          </p>
+          <Note className="mt-2">
             Moving your current pupil, staff and fee records into the system. Setting up your
             classes, subjects and fees. Putting your letterhead, stamp and signature in. Training
             your staff until they can use it without us in the room.
-          </p>
-          <p className="mt-3 text-sm leading-6 text-gray-600">
-            <strong className="text-gray-900">Hosting is separate on this option.</strong> The
-            system runs on a computer online, and that costs a small amount each year. We set it up
-            for you and you pay for it directly, at cost. We do not add anything on top.
-          </p>
-        </div>
+          </Note>
+          <Note className="mt-4">
+            <strong>Hosting is separate on this option.</strong> The system runs on a computer
+            online, and that costs a small amount each year. We set it up for you and you pay for it
+            directly, at cost. We do not add anything on top.
+          </Note>
+        </Inset>
 
-        <p className="mt-4 text-sm text-gray-500">
+        <Note className="mt-5">
           The full list of everything in the Foundation is at the end of this document.
-        </p>
+        </Note>
       </OptionCard>
 
       {/* Option 2 */}
@@ -316,12 +323,12 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         recurring="GHS 4,000"
         recurringNote="a term after that"
       >
-        <p className="text-base leading-7 text-gray-700">
+        <P>
           Everything in the Foundation, plus everything else we build. It costs more because there
           is a lot more in it, and several parts of it connect to outside services like the mobile
           money networks. Hosting is included in the termly fee, so there is nothing else to pay.
-        </p>
-        <ul className="mt-4 space-y-2">
+        </P>
+        <BulletList className="mt-6">
           <Bullet>
             <strong>Mobile Money, connected.</strong> MTN, Telecel and AT payments land against the
             right child on their own. The office stops matching payments by hand.
@@ -395,7 +402,7 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             at all. It catches up when the connection returns. Fees can also be collected offline on
             one chosen device.
           </Bullet>
-        </ul>
+        </BulletList>
       </OptionCard>
 
       {/* Option 3 */}
@@ -408,13 +415,13 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
         recurringNote="to build, and no hosting fee"
         featured
       >
-        <p className="text-base leading-7 text-gray-700">
+        <P>
           The same Complete System described above, with nothing left out. We pay for building it
           and we pay for keeping it running. The school pays nothing to start and instead pays once
           a term, based on how many pupils are actually in the school.
-        </p>
+        </P>
 
-        <ul className="mt-4 space-y-2">
+        <BulletList className="mt-6">
           <Bullet>
             <strong>You pay GHS 20 for each pupil, each term.</strong> If pupil numbers go down, the
             bill goes down. There is a minimum of GHS 3,500 a term, so the bill never falls below
@@ -448,132 +455,133 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             <strong>Your records stay yours.</strong> You can download everything at any time. The
             system itself stays ours, and you use it for as long as you are paying.
           </Bullet>
-        </ul>
+        </BulletList>
 
-        <div className="mt-5 rounded-lg border border-primary/20 bg-white p-4 sm:p-5">
-          <p className="text-sm font-semibold text-gray-900">You can buy it later if you want to</p>
-          <p className="mt-1.5 text-base leading-7 text-gray-700">
+        <Inset className="mt-7">
+          <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
+            You can buy it later if you want to
+          </p>
+          <P className="mt-2.5">
             If you decide to own the system instead, we take a third of everything you have already
             paid off the GHS 18,000 price.
-          </p>
-          <p className="mt-3 text-base leading-7 text-gray-700">
+          </P>
+          <P className="mt-4">
             <strong>An example, using round numbers.</strong> Say a school has 300 pupils, so it
             pays GHS 6,000 a term. After three terms it has paid GHS 18,000. A third of that is GHS
             6,000. So the price to buy the system drops from GHS 18,000 to GHS 12,000, and after
             that there is no more termly rent, only the GHS 4,000 a term care plan.
-          </p>
-        </div>
+          </P>
+        </Inset>
       </OptionCard>
 
       {/* Care plan explained */}
-      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-5 sm:p-6">
-        <Eyebrow>About The Care Plan</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          Why there is still a termly fee on a system you own
-        </h3>
-        <p className="mt-3 text-base leading-8 text-gray-700">
-          It is a fair question, so here is the plain answer.
-        </p>
-        <p className="mt-3 text-base leading-8 text-gray-700">
-          <strong>Anything we get wrong, we fix free, for as long as you use the system.</strong>{" "}
-          That is not what the care plan is for. The care plan is for the things that are nobody&rsquo;s
-          mistake.
-        </p>
-        <ul className="mt-4 space-y-2">
-          <Bullet>
-            <strong>The rules change.</strong> GRA changes tax rates. GES changes the report card.
-            SSNIT changes its percentages. Every year something moves, and somebody has to do that
-            work so your system keeps up.
-          </Bullet>
-          <Bullet>
-            <strong>The school changes.</strong> A new fee item. A new class. A new accountant who
-            needs training. A teacher who forgets her password in the middle of exams week.
-          </Bullet>
-          <Bullet>
-            <strong>It has to keep running.</strong> The system sits on a computer online, backed up
-            every day and kept secure. That costs money every single month, whether anyone touches
-            it or not.
-          </Bullet>
-          <Bullet>
-            <strong>Small changes you ask for.</strong> A new report layout, a new user, a small
-            adjustment to how something works. These are included rather than quoted for one by one.
-          </Bullet>
-        </ul>
-        <p className="mt-4 text-base leading-8 text-gray-700">
-          The simplest way to think about it: you can buy a school bus outright and the bus is
-          yours. You still pay for fuel, servicing and a driver.
-        </p>
-      </div>
+      <Section>
+        <Panel tone="quiet">
+          <Eyebrow>About The Care Plan</Eyebrow>
+          <Heading className="mt-3">Why there is still a termly fee on a system you own</Heading>
+          <P className="mt-5">It is a fair question, so here is the plain answer.</P>
+          <P className="mt-4">
+            <strong>Anything we get wrong, we fix free, for as long as you use the system.</strong>{" "}
+            That is not what the care plan is for. The care plan is for the things that are
+            nobody&rsquo;s mistake.
+          </P>
+          <BulletList className="mt-6">
+            <Bullet>
+              <strong>The rules change.</strong> GRA changes tax rates. GES changes the report card.
+              SSNIT changes its percentages. Every year something moves, and somebody has to do that
+              work so your system keeps up.
+            </Bullet>
+            <Bullet>
+              <strong>The school changes.</strong> A new fee item. A new class. A new accountant who
+              needs training. A teacher who forgets her password in the middle of exams week.
+            </Bullet>
+            <Bullet>
+              <strong>It has to keep running.</strong> The system sits on a computer online, backed
+              up every day and kept secure. That costs money every single month, whether anyone
+              touches it or not.
+            </Bullet>
+            <Bullet>
+              <strong>Small changes you ask for.</strong> A new report layout, a new user, a small
+              adjustment to how something works. These are included rather than quoted for one by
+              one.
+            </Bullet>
+          </BulletList>
+          <P className="mt-6">
+            The simplest way to think about it: you can buy a school bus outright and the bus is
+            yours. You still pay for fuel, servicing and a driver.
+          </P>
+        </Panel>
+      </Section>
 
       {/* Which costs less */}
-      <div className="avoid-break mb-10 rounded-lg border border-gray-200 p-5 sm:p-6">
-        <Eyebrow>Which Costs Less</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          Renting is cheaper at first. Buying is cheaper if you stay long enough
-        </h3>
-        <p className="mt-3 text-base leading-8 text-gray-700">
-          We would rather say this than have you work it out afterwards. Here it is with round
-          numbers, for a school of 300 pupils. Your own figures will differ.
-        </p>
+      <Section>
+        <Panel tone="quiet">
+          <Eyebrow>Which Costs Less</Eyebrow>
+          <Heading className="mt-3">
+            Renting is cheaper at first. Buying is cheaper if you stay long enough
+          </Heading>
+          <P className="mt-5">
+            We would rather say this than have you work it out afterwards. Here it is with round
+            numbers, for a school of 300 pupils. Your own figures will differ.
+          </P>
 
-        {/* Scrolls sideways on a phone rather than crushing three money columns. */}
-        <div className="mt-4 overflow-x-auto rounded border border-gray-200">
-          <table className="w-full min-w-[420px] text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="px-3 py-2.5 sm:px-4 font-semibold text-gray-700">Total paid by the end of</th>
-                <th className="px-3 py-2.5 sm:px-4 text-right font-semibold text-gray-700">Renting</th>
-                <th className="px-3 py-2.5 sm:px-4 text-right font-semibold text-gray-700">Buying</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              <tr>
-                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 1</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 18,000
-                </td>
-                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 30,000</td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 2</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 36,000
-                </td>
-                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 42,000</td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 3</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 54,000</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 54,000</td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2.5 sm:px-4 text-gray-600">Year 4</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right tabular-nums text-gray-600">GHS 72,000</td>
-                <td className="px-3 py-2.5 sm:px-4 text-right font-semibold tabular-nums text-gray-900">
-                  GHS 66,000
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          {/* Scrolls sideways on a phone rather than crushing three money columns. */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="doc-table min-w-[26rem]">
+              <thead>
+                <tr>
+                  <th>Total paid by the end of</th>
+                  <th className="text-right">Renting</th>
+                  <th className="text-right">Buying</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Year 1</td>
+                  <td className="text-right font-semibold text-[var(--doc-ink)] tabular-nums">
+                    GHS 18,000
+                  </td>
+                  <td className="text-right tabular-nums">GHS 30,000</td>
+                </tr>
+                <tr>
+                  <td>Year 2</td>
+                  <td className="text-right font-semibold text-[var(--doc-ink)] tabular-nums">
+                    GHS 36,000
+                  </td>
+                  <td className="text-right tabular-nums">GHS 42,000</td>
+                </tr>
+                <tr>
+                  <td>Year 3</td>
+                  <td className="text-right tabular-nums">GHS 54,000</td>
+                  <td className="text-right tabular-nums">GHS 54,000</td>
+                </tr>
+                <tr>
+                  <td>Year 4</td>
+                  <td className="text-right tabular-nums">GHS 72,000</td>
+                  <td className="text-right font-semibold text-[var(--doc-ink)] tabular-nums">
+                    GHS 66,000
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <p className="mt-4 text-base leading-8 text-gray-700">
-          At that size the two come level after three years. Before then renting costs less and asks
-          for nothing up front. After then buying costs less. Remember also that the rent follows
-          your numbers: if the school grows, the rent grows with it.
-        </p>
-      </div>
+          <P className="mt-6">
+            At that size the two come level after three years. Before then renting costs less and
+            asks for nothing up front. After then buying costs less. Remember also that the rent
+            follows your numbers: if the school grows, the rent grows with it.
+          </P>
+        </Panel>
+      </Section>
 
       {/* Costs not included */}
-      <div className="avoid-break mb-10">
+      <Section avoidBreak>
         <Eyebrow>Costs That Are Not In These Prices</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          Things charged by the message or by the transaction
-        </h3>
-        <p className="mt-3 text-base leading-8 text-gray-700">
+        <Heading className="mt-3">Things charged by the message or by the transaction</Heading>
+        <P className="mt-5">
           A few things are charged each time they are used, so they cannot sit inside a fixed price.
-        </p>
-        <ul className="mt-4 space-y-2">
+        </P>
+        <BulletList className="mt-6">
           <Bullet>
             <strong>SMS.</strong> Bought in bundles. We will price this for you once we know how
             many parents you have and how often you want to write to them.
@@ -593,23 +601,26 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             <strong>Gate equipment.</strong> If you want card or fingerprint check-in, the readers
             and cards are quoted separately once we know how many gates.
           </Bullet>
-        </ul>
-      </div>
+        </BulletList>
+      </Section>
 
       {/* Moving up */}
-      <div className="avoid-break mb-10 rounded-lg bg-gray-50 p-5 sm:p-6">
-        <Eyebrow>Moving Up Later</Eyebrow>
-        <p className="mt-2.5 text-base leading-8 text-gray-700">
-          If you start on the Foundation and later want the Complete System, you pay the difference,
-          GHS 12,000. Nothing you have already paid is lost, and nothing already in the system has to
-          be entered again. The termly fee then moves from GHS 2,000 to GHS 4,000.
-        </p>
-      </div>
+      <Section avoidBreak>
+        <Panel>
+          <Eyebrow>Moving Up Later</Eyebrow>
+          <P className="mt-4">
+            If you start on the Foundation and later want the Complete System, you pay the
+            difference, GHS 12,000. Nothing you have already paid is lost, and nothing already in
+            the system has to be entered again. The termly fee then moves from GHS 2,000 to GHS
+            4,000.
+          </P>
+        </Panel>
+      </Section>
 
       {/* Terms */}
-      <div className="avoid-break mb-10">
+      <Section avoidBreak>
         <Eyebrow>Terms</Eyebrow>
-        <ul className="mt-3 space-y-2">
+        <BulletList className="mt-5">
           <Bullet>
             <strong>Starting.</strong> On Option 1 and Option 2, half the build fee starts the work
             and the rest is due at handover. On Option 3 there is no build fee, only the GHS 3,000
@@ -633,51 +644,56 @@ export function ShammahSchoolMisProposal({ record }: { record: DocumentRecord })
             is signed we sit with the head teacher and the accounts office once, to agree exactly
             what is being built.
           </Bullet>
-        </ul>
-      </div>
+        </BulletList>
+      </Section>
 
       {/* Next steps */}
-      <div className="avoid-break mb-12 rounded-lg bg-primary/5 p-5 sm:p-6">
-        <Eyebrow>What Happens Next</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          One meeting, then we start
-        </h3>
-        <p className="mt-3 text-base leading-8 text-gray-700">
-          Tell us which option suits the school. Then we sit with the head teacher and the accounts
-          office once and go through your classes, your fees, your report card and how you talk to
-          parents today. That meeting costs nothing and it is what we build from.
-        </p>
-        <div className="mt-4 flex flex-col gap-1 text-base font-semibold text-gray-900 sm:flex-row sm:gap-4">
-          <span>059 212 3054</span>
-          <span>050 988 6584</span>
-          <span className="break-all">contact@saharabasetech.com</span>
-        </div>
-      </div>
+      <Section avoidBreak className="mb-14">
+        <Panel tone="ink">
+          <Eyebrow>What Happens Next</Eyebrow>
+          <Heading size="h2" className="mt-3">
+            One meeting, then we start
+          </Heading>
+          <Lead className="mt-5">
+            Tell us which option suits the school. Then we sit with the head teacher and the
+            accounts office once and go through your classes, your fees, your report card and how
+            you talk to parents today. That meeting costs nothing and it is what we build from.
+          </Lead>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-3">
+            {["059 212 3054", "050 988 6584", "contact@saharabasetech.com"].map((c) => (
+              <span
+                key={c}
+                className="rounded-[var(--doc-r-chip)] bg-[var(--doc-fill-strong)] px-5 py-2.5 text-center text-[length:var(--doc-t-sm)] font-medium whitespace-nowrap text-[var(--doc-ink)]"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </Panel>
+      </Section>
 
       {/* ── APPENDIX A ───────────────────────────────────────────── */}
-      <div className="mb-10 border-t-2 border-gray-800 pt-6">
-        <Eyebrow>Appendix A</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          Everything in the Foundation
-        </h3>
-        <p className="mt-2 text-sm text-gray-600">
+      <Divider />
+      <Section>
+        <Chip>Appendix A</Chip>
+        <Heading className="mt-4">Everything in the Foundation</Heading>
+        <Note className="mt-2">
           All {countIn(foundation)} items, listed in full, for GHS 6,000.
-        </p>
+        </Note>
         <FeatureList sections={foundation} />
-      </div>
+      </Section>
 
       {/* ── APPENDIX B ───────────────────────────────────────────── */}
-      <div className="mb-10 border-t-2 border-gray-800 pt-6">
-        <Eyebrow>Appendix B</Eyebrow>
-        <h3 className="mt-2 text-xl font-semibold leading-snug text-gray-900">
-          What the Complete System adds
-        </h3>
-        <p className="mt-2 text-sm text-gray-600">
+      <Divider />
+      <Section>
+        <Chip>Appendix B</Chip>
+        <Heading className="mt-4">What the Complete System adds</Heading>
+        <Note className="mt-2">
           A further {countIn(completeAdds)} items on top of everything in Appendix A. Included in
           Option 2 and in Option 3.
-        </p>
+        </Note>
         <FeatureList sections={completeAdds} />
-      </div>
+      </Section>
 
       <DocumentFooter record={record} />
     </>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Sora } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -26,6 +26,15 @@ export const metadata: Metadata = {
     template: "%s · Bedrock",
   },
   description: "Client management & gated-delivery payment system for SaharaBase Technologies.",
+};
+
+/**
+ * Without this, phones lay the page out at the 980px fallback width and scale it
+ * down — which silently defeats every responsive rule in the app, documents included.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

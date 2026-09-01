@@ -38,8 +38,9 @@
 
   --color-ring: #0a0a0a;
 
-  --font-sans: var(--font-general), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:
+    var(--font-general), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-display: var(--font-sora), var(--font-general), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 
@@ -95,58 +96,192 @@
     font-weight: 500;
   }
 
-  /* Hairline rule matching the marketing site's border-*/10 dividers. */
-  .hairline {
+  /* Hairline rule matching the marketing site's border-*/
+  10 dividers. */ .hairline {
     border-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
   }
 }
 
 /*
  * ============================================================
- * Document engine — print-to-PDF sheets (invoices, proposals, …)
- * A4 sheet on a neutral canvas on screen; edge-to-edge on print.
- * Authored bodies live inside `.doc-sheet`; `.no-print` is stripped on print.
+ * Document engine — print-to-PDF sheets (proposals, invoices, …)
+ *
+ * The visual language is fills, not lines. There is not a single border in a
+ * document body: every block is separated from the one beside it by a light
+ * tint on the white sheet, with a generous radius. Nesting alternates against
+ * the ground — a tinted panel takes white insets, the white sheet takes tinted
+ * panels — so depth never needs an outline and never stacks the same tone twice.
+ *
+ * Type runs one step larger than the app (17px body on a 6.77in measure ≈ 73
+ * characters a line), because these are read slowly, often on a phone, and
+ * often by someone deciding whether to spend money.
+ *
+ * Authored bodies live inside `.doc-sheet` and build from `doc-ui.tsx`;
+ * `.no-print` is stripped on print.
  * ============================================================
  */
-.doc-page {
-  --doc-accent: var(--color-foreground);
-  background: #e9e8e5;
-  min-height: 100vh;
-  padding: 2rem 0;
-}
-/* The document body uses Sora — the original document font — everywhere, on screen
-   and in the printed PDF. Set explicitly so the sheet never inherits the app body face. */
-.doc-page,
-.doc-sheet {
-  font-family: var(--font-sora), "Sora", system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-.doc-sheet {
-  background: #fff;
-  color: #111827;
-  width: 100%;
-  max-width: 8.27in;
-  min-height: 11.69in;
-  margin: 0 auto;
-  padding: 0.6in;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
-}
-
-@media (max-width: 640px) {
-  .doc-page {
-    padding: 0;
-  }
+@layer components {
+  .doc-page,
   .doc-sheet {
-    max-width: 100%;
-    min-height: 0;
-    padding: 1rem 0.85rem;
-    box-shadow: none;
+    /* Fills — the document's only structure. */
+    --doc-paper: #ffffff;
+    --doc-fill-quiet: #f7f6f3;
+    --doc-fill: #f1efea;
+    --doc-fill-strong: #e7e4dd;
+    --doc-fill-ink: #131211;
+
+    /* Ink. Every value clears 4.5:1 on every fill above. */
+    --doc-ink: #12110f;
+    --doc-ink-body: #35332e;
+    --doc-ink-soft: #63615a;
+    --doc-ink-invert: #ffffff;
+    --doc-ink-invert-soft: #d8d5cd;
+
+    /* Radius. Panels are the generous step; insets sit one step tighter. */
+    --doc-r-panel: 1.75rem;
+    --doc-r-inset: 1.125rem;
+    --doc-r-chip: 999px;
+
+    /* Type scale. */
+    --doc-t-micro: 0.75rem;
+    --doc-t-xs: 0.875rem;
+    --doc-t-sm: 0.9375rem;
+    --doc-t-body: 1.0625rem;
+    --doc-t-lead: 1.1875rem;
+    --doc-t-h3: 1.5rem;
+    --doc-t-h2: 1.875rem;
+    --doc-t-h1: 2.25rem;
+    --doc-t-figure: 2.25rem;
+  }
+
+  .doc-page {
+    background: #e9e8e5;
+    min-height: 100vh;
+    padding: 2.5rem 1rem;
+  }
+
+  /* The document body uses Sora — the original document font — everywhere, on screen
+     and in the printed PDF. Set explicitly so the sheet never inherits the app body face. */
+  .doc-page,
+  .doc-sheet {
+    font-family:
+      var(--font-sora),
+      "Sora",
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif;
+  }
+
+  .doc-sheet {
+    background: var(--doc-paper);
+    color: var(--doc-ink-body);
+    font-size: var(--doc-t-body);
+    line-height: 1.7;
+    width: 100%;
+    max-width: 8.27in;
+    min-height: 11.69in;
+    margin: 0 auto;
+    padding: 0.75in;
+    border-radius: 1.5rem;
+    box-shadow:
+      0 1px 2px rgba(24, 22, 18, 0.06),
+      0 18px 48px -12px rgba(24, 22, 18, 0.22);
+  }
+
+  /* Emphasis inside prose is ink and weight, never a second colour. */
+  .doc-sheet strong {
+    color: var(--doc-ink);
+    font-weight: 600;
+  }
+
+  /*
+   * Tables, borderless. The header takes the strong fill, the body zebras between
+   * paper and the quiet fill, and the whole thing is clipped to the inset radius —
+   * so rows are told apart by tone rather than by rules.
+   */
+  .doc-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--doc-t-sm);
+    line-height: 1.5;
+  }
+  .doc-table thead th {
+    background: var(--doc-fill-strong);
+    color: var(--doc-ink);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.85rem 1.1rem;
+  }
+  .doc-table thead th:first-child {
+    border-top-left-radius: var(--doc-r-inset);
+  }
+  .doc-table thead th:last-child {
+    border-top-right-radius: var(--doc-r-inset);
+  }
+  .doc-table tbody td {
+    padding: 0.8rem 1.1rem;
+    color: var(--doc-ink-body);
+    background: var(--doc-paper);
+  }
+  /* Pairs with the panel tones above it: on paper, on quiet and on base fill alike,
+     the stripe stays visible and the last row still has a defined bottom edge. */
+  .doc-table tbody tr:nth-child(even) td {
+    background: var(--doc-fill);
+  }
+  .doc-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: var(--doc-r-inset);
+  }
+  .doc-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: var(--doc-r-inset);
+  }
+  /*
+   * Inverted ground. Remapping the tokens (rather than branching in every component)
+   * means any primitive dropped inside a dark panel reads correctly with no prop:
+   * a nested inset, a table, a bullet dot and a label all follow the same swap.
+   */
+  .doc-invert {
+    color: var(--doc-ink-body);
+    --doc-ink: #ffffff;
+    --doc-ink-body: #f0eee9;
+    --doc-ink-soft: #b8b5ac;
+    --doc-paper: #211f1c;
+    --doc-fill-quiet: #1c1a18;
+    --doc-fill: #26241f;
+    --doc-fill-strong: #322f29;
+  }
+
+  @media (max-width: 640px) {
+    .doc-page {
+      padding: 0;
+    }
+    .doc-page,
+    .doc-sheet {
+      /* A 28px radius eats a phone-width panel; step the whole scale down. */
+      --doc-r-panel: 1.25rem;
+      --doc-r-inset: 0.875rem;
+      --doc-t-figure: 2rem;
+      --doc-t-h1: 1.875rem;
+      --doc-t-h2: 1.625rem;
+      --doc-t-h3: 1.375rem;
+    }
+    .doc-sheet {
+      max-width: 100%;
+      min-height: 0;
+      padding: 1.5rem 1.125rem;
+      border-radius: 0;
+      box-shadow: none;
+    }
   }
 }
 
 @media print {
   @page {
     size: A4;
-    margin: 0.6in 0.5in;
+    /* Matches the on-screen 0.75in sheet padding, so the printed measure is the
+       same ~73 characters the page was designed around. */
+    margin: 0.7in 0.75in;
   }
   html,
   body {
@@ -168,6 +303,7 @@
     min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
   }
   /*

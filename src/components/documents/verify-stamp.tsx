@@ -26,7 +26,7 @@ export function VerifyStamp({ documentId }: { documentId: string }) {
       type: "svg",
       margin: 0,
       errorCorrectionLevel: "H",
-      color: { dark: "#111827", light: "#ffffff" },
+      color: { dark: "#12110f", light: "#ffffff" },
     })
       .then((out) => alive && setSvg(out))
       .catch(() => {});
@@ -36,17 +36,19 @@ export function VerifyStamp({ documentId }: { documentId: string }) {
   }, [ready, verifyUrl]);
 
   return (
-    <div className="flex shrink-0 flex-col items-center">
-      <div className="flex h-[88px] w-[88px] items-center justify-center border border-gray-200 bg-white [&>svg]:h-full [&>svg]:w-full">
+    // The stamp is a filled tile, not an outlined one: the QR needs a white quiet zone
+    // to scan, so the padding around it comes from the fill sitting behind it.
+    <div className="flex shrink-0 flex-col items-center gap-2.5 rounded-[var(--doc-r-inset)] bg-[var(--doc-fill)] p-4">
+      <div className="flex h-[88px] w-[88px] items-center justify-center rounded-md bg-white p-1.5 [&>svg]:h-full [&>svg]:w-full">
         {ready && svg ? (
           <span className="h-full w-full" dangerouslySetInnerHTML={{ __html: svg }} />
         ) : (
-          <span className="px-2 text-center text-[8px] leading-tight text-gray-400">
+          <span className="px-2 text-center text-[9px] leading-tight text-[var(--doc-ink-soft)]">
             QR on prepare
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+      <p className="text-[9px] font-semibold tracking-[0.16em] text-[var(--doc-ink-soft)] uppercase">
         Scan to verify
       </p>
     </div>

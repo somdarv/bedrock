@@ -14,19 +14,35 @@ export function DocumentFooter({ record }: { record: DocumentRecord }) {
   const { prepared, status } = useDocumentState();
   const ready = status === "ready" && prepared;
 
+  const meta: [string, string][] = [
+    ["Document ID", record.id],
+    ["Generated on system", record.system],
+    ["Time", ready ? prepared!.preparedAt : "— pending preparation —"],
+    ...(ready ? ([["Verification serial", prepared!.serial]] as [string, string][]) : []),
+  ];
+
   return (
-    // Stacks on a phone so the long document ID is not squeezed against the QR stamp.
-    <div className="mt-10 flex flex-col gap-6 border-t border-gray-300 pt-6 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0 text-xs text-gray-600">
-        <p>Approved by: {record.approver.name}</p>
-        <p className="mt-2 break-all text-gray-500">Document ID: {record.id}</p>
-        <p className="text-gray-500">Generated on System: {record.system}</p>
-        <p className="text-gray-500">
-          Time: {ready ? prepared!.preparedAt : "— pending preparation —"}
-        </p>
-        {ready && <p className="text-gray-500">Verification serial: {prepared!.serial}</p>}
+    <div className="avoid-break mt-16">
+      {/* A rule made of fill, like every other separator in the document. */}
+      <div className="h-2 rounded-[var(--doc-r-chip)] bg-[var(--doc-fill-strong)]" aria-hidden />
+
+      {/* Stacks on a phone so the long document ID is not squeezed against the QR stamp. */}
+      <div className="mt-7 flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
+            Approved by {record.approver.name}
+          </p>
+          <dl className="mt-4 space-y-2">
+            {meta.map(([label, value]) => (
+              <div key={label} className="flex flex-wrap gap-x-2 text-[length:var(--doc-t-micro)]">
+                <dt className="text-[var(--doc-ink-soft)]">{label}:</dt>
+                <dd className="break-all text-[var(--doc-ink-body)]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <VerifyStamp documentId={record.id} />
       </div>
-      <VerifyStamp documentId={record.id} />
     </div>
   );
 }
