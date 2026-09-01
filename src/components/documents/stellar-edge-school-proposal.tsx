@@ -602,9 +602,10 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
             Open the demo, then give us one meeting
           </Heading>
           <Lead className="mt-5">
-            Look at {DEMO_URL.replace(/^https?:\/\//, "")} first. Then we sit with you and the head
-            teacher once and go through your classes, your fees, your report card and how you talk
-            to parents today. That meeting costs nothing and it is what we build from.
+            Look at {DEMO_URL.replace(/^https?:\/\//, "")} first. Then we sit down once with you,
+            the head teacher and whoever keeps your accounts, and go through your classes, your
+            fees, your report card and how you talk to parents today. We agree the numbers and the
+            timing in that same meeting. It costs nothing and it is what we build from.
           </Lead>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-3">
             {["059 212 3054", "050 988 6584", "admin@saharabasetech.com"].map((c) => (
