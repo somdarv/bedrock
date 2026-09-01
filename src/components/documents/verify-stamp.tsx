@@ -48,7 +48,7 @@ export function VerifyStamp({ documentId }: { documentId: string }) {
           </span>
         )}
       </div>
-      <p className="text-[9px] font-semibold tracking-[0.16em] text-[var(--doc-ink-soft)] uppercase">
+      <p className="text-[10px] font-semibold tracking-[0.05em] text-[var(--doc-ink-soft)] uppercase">
         Scan to verify
       </p>
     </div>

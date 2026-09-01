@@ -93,7 +93,7 @@ export function Chip({
     <span
       className={cn(
         "inline-flex items-center rounded-[var(--doc-r-chip)] px-3.5 py-1.5",
-        "text-[length:var(--doc-t-micro)] font-semibold tracking-[0.16em] uppercase",
+        "text-[length:var(--doc-t-micro)] font-semibold tracking-[0.05em] uppercase",
         "text-[var(--doc-ink)]",
         PANEL_TONE[tone],
         className,
@@ -148,7 +148,7 @@ export function Eyebrow({
   return (
     <p
       className={cn(
-        "text-[length:var(--doc-t-micro)] font-semibold tracking-[0.18em] text-[var(--doc-ink-soft)] uppercase",
+        "text-[length:var(--doc-t-xs)] font-semibold tracking-[0.05em] text-[var(--doc-ink-soft)] uppercase",
         className,
       )}
     >

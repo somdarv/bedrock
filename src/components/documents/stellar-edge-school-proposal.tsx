@@ -23,16 +23,6 @@ import {
 
 const DEMO_URL = "https://shammah.saharabasetech.com";
 
-/** What makes up the GHS 22,200, so the figure reads as a total and not a guess. */
-const BUILD_BREAKDOWN: { item: string; amount: string }[] = [
-  { item: "Pupils, parents, admissions and the class structure", amount: "5,400" },
-  { item: "Attendance, marks and report cards", amount: "3,600" },
-  { item: "Fees, payments, receipts and the debtors list", amount: "4,600" },
-  { item: "Staff, payroll and the timetable", amount: "3,200" },
-  { item: "Parent app, SMS and WhatsApp", amount: "2,800" },
-  { item: "Moving your records in, setting up your school, training your staff", amount: "2,600" },
-];
-
 /** The appendix list. Generated from the catalogue so it cannot drift from what we build. */
 function FeatureList({ sections }: { sections: PackageListSection[] }) {
   return (
@@ -151,8 +141,12 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
           <Eyebrow>See It Working</Eyebrow>
           <Heading className="mt-3">Open it before you read another line</Heading>
           <P className="mt-5">
-            This is the system running, not pictures of it. Look around it, and then come back and
-            read what the rest of this says.
+            This is a demo. It is a real school system you can click around in, and it will show you
+            a good part of what we build and how it feels to use.
+          </P>
+          <P className="mt-4">
+            It is not what you would be handed. Yours would be set up around your classes, your fee
+            structure and your report card. Take this as the direction, not the finished thing.
           </P>
           <Inset className="mt-6">
             <p className="text-[length:var(--doc-t-lead)] font-semibold break-all text-[var(--doc-ink)]">
@@ -435,46 +429,21 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
           </P>
 
           <P className="mt-5">
-            Here is how that price is made up, so you can see it is a total and not a guess.
+            The price covers the build itself, moving your current pupil, staff and fee records into
+            it, setting up your classes, subjects and fee structure, putting your letterhead and
+            your report card into it, and training your staff until they can use it without us in
+            the room.
           </P>
-
-          <div className="mt-6 overflow-x-auto">
-            <table className="doc-table min-w-[24rem]">
-              <thead>
-                <tr>
-                  <th>What is being built</th>
-                  <th className="text-right">GHS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BUILD_BREAKDOWN.map((row) => (
-                  <tr key={row.item}>
-                    <td>{row.item}</td>
-                    <td className="text-right tabular-nums">{row.amount}</td>
-                  </tr>
-                ))}
-                {/* The total takes the header's fill so it reads as a sum, not a row. */}
-                <tr>
-                  <td className="bg-[var(--doc-fill-strong)]! font-semibold text-[var(--doc-ink)]">
-                    Total
-                  </td>
-                  <td className="bg-[var(--doc-fill-strong)]! text-right font-semibold text-[var(--doc-ink)] tabular-nums">
-                    22,200
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
 
           <Inset className="mt-7">
             <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
               Owning it does not mean you are on your own
             </p>
             <P className="mt-2.5">
-              We stay with the system after you own it. We watch it to make sure it is up, we keep
-              it backed up and secure, we move it forward when GES or GRA change something, and we
-              are the people you call when a teacher forgets her password in exams week. That is the
-              care plan, and it is GHS 4,000 a term.
+              We stay with the system after you own it. We keep it online, backed up and protected,
+              we watch it so you never have to, we are the ones fixing it the morning MTN or
+              WhatsApp changes something, and every improvement we build from then on lands in your
+              system too. That is the care plan, and it is GHS 4,000 a term.
             </P>
             <P className="mt-4">
               It starts the term after handover, and it is billed per term rather than per month so
@@ -489,10 +458,14 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
         <Panel tone="quiet">
           <Eyebrow>About These Figures</Eyebrow>
           <P className="mt-4">
-            Everything above is proposed, not fixed. We put real numbers on paper because a proposal
-            with no numbers wastes your time, but we would rather agree them with you than hand them
-            to you. If something here does not fit the school, tell us and we will work it out
-            together.
+            Everything above is proposed, not fixed. That goes for the amounts and just as much for
+            when they are paid. We put real numbers on paper because a proposal with no numbers
+            wastes your time, but we would rather agree them with you than hand them to you.
+          </P>
+          <P className="mt-4">
+            If the amount is wrong for the school, or the timing falls in the wrong week of term,
+            say so and we will work out something that fits. We would rather start well than start
+            on our own numbers.
           </P>
         </Panel>
       </Section>
@@ -504,32 +477,49 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
           <Heading className="mt-3">Why there is still a termly fee on a system you own</Heading>
           <P className="mt-5">It is a fair question, so here is the plain answer.</P>
           <P className="mt-4">
-            <strong>Anything we get wrong, we fix free, for as long as you use the system.</strong>{" "}
-            That is not what the care plan is for. The care plan is for the things that are
-            nobody&rsquo;s mistake.
+            <strong>First, what the care plan is not for.</strong> Adding a fee item, opening a
+            class, changing a teacher, resetting a password: the system does all of that by itself
+            and you never pay us for it. Anything we get wrong, we fix free, for as long as you use
+            the system. None of that is what you are paying for here.
+          </P>
+          <P className="mt-4">
+            What you are paying for is that the system is still alive, still safe, and still worth
+            using in three years. That does not happen on its own.
           </P>
           <BulletList className="mt-6">
             <Bullet>
-              <strong>The rules change.</strong> GRA changes tax rates. GES changes the report card.
-              SSNIT changes its percentages. Every year something moves, and somebody has to do that
-              work so your system keeps up.
+              <strong>It holds everything, so it has to be protected.</strong> Every child&rsquo;s
+              name, photo, home, medical note and emergency contact is in there, and so is every
+              cedi the school has collected. It sits on a computer online that has to be paid for,
+              patched and watched every month. A school system nobody is watching is one dead disk
+              away from losing a term of marks, and one weak password away from something far worse.
+              We take that on so it is never a thing you have to think about.
             </Bullet>
             <Bullet>
-              <strong>The school changes.</strong> A new fee item. A new class. A new accountant who
-              needs training. A teacher who forgets her password in the middle of exams week.
+              <strong>What it plugs into keeps moving, and it moves without warning.</strong> MTN,
+              Telecel and AT change how payments come through. Meta changes what WhatsApp costs and
+              what it will let you send. SMS providers change their rules. Any one of those can stop
+              your fee collection or your parent messages working on a Monday morning, and somebody
+              has to be watching for it and fixing it that same morning. That somebody is us.
             </Bullet>
             <Bullet>
-              <strong>It has to keep running.</strong> The system sits on a computer online, backed
-              up every day and kept secure. We watch it so you do not have to. That costs money
-              every single month, whether anyone touches it or not.
+              <strong>Someone picks up when it matters.</strong> The two times a school cannot wait
+              are exams week and the first three weeks of term. Those are exactly the weeks
+              something will go wrong. You are calling people who already know your school and your
+              setup, not explaining yourself to a queue.
             </Bullet>
             <Bullet>
-              <strong>Small changes you ask for.</strong> A new report layout, a new user, a small
-              adjustment to how something works. These are included rather than quoted for one by
-              one.
+              <strong>You get everything we build next.</strong> We are still building this system
+              and we will be for years. Whatever we add next term for any school on it lands in
+              yours too, at no extra charge. You are not paying to stand still. You are paying to
+              keep moving with us, and that is the part that is worth the most over time.
             </Bullet>
           </BulletList>
           <P className="mt-6">
+            When GES changes the report card or GRA moves a tax rate, that work is covered too. It
+            just is not the main reason, because it does not happen often enough to be one.
+          </P>
+          <P className="mt-4">
             The simplest way to think about it: you can buy a school bus outright and the bus is
             yours. You still pay for fuel, servicing and a driver.
           </P>
@@ -571,12 +561,15 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
         <Eyebrow>Terms</Eyebrow>
         <BulletList className="mt-5">
           <Bullet>
-            <strong>Starting on the rental.</strong> There is no build fee. The GHS 3,000 commitment
-            fee starts the work and comes back to you against your first termly payments.
+            <strong>Starting on the rental.</strong> There is no build fee. A commitment fee of GHS
+            3,000 starts the work and comes back to you against your first termly payments. Both the
+            amount and when it falls are open to discussion.
           </Bullet>
           <Bullet>
-            <strong>Starting on the purchase.</strong> Half of the GHS 22,200 starts the work and
-            the rest is due at handover.
+            <strong>Starting on the purchase.</strong> As a starting point, half of the GHS 22,200
+            begins the work and the rest is due at handover. If that shape does not suit your term,
+            tell us. We will agree an amount and a schedule that the school can actually meet, and
+            we are happy to spread it.
           </Bullet>
           <Bullet>
             <strong>Care plans</strong> are billed each term, not each month, so they fall due when
@@ -592,9 +585,11 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
             records at any time. Nothing is ever held back over a bill.
           </Bullet>
           <Bullet>
-            <strong>This offer</strong> holds for 21 days from the date at the top. Before anything
-            is signed we sit with you and the head teacher once, to agree exactly what is being
-            built.
+            <strong>Nothing here is signed off yet.</strong> Before anything is, we sit down with
+            you, the head teacher, whoever keeps your accounts and anyone else you want in the room.
+            We go through exactly what is being built, exactly what it costs and exactly when it is
+            paid, and we agree all three together. This offer holds for 21 days from the date at the
+            top, and if you need longer than that, ask us.
           </Bullet>
         </BulletList>
       </Section>
