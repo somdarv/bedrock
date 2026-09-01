@@ -229,8 +229,8 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
             </Bullet>
             <Bullet>
               <strong>Everything is included.</strong> Every feature listed below, hosting, backups,
-              support, training, every update we make, and the care plan. The termly fee is the only
-              bill.
+              support, training, the improvements we make to them, and the care plan. The termly fee
+              is the only bill.
             </Bullet>
             <Bullet>
               <strong>How we count.</strong> The number we charge for is the number of pupils in the
@@ -442,8 +442,8 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
             <P className="mt-2.5">
               We stay with the system after you own it. We keep it online, backed up and protected,
               we watch it so you never have to, we are the ones fixing it the morning MTN or
-              WhatsApp changes something, and every improvement we build from then on lands in your
-              system too. That is the care plan, and it is GHS 4,000 a term.
+              WhatsApp changes something, and the improvements we make to what you are running
+              arrive as we make them. That is the care plan, and it is GHS 4,000 a term.
             </P>
             <P className="mt-4">
               It starts the term after handover, and it is billed per term rather than per month so
@@ -509,10 +509,12 @@ export function StellarEdgeSchoolProposal({ record }: { record: DocumentRecord }
               setup, not explaining yourself to a queue.
             </Bullet>
             <Bullet>
-              <strong>You get everything we build next.</strong> We are still building this system
-              and we will be for years. Whatever we add next term for any school on it lands in
-              yours too, at no extra charge. You are not paying to stand still. You are paying to
-              keep moving with us, and that is the part that is worth the most over time.
+              <strong>What you have keeps getting better.</strong> We are still working on this
+              system and we will be for years. As we sharpen the parts you already use, those
+              improvements arrive in your system as we make them, at no extra charge. What you are
+              running in two years will be better than what we hand you, and you will not have paid
+              more for that. You are not paying to stand still. You are paying to keep moving with
+              us, and over time that is the part worth the most.
             </Bullet>
           </BulletList>
           <P className="mt-6">
