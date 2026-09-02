@@ -83,6 +83,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20260902-PRO-SWAD-59",
+    reference: "PRO-SWAD-59",
+    category: "proposals",
+    type: "Proposal",
+    title: "Restaurant & Bar Operations System for Swad International Kitchen & Bar",
+    client: "Swad International Kitchen & Bar",
+    project: "Restaurant & Bar Operations System",
+    issueDate: "2 September 2026",
+    validUntil: "23 September 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260901-PRO-STE-58",
     reference: "PRO-STE-58",
     category: "proposals",

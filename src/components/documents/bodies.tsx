@@ -4,6 +4,7 @@ import { DropynFeeSchedule } from "./dropyn-fee-schedule";
 import { GreaterHeightsProposal } from "./greater-heights-proposal";
 import { ShammahSchoolMisProposal } from "./shammah-school-mis-proposal";
 import { StellarEdgeSchoolProposal } from "./stellar-edge-school-proposal";
+import { SwadKitchenBarProposal } from "./swad-kitchen-bar-proposal";
 import { ZenithFeeSchedule } from "./zenith-fee-schedule";
 import { ZenithSchoolProposal } from "./zenith-school-proposal";
 
@@ -20,6 +21,7 @@ const BODIES: Record<string, (record: DocumentRecord) => React.ReactNode> = {
   "SAH-BD-20260714-BIL-DEIG-56": (record) => <DeiGratiaFeeSchedule record={record} />,
   "SAH-BD-20260826-PRO-SHM-57": (record) => <ShammahSchoolMisProposal record={record} />,
   "SAH-BD-20260901-PRO-STE-58": (record) => <StellarEdgeSchoolProposal record={record} />,
+  "SAH-BD-20260902-PRO-SWAD-59": (record) => <SwadKitchenBarProposal record={record} />,
 };
 
 export function hasDocumentBody(id: string): boolean {

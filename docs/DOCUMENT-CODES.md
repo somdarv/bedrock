@@ -119,6 +119,7 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 | Dei Gratia Medical Services | `DEIG` |
 | Shammah Preparatory School | `SHM` |
 | Stellar Edge School | `STE` |
+| Swad International Kitchen & Bar | `SWAD` |
 
 Assigned once per client and reused across their documents.
 
