@@ -102,6 +102,7 @@ export function PackageDetail({
   // still reads true when the work was billed rather than paid up front.
   const paid = paidTotal(pkg);
   const bal = balance(pkg);
+  const invoicedOutstanding = Math.max(0, pkg.invoicedOutstanding ?? 0);
   const publicUrl = `${publicBaseUrl()}/p/${pkg.publicSlug}`;
   // The receipt is drawn from payments recorded on the package itself. A deferred package is
   // paid on the invoice raised for it, so its receipt belongs to that invoice, not here.
@@ -541,6 +542,24 @@ export function PackageDetail({
                 {formatCedis(bal)}
               </span>
             </div>
+            {/* Money already billed and still waiting. Without this row a project whose scope
+                carries no prices reads as ₵0.00 owed on every figure above, while the client
+                has an invoice in hand. */}
+            {invoicedOutstanding > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Invoiced, not yet paid</span>
+                <span className="text-warning tabular-nums">
+                  {formatCedis(invoicedOutstanding)}
+                </span>
+              </div>
+            )}
+            {invoicedOutstanding > 0 && total <= 0 && (
+              <p className="bg-warning-soft text-warning rounded-md px-3 py-2 text-xs leading-5">
+                Nothing on this project is priced, so its total reads ₵0.00 while{" "}
+                {formatCedis(invoicedOutstanding)} sits on an invoice. Give it a fixed total or
+                add line items, and this panel and the client link will agree.
+              </p>
+            )}
           </div>
 
           <dl className="space-y-2 rounded-lg border bg-surface p-5 text-sm">
