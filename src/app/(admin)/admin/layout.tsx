@@ -30,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <UserMenu user={user} />
         </header>
-        <main className="flex-1 overflow-y-auto px-4 py-6 [--drive-sticky-top:-1.5rem] sm:px-6 sm:py-8 sm:[--drive-sticky-top:-2rem] md:px-10 md:py-10 md:[--drive-sticky-top:-2.5rem]">
+        <main className="flex-1 overflow-y-auto px-4 py-6 [--drive-sticky-top:-1.5rem] [scrollbar-gutter:stable] sm:px-6 sm:py-8 sm:[--drive-sticky-top:-2rem] md:px-10 md:py-10 md:[--drive-sticky-top:-2.5rem]">
           {children}
         </main>
       </div>

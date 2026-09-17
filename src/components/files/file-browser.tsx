@@ -465,13 +465,18 @@ export function FileBrowser(props: FileBrowserProps) {
       onPress(kind, id, e, open) {
         const k = key(kind, id);
         if (open || !admin) return openItem(kind, id);
-        const sel = selectedRef.current;
+        // Every branch updates from the previous selection rather than from a copy read at the
+        // start: two picks in the same instant used to leave only the second one standing.
+        const toggle = () =>
+          setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(k)) next.delete(k);
+            else next.add(k);
+            return next;
+          });
         if (!fineRef.current) {
-          if (sel.size === 0) return openItem(kind, id);
-          const next = new Set(sel);
-          if (next.has(k)) next.delete(k);
-          else next.add(k);
-          return setSelected(next);
+          if (selectedRef.current.size === 0) return openItem(kind, id);
+          return toggle();
         }
         const mouse = e as React.MouseEvent;
         if (mouse.shiftKey && anchor.current) {
@@ -480,16 +485,11 @@ export function FileBrowser(props: FileBrowserProps) {
           const b = list.indexOf(k);
           if (a >= 0 && b >= 0) {
             const [from, to] = a < b ? [a, b] : [b, a];
-            return setSelected(new Set([...sel, ...list.slice(from, to + 1)]));
+            return setSelected((prev) => new Set([...prev, ...list.slice(from, to + 1)]));
           }
         }
         anchor.current = k;
-        if (mouse.metaKey || mouse.ctrlKey) {
-          const next = new Set(sel);
-          if (next.has(k)) next.delete(k);
-          else next.add(k);
-          return setSelected(next);
-        }
+        if (mouse.metaKey || mouse.ctrlKey) return toggle();
         setSelected(new Set([k]));
       },
       onLongPress(kind, id) {
@@ -725,43 +725,69 @@ export function FileBrowser(props: FileBrowserProps) {
         <div className="min-w-0">
           {(trail.length > 0 || folderId || q) && (
             <nav aria-label="Folder path" className="-ml-1.5 mb-1.5 flex flex-wrap items-center gap-y-0.5 text-sm">
-              {trail.map((c) => (
-                <React.Fragment key={c.href}>
-                  <Link href={c.href} className="rounded-full px-1.5 py-0.5 text-[var(--doc-ink-soft)] hover:bg-[var(--doc-fill)] hover:text-[var(--doc-ink)]">
+              {[
+                ...trail.map((c) => (
+                  <Link
+                    key={c.href}
+                    href={c.href}
+                    className="max-w-[14rem] truncate rounded-full px-1.5 py-0.5 text-[var(--doc-ink-body)] transition-colors hover:bg-[var(--doc-fill)] hover:text-[var(--doc-ink)]"
+                  >
                     {c.label}
                   </Link>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-[var(--doc-ink-soft)]" />
+                )),
+                ...(folderId || q ? (q ? [{ label: rootLabel, id: null }] : crumbs) : []).map((c) => (
+                  <CrumbButton
+                    key={c.id ?? "root"}
+                    label={c.label}
+                    active={dropFolder === `crumb:${c.id ?? "root"}`}
+                    onOpen={() => go(c.id)}
+                    onDragOver={(e) => {
+                      if (!admin || !e.dataTransfer.types.includes(DRAG_TYPE)) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDropFolder(`crumb:${c.id ?? "root"}`);
+                    }}
+                    onDragLeave={() => setDropFolder(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDropFolder(null);
+                      void handleDrop(e.dataTransfer, c.id);
+                    }}
+                  />
+                )),
+                // Where you are now, in bold. At the project root the heading below says it
+                // already, so the path stops at the project instead of repeating itself.
+                ...(folderId || q
+                  ? [
+                      <span
+                        key="current"
+                        aria-current="page"
+                        className="max-w-[16rem] truncate px-1.5 py-0.5 font-semibold text-[var(--doc-ink)]"
+                      >
+                        {q ? `Results for “${query.trim()}”` : current?.name ?? rootLabel}
+                      </span>,
+                    ]
+                  : []),
+              ].map((node, i, all) => (
+                <React.Fragment key={i}>
+                  {node}
+                  {i < all.length - 1 && (
+                    <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-[var(--doc-ink-soft)]" />
+                  )}
                 </React.Fragment>
               ))}
-              {(folderId || q) &&
-                (q ? [{ label: rootLabel, id: null }] : crumbs).map((c) => (
-                  <React.Fragment key={c.id ?? "root"}>
-                    <CrumbButton
-                      label={c.label}
-                      active={dropFolder === `crumb:${c.id ?? "root"}`}
-                      onOpen={() => go(c.id)}
-                      onDragOver={(e) => {
-                        if (!admin || !e.dataTransfer.types.includes(DRAG_TYPE)) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDropFolder(`crumb:${c.id ?? "root"}`);
-                      }}
-                      onDragLeave={() => setDropFolder(null)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDropFolder(null);
-                        void handleDrop(e.dataTransfer, c.id);
-                      }}
-                    />
-                    <ChevronRightIcon className="h-3.5 w-3.5 text-[var(--doc-ink-soft)]" />
-                  </React.Fragment>
-                ))}
             </nav>
           )}
           <div className="flex items-center gap-1.5">
             {folderId && !q && (
-              <IconButton label="Back" size="sm" className="-ml-2 lg:hidden" onClick={() => go(current?.parentId ?? null)}>
+              <IconButton
+                label={`Back to ${nameOf(current?.parentId ?? null)}`}
+                size="sm"
+                tone="fill"
+                className="-ml-1 mr-0.5"
+                onClick={() => go(current?.parentId ?? null)}
+              >
                 <ChevronLeftIcon />
               </IconButton>
             )}
@@ -942,7 +968,7 @@ export function FileBrowser(props: FileBrowserProps) {
             {shownFolders.length > 0 && (
               <div>
                 <GroupLabel>Folders</GroupLabel>
-                <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(15.5rem,1fr))]">
                   {shownFolders.map((f) => (
                     <FolderCard
                       key={f.id}
@@ -1209,7 +1235,7 @@ function CrumbButton({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={cn(
-        "max-w-[14rem] truncate rounded-full px-1.5 py-0.5 text-[var(--doc-ink-soft)] transition-colors hover:bg-[var(--doc-fill)] hover:text-[var(--doc-ink)]",
+        "max-w-[14rem] truncate rounded-full px-1.5 py-0.5 text-[var(--doc-ink-body)] transition-colors hover:bg-[var(--doc-fill)] hover:text-[var(--doc-ink)]",
         active && "bg-[var(--doc-fill-strong)] text-[var(--doc-ink)]",
       )}
     >

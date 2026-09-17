@@ -78,10 +78,11 @@ function Check({
     >
       <span
         className={cn(
-          "flex h-5 w-5 items-center justify-center rounded-full transition-colors duration-150",
+          "flex h-[1.375rem] w-[1.375rem] items-center justify-center rounded-full transition-colors duration-150",
+          // The ring is what makes it legible on a pale thumbnail; the drop shadow alone was not.
           checked
-            ? "bg-[var(--doc-ink)] text-[var(--doc-paper)]"
-            : "bg-[var(--doc-paper)] shadow-[0_1px_3px_rgba(18,17,15,0.28)]",
+            ? "bg-[#12110f] text-white shadow-[0_0_0_1.5px_rgba(255,255,255,0.92),0_1px_3px_rgba(18,17,15,0.35)]"
+            : "bg-white shadow-[0_0_0_1.5px_rgba(18,17,15,0.42),0_1px_2px_rgba(18,17,15,0.18)]",
         )}
       >
         {checked && <CheckIcon className="h-3.5 w-3.5" />}
@@ -230,11 +231,9 @@ function Chip({ children }: { children: React.ReactNode }) {
 const surface = (selected: boolean, dropTarget = false) =>
   cn(
     "group relative transition-colors duration-150 ease-out",
-    selected
-      ? "doc-invert bg-[var(--doc-fill-ink)]"
-      : dropTarget
-        ? "bg-[var(--doc-fill-strong)] shadow-[0_0_0_2px_var(--doc-ink)]"
-        : "",
+    // `drive-selected` is a tint plus an inset rule (globals.css). An inset one cannot be clipped
+    // by the list's rounded, overflowing container the way an outer ring is.
+    selected ? "drive-selected" : dropTarget ? "drive-drop" : "",
   );
 
 /** The invisible button that makes the whole item clickable, under the tick box and menu. */
@@ -270,7 +269,11 @@ function HitArea({
       type="button"
       aria-label={label}
       draggable={draggable}
-      onDragStart={(e) => handlers.onDragStart(kind, id, e)}
+      onDragStart={(e) => {
+        const card = e.currentTarget.parentElement;
+        if (card) e.dataTransfer.setDragImage(card, 24, 24);
+        handlers.onDragStart(kind, id, e);
+      }}
       onPointerDown={(e) => {
         lastPointer.current = e.pointerType;
         held.current = false;
@@ -326,7 +329,7 @@ export const FolderCard = React.memo(function FolderCard({
       onDrop={(e) => h.onDropFolder(folder.id, e)}
       className={cn(
         surface(c.selected, dropTarget),
-        "flex h-[4.25rem] items-center gap-1 rounded-[var(--doc-r-inset)] pr-1 pl-2",
+        "flex min-h-[4.5rem] items-center gap-1 rounded-[var(--doc-r-inset)] py-2.5 pr-1 pl-2",
         !c.selected && !dropTarget && "bg-[var(--doc-fill)] hover:bg-[var(--doc-fill-strong)]",
       )}
     >
@@ -357,10 +360,12 @@ export const FolderCard = React.memo(function FolderCard({
             <RenameField initial={folder.name} isFile={false} onDone={(n) => h.onRename("folder", folder.id, n)} />
           </div>
         ) : (
-          <p className="truncate text-[15px] leading-tight font-semibold text-[var(--doc-ink)]">{folder.name}</p>
+          <p className="line-clamp-2 text-[15px] leading-snug font-semibold text-[var(--doc-ink)]">
+            {folder.name}
+          </p>
         )}
         {!c.renaming && (
-          <p className="mt-0.5 truncate text-xs text-[var(--doc-ink-soft)]">
+          <p className="mt-0.5 text-xs whitespace-nowrap text-[var(--doc-ink-soft)]">
             {stats.files === 0 ? "Empty" : `${plural(stats.files, "file")} · ${formatBytes(stats.bytes)}`}
           </p>
         )}

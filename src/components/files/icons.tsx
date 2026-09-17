@@ -124,7 +124,7 @@ export const ChevronDownIcon = ({ className }: P) => (
 );
 export const CheckIcon = ({ className }: P) => (
   <Svg className={className}>
-    <path d="M5 12.5 9.5 17 19 7.5" strokeWidth="2.2" />
+    <path d="M5 12.5 9.5 17 19 7.5" strokeWidth="2.8" />
   </Svg>
 );
 export const LockIcon = ({ className }: P) => (
