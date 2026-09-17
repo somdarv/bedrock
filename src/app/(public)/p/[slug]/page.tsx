@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { PortalPayButton } from "@/components/portal/portal-pay-button";
-import { PortalPreviews } from "@/components/portal/portal-previews";
+import { FileBrowser } from "@/components/files/file-browser";
 import {
   api,
   ApiError,
@@ -32,8 +32,15 @@ function extractSlug(raw: string): string {
   return match ? match[0] : raw;
 }
 
-export default async function ClientPortalPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ClientPortalPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ folder?: string }>;
+}) {
   const { slug: rawSlug } = await params;
+  const { folder } = await searchParams;
   const slug = extractSlug(rawSlug);
 
   const pkg = await api.packages.getBySlug(slug).catch((e) => {
@@ -115,7 +122,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
                 <path d="M20 6 9 17l-5-5" />
               </svg>
-              Paid in full — thank you. Your files are unlocked below.
+              Paid in full. Thank you. Your files are unlocked below.
             </p>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -327,13 +334,14 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ s
         </section>
       )}
 
-      {/* Deliverables — watermarked previews; originals unlock at zero balance */}
+      {/* Files: previews for everyone, originals once the balance allows */}
       {pkg.deliverables.length > 0 && (
-        <PortalPreviews
-          deliverables={pkg.deliverables}
+        <FileBrowser
+          mode="client"
+          pkg={pkg}
           slug={slug}
           apiBase={apiBase}
-          settled={settled}
+          initialFolderId={folder ?? null}
         />
       )}
     </div>

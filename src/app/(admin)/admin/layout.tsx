@@ -1,4 +1,4 @@
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminSidebar, MobileNav } from "@/components/admin/admin-sidebar";
 import { UserMenu } from "@/components/admin/user-menu";
 import { requireSession } from "@/lib/auth/session";
 import { api } from "@/lib/api";
@@ -23,11 +23,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminSidebar counts={{ attention, infra: infraAttention }} />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-6 md:px-10">
-          <span className="eyebrow">Bedrock Admin</span>
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6 md:px-10">
+          <div className="flex items-center gap-2">
+            <MobileNav counts={{ attention, infra: infraAttention }} />
+            <span className="eyebrow">Bedrock Admin</span>
+          </div>
           <UserMenu user={user} />
         </header>
-        <main className="flex-1 overflow-y-auto px-6 py-8 md:px-10 md:py-10">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-6 [--drive-sticky-top:-1.5rem] sm:px-6 sm:py-8 sm:[--drive-sticky-top:-2rem] md:px-10 md:py-10 md:[--drive-sticky-top:-2.5rem]">
+          {children}
+        </main>
       </div>
     </div>
   );

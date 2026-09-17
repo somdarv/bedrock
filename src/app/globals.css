@@ -121,8 +121,11 @@
  * ============================================================
  */
 @layer components {
+  /* `.drive` is the file repository. It borrows the document palette so files and the
+     proposals they belong to read as one system: fills, never lines. */
   .doc-page,
-  .doc-sheet {
+  .doc-sheet,
+  .drive {
     /* Fills — the document's only structure. */
     --doc-paper: #ffffff;
     --doc-fill-quiet: #f7f6f3;
@@ -257,7 +260,8 @@
       padding: 0;
     }
     .doc-page,
-    .doc-sheet {
+    .doc-sheet,
+    .drive {
       /* A 28px radius eats a phone-width panel; step the whole scale down. */
       --doc-r-panel: 1.25rem;
       --doc-r-inset: 0.875rem;
@@ -330,5 +334,106 @@
   tr {
     page-break-inside: auto;
     break-inside: auto;
+  }
+}
+
+/*
+ * File repository motion. Each movement says where something came from: a sheet rises from
+ * the bottom edge, a menu drops from its button. Ease-out, under 200ms, and nothing at all
+ * for anyone who has asked for less motion.
+ */
+@layer components {
+  .drive-fade {
+    animation: drive-fade 160ms ease-out both;
+  }
+  .drive-rise {
+    animation: drive-rise 190ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .drive-pop {
+    animation: drive-pop 150ms ease-out both;
+    transform-origin: top right;
+  }
+  .drive-slide {
+    animation: drive-slide 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Long folders: let the browser skip laying out tiles that are off screen. */
+  .drive-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 15rem;
+  }
+  .drive-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 3.75rem;
+  }
+
+  @keyframes drive-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes drive-rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+  @keyframes drive-slide {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes drive-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drive-fade,
+    .drive-rise,
+    .drive-pop,
+    .drive-slide {
+      animation: none;
+    }
+    .drive,
+    .drive * {
+      transition-duration: 0ms !important;
+    }
+  }
+}
+
+/* File list rows: one grid, so the header and every row line up at each width. */
+@layer components {
+  .drive-grid-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+    align-items: center;
+    column-gap: 0.75rem;
+    min-height: 3.75rem;
+    padding: 0.25rem 0.375rem 0.25rem 0.625rem;
+  }
+  .drive-head {
+    min-height: 2.5rem;
+  }
+  @media (min-width: 768px) {
+    .drive-grid-row {
+      grid-template-columns: 2.5rem minmax(0, 1fr) 5.5rem 9rem 2.5rem;
+      min-height: 3.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .drive-grid-row {
+      grid-template-columns: 2.5rem minmax(0, 1fr) 5.5rem 6.5rem 9rem 2.5rem;
+    }
+  }
+  /* Zebra instead of rules, as in the document tables. A selected row keeps its ink. */
+  .drive-list > .drive-row:not(.doc-invert):nth-child(odd) {
+    background: var(--doc-fill-quiet);
+  }
+  .drive-list > .drive-row:not(.doc-invert):hover {
+    background: var(--doc-fill);
   }
 }

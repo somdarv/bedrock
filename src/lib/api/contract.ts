@@ -6,6 +6,8 @@ import type {
   ClientAssetInput,
   ClientInput,
   ClientNotifyEvent,
+  FileManifest,
+  FileSelection,
   FxInput,
   FxState,
   HostingServer,
@@ -31,6 +33,7 @@ import type {
   TestServerInput,
   TestServerResult,
   TrackResult,
+  UploadPlan,
   VaultEntryInput,
   VaultEntryRecord,
   VaultKeyInput,
@@ -87,11 +90,56 @@ export interface BedrockApi {
     notify(id: string, event: ClientNotifyEvent): Promise<WorkPackage>;
     /** Toggle a line item's done flag to drive the client progress bar. */
     setLineItemDone(packageId: string, itemId: string, done: boolean): Promise<WorkPackage>;
-    /** Upload an original; the backend stores it in R2 and queues preview generation. */
-    addDeliverable(packageId: string, file: File): Promise<WorkPackage>;
+    /**
+     * Upload a file in one request. Only for storage that cannot take parts (the local disk in
+     * dev, and the mock); on R2 files go through startUpload.
+     */
+    addDeliverable(packageId: string, file: File, folderId?: string | null): Promise<WorkPackage>;
     removeDeliverable(packageId: string, deliverableId: string): Promise<WorkPackage>;
     /** Delete all original files from storage (keep previews) to free space after handoff. */
     purgeDeliverables(packageId: string): Promise<WorkPackage>;
+
+    // ----- The file repository (docs/FILES.md) -----
+    createFolder(
+      packageId: string,
+      input: { name: string; parentId: string | null },
+    ): Promise<WorkPackage>;
+    /** Rename and/or move a folder. `parentId: null` moves it to the root. */
+    updateFolder(
+      packageId: string,
+      folderId: string,
+      input: { name?: string; parentId?: string | null },
+    ): Promise<WorkPackage>;
+    /** Rename and/or move a file. */
+    updateFile(
+      packageId: string,
+      fileId: string,
+      input: { filename?: string; folderId?: string | null },
+    ): Promise<WorkPackage>;
+    moveFiles(packageId: string, selection: FileSelection, to: string | null): Promise<WorkPackage>;
+    /** Deletes the files, the folders and everything inside them, from storage too. */
+    deleteFiles(packageId: string, selection: FileSelection): Promise<WorkPackage>;
+    /** Open an upload. The answer says how the bytes should travel. */
+    startUpload(
+      packageId: string,
+      input: { filename: string; size: number; mime: string | null; folderId: string | null },
+    ): Promise<UploadPlan>;
+    /** Presigned PUT URLs for up to 100 parts, keyed by part number. */
+    signUploadParts(
+      packageId: string,
+      uploadId: string,
+      parts: number[],
+    ): Promise<Record<string, string>>;
+    completeUpload(
+      packageId: string,
+      uploadId: string,
+      parts: { partNumber: number; etag: string }[],
+    ): Promise<WorkPackage>;
+    abortUpload(packageId: string, uploadId: string): Promise<void>;
+    /** What a ZIP of the selection holds. An empty selection is the whole package. */
+    fileManifest(packageId: string, selection: FileSelection): Promise<FileManifest>;
+    /** The client's ZIP: unlocked files only, one folder or everything. */
+    portalManifest(slug: string, folderId: string | null): Promise<FileManifest>;
     /**
      * Record a confirmed payment and run the two-gate logic. In production this is
      * driven by the verified Paystack webhook; admin entry covers offline payments.

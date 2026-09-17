@@ -2,6 +2,7 @@
 
 > Living context for continuing work across sessions. **Last updated: 2026-07-06.**
 > Read this first, then [ARCHITECTURE.md](./ARCHITECTURE.md), [DOCUMENT-CODES.md](./DOCUMENT-CODES.md), [ROADMAP.md](./ROADMAP.md).
+> The client work repository (folders, large uploads, ZIP downloads) has its own doc: [FILES.md](./FILES.md).
 
 ---
 
@@ -73,6 +74,14 @@ Key backend env (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERABLES_DI
   new tab. Records live in the DB; author locally + seed (see §6).
 - **R2 storage** — originals stored private; downloads **gated** (locked until balance 0) via
   signed, time-limited URLs; "free up storage" purges originals → download 410.
+- **Files: the client work repository** (2026-09-17) — folders inside folders on every work
+  package, any file type up to **2 GB** (uploaded in 10 MB parts), rename, move, bulk delete,
+  and ZIP downloads of a folder or a whole project, streamed with an exact Content-Length.
+  `/admin/files` lists every client as a folder and searches every file. The client portal shows
+  the same tree with previews and downloads what is unlocked. Deleting now really frees storage.
+  **Read [FILES.md](./FILES.md)** — it carries the upload protocol, the one Cloudflare CORS rule
+  that turns on browser-direct uploads, and the two housekeeping commands
+  (`files:backfill-sizes` to run once after deploying, `files:prune-uploads` scheduled daily).
 - **Media pipeline (images)** — **real** downscaled low-res JPEG previews via **PHP-GD**. The tiled
   watermark is now **off by default** (`MEDIA_WATERMARK_ENABLED=false`) — for graphic review the
   low-res preview + view-only framed portal modal + gated originals are the protection; flip the env

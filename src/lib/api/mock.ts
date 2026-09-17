@@ -1,7 +1,8 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableType, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type FileManifest, type FileSelection, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
-import { deliverableTypeFromName, formatCedis } from "@/lib/utils";
+import { formatCedis } from "@/lib/utils";
+import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
 
 /**
  * In-memory mock backend. Default in dev so the frontend is never blocked on the
@@ -266,7 +267,23 @@ const packages: WorkPackage[] = [
         paidAt: "2026-06-15T10:12:00Z",
       },
     ],
-    deliverables: [],
+    folders: [
+      { id: "fd_logos", parentId: null, name: "Logos", createdAt: "2026-06-16T09:00:00Z", updatedAt: "2026-06-16T09:00:00Z" },
+      { id: "fd_final", parentId: "fd_logos", name: "Final", createdAt: "2026-06-18T09:00:00Z", updatedAt: "2026-06-18T09:00:00Z" },
+      { id: "fd_cards", parentId: null, name: "Business cards", createdAt: "2026-06-17T09:00:00Z", updatedAt: "2026-06-17T09:00:00Z" },
+      { id: "fd_source", parentId: null, name: "Source files", createdAt: "2026-06-19T09:00:00Z", updatedAt: "2026-06-19T09:00:00Z" },
+    ],
+    deliverables: [
+      seedFile("dl_s1", "fd_final", "ama-boateng-logo-primary.png", 2_418_332, "2026-06-18T10:12:00Z"),
+      seedFile("dl_s2", "fd_final", "ama-boateng-logo-white.png", 1_902_120, "2026-06-18T10:13:00Z"),
+      seedFile("dl_s3", "fd_logos", "logo-concepts-round-1.pdf", 8_730_004, "2026-06-16T15:40:00Z"),
+      seedFile("dl_s4", "fd_cards", "business-card-front.jpg", 3_120_600, "2026-06-17T11:02:00Z"),
+      seedFile("dl_s5", "fd_cards", "business-card-back.jpg", 2_990_450, "2026-06-17T11:03:00Z"),
+      seedFile("dl_s6", "fd_source", "brand-identity-master.ai", 64_220_118, "2026-06-19T08:30:00Z"),
+      seedFile("dl_s7", "fd_source", "fonts-and-licences.zip", 12_004_880, "2026-06-19T08:31:00Z"),
+      seedFile("dl_s8", null, "brand-guidelines.pdf", 5_402_770, "2026-06-20T16:20:00Z"),
+      seedFile("dl_s9", null, "logo-reveal.mp4", 148_900_120, "2026-06-21T12:05:00Z"),
+    ],
     activity: [
       {
         id: "ev_1",
@@ -278,6 +295,74 @@ const packages: WorkPackage[] = [
     createdAt: "2026-06-14T15:00:00Z",
   },
 ];
+
+/** A ready, previewed file for the seeded repository. */
+function seedFile(
+  id: string,
+  folderId: string | null,
+  filename: string,
+  size: number,
+  at: string,
+): Deliverable {
+  const type = typeFromName(filename);
+  const previewable = type !== "file";
+  return {
+    id,
+    folderId,
+    type,
+    filename,
+    size,
+    mime: null,
+    previewUrl: previewable ? makePreview(type, filename) : null,
+    hasPreview: type === "image" || type === "pdf",
+    locked: true,
+    archived: false,
+    processingStatus: "ready",
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function packageById(id: string): WorkPackage {
+  return found(
+    packages.find((p) => p.id === id),
+    "Work package",
+  );
+}
+
+function mockFolder(pkg: WorkPackage, id: string | null | undefined): string | null {
+  if (!id) return null;
+  if (!pkg.folders.some((f) => f.id === id)) {
+    throw new ApiError(422, "That folder is not part of this package.");
+  }
+  return id;
+}
+
+/** Mirrors FileTree::archiveEntries in the API, without the duplicate handling. */
+function mockManifest(pkg: WorkPackage, files: Deliverable[], selection: FileSelection): FileManifest {
+  const all = selection.fileIds.length === 0 && selection.folderIds.length === 0;
+  const inside = withDescendants(pkg.folders, selection.folderIds);
+  const entries = files.flatMap((f) => {
+    const dirs = pathTo(pkg.folders, f.folderId);
+    if (all) return [{ f, path: [...dirs.map((d) => d.name), f.filename].join("/") }];
+    if (f.folderId && inside.has(f.folderId)) {
+      const start = dirs.findIndex((d) => selection.folderIds.includes(d.id));
+      return [{ f, path: [...dirs.slice(start).map((d) => d.name), f.filename].join("/") }];
+    }
+    return selection.fileIds.includes(f.id) ? [{ f, path: f.filename }] : [];
+  });
+  return {
+    name: pkg.title,
+    files: entries.map(({ f, path }) => ({
+      id: f.id,
+      path,
+      size: null,
+      modifiedAt: f.updatedAt,
+      url: `data:text/plain,${encodeURIComponent(`Mock copy of ${f.filename}`)}`,
+      apiPath: null,
+    })),
+  };
+}
 
 function found<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new ApiError(404, `${what} not found`);
@@ -335,6 +420,7 @@ function settleDeliverables(pkg: WorkPackage) {
       if (now >= until) {
         d.processingStatus = "ready";
         d.previewUrl = makePreview(d.type, d.filename);
+        d.hasPreview = d.type === "image" || d.type === "pdf";
         processingUntil.delete(d.id);
       }
     }
@@ -498,6 +584,7 @@ export const mockApi: BedrockApi = {
         milestones: [],
         payments: [],
         deliverables: [],
+        folders: [],
         activity: [activity],
         createdAt: now,
       };
@@ -642,28 +729,32 @@ export const mockApi: BedrockApi = {
       );
       return pkg;
     },
-    async addDeliverable(packageId, file) {
+    async addDeliverable(packageId, file, folderId) {
       await delay();
-      const pkg = found(
-        packages.find((p) => p.id === packageId),
-        "Work package",
-      );
-      const type = deliverableTypeFromName(file.name);
-      if (!type) throw new ApiError(422, "Unsupported file type. Use an image, PDF, or video.");
+      const pkg = packageById(packageId);
+      const type = typeFromName(file.name);
+      const now = new Date().toISOString();
       const deliverable: Deliverable = {
         id: `dl_${crypto.randomUUID().slice(0, 8)}`,
+        folderId: mockFolder(pkg, folderId),
         type,
         filename: file.name,
+        size: file.size,
+        mime: file.type || null,
         previewUrl: null,
+        hasPreview: false,
         // Download gate: originals stay locked until the balance reaches zero. Deferred
         // billing has no such gate — the work is invoiced after it lands.
         locked: pkg.billingMode === "gated" && balance(pkg) > 0,
         archived: false,
-        processingStatus: "processing",
+        // A file with no preview to make is ready at once, as in the API.
+        processingStatus: type === "file" ? "ready" : "processing",
+        createdAt: now,
+        updatedAt: now,
       };
       pkg.deliverables.push(deliverable);
-      processingUntil.set(deliverable.id, Date.now() + PROCESSING_MS);
-      logActivity(pkg, "deliverable_uploaded", `Uploaded "${file.name}" — generating preview.`);
+      if (type !== "file") processingUntil.set(deliverable.id, Date.now() + PROCESSING_MS);
+      logActivity(pkg, "deliverable_uploaded", `Uploaded "${file.name}".`);
       return pkg;
     },
     async removeDeliverable(packageId, deliverableId) {
@@ -678,6 +769,111 @@ export const mockApi: BedrockApi = {
       processingUntil.delete(deliverableId);
       logActivity(pkg, "deliverable_removed", `Removed "${removed.filename}".`);
       return pkg;
+    },
+    async createFolder(packageId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const now = new Date().toISOString();
+      const folder: DeliverableFolder = {
+        id: `fd_${crypto.randomUUID().slice(0, 8)}`,
+        parentId: mockFolder(pkg, input.parentId),
+        name: input.name.trim() || "Untitled folder",
+        createdAt: now,
+        updatedAt: now,
+      };
+      pkg.folders.push(folder);
+      return { ...pkg, createdFolderId: folder.id };
+    },
+    async updateFolder(packageId, folderId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const folder = found(
+        pkg.folders.find((f) => f.id === folderId),
+        "Folder",
+      );
+      if (input.name !== undefined) folder.name = input.name.trim() || "Untitled folder";
+      if (input.parentId !== undefined) {
+        const target = mockFolder(pkg, input.parentId);
+        if (target && pathTo(pkg.folders, target).some((f) => f.id === folderId)) {
+          throw new ApiError(422, "A folder cannot be moved inside itself.");
+        }
+        folder.parentId = target;
+      }
+      folder.updatedAt = new Date().toISOString();
+      return pkg;
+    },
+    async updateFile(packageId, fileId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const file = found(
+        pkg.deliverables.find((d) => d.id === fileId),
+        "File",
+      );
+      if (input.filename !== undefined) {
+        const ext = extensionOf(file.filename);
+        const name = input.filename.trim() || file.filename;
+        file.filename = ext && !extensionOf(name) ? `${name}.${ext}` : name;
+      }
+      if (input.folderId !== undefined) file.folderId = mockFolder(pkg, input.folderId);
+      file.updatedAt = new Date().toISOString();
+      return pkg;
+    },
+    async moveFiles(packageId, selection, to) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const target = mockFolder(pkg, to);
+      if (target && selection.folderIds.some((id) => pathTo(pkg.folders, target).some((f) => f.id === id))) {
+        throw new ApiError(422, "A folder cannot be moved inside itself.");
+      }
+      pkg.deliverables.forEach((d) => {
+        if (selection.fileIds.includes(d.id)) d.folderId = target;
+      });
+      pkg.folders.forEach((f) => {
+        if (selection.folderIds.includes(f.id)) f.parentId = target;
+      });
+      return pkg;
+    },
+    async deleteFiles(packageId, selection) {
+      await delay(150);
+      const pkg = packageById(packageId);
+      const folders = withDescendants(pkg.folders, selection.folderIds);
+      const before = pkg.deliverables.length;
+      pkg.deliverables = pkg.deliverables.filter(
+        (d) => !selection.fileIds.includes(d.id) && !(d.folderId && folders.has(d.folderId)),
+      );
+      pkg.folders = pkg.folders.filter((f) => !folders.has(f.id));
+      const removed = before - pkg.deliverables.length;
+      if (removed > 0) logActivity(pkg, "deliverable_removed", `Removed ${removed} file(s).`);
+      return pkg;
+    },
+    async startUpload() {
+      await delay(80);
+      // The mock has no object storage, so every file takes the single-request path.
+      return { strategy: "form" };
+    },
+    async signUploadParts() {
+      throw new ApiError(400, "The mock backend has no multipart uploads.");
+    },
+    async completeUpload() {
+      throw new ApiError(400, "The mock backend has no multipart uploads.");
+    },
+    async abortUpload() {
+      await delay(50);
+    },
+    async fileManifest(packageId, selection) {
+      await delay();
+      const pkg = packageById(packageId);
+      return mockManifest(pkg, pkg.deliverables.filter((d) => !d.archived), selection);
+    },
+    async portalManifest(slug, folderId) {
+      await delay();
+      const pkg = found(
+        packages.find((p) => p.publicSlug === slug),
+        "Work package",
+      );
+      const open = pkg.deliverables.filter((d) => !d.archived && !d.locked);
+      if (open.length === 0) throw new ApiError(403, "These files unlock when the balance is cleared.");
+      return mockManifest(pkg, open, { fileIds: [], folderIds: folderId ? [folderId] : [] });
     },
     async purgeDeliverables(packageId) {
       await delay();

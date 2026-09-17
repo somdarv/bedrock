@@ -79,7 +79,8 @@ export interface TrackResult {
 
 export type PricingMode = "itemized" | "fixed";
 
-export type DeliverableType = "image" | "pdf" | "video";
+/** `file` is anything without a generated preview: archives, design sources, documents. */
+export type DeliverableType = "image" | "pdf" | "video" | "file";
 
 export type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
 
@@ -351,13 +352,60 @@ export interface PaymentSession {
 
 export interface Deliverable {
   id: string;
+  /** The folder it is filed in, or null for the package root. */
+  folderId: string | null;
   type: DeliverableType;
   filename: string;
+  /** Bytes. Null only for files uploaded before sizes were recorded. */
+  size: number | null;
+  mime: string | null;
   previewUrl: string | null;
+  /** False while only a placeholder exists, so the browser draws the file's icon instead. */
+  hasPreview: boolean;
   locked: boolean;
   /** True once the original file has been deleted from storage (preview kept). */
   archived: boolean;
   processingStatus: ProcessingStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A folder in a package's file repository. A null parent is the package root. */
+export interface DeliverableFolder {
+  id: string;
+  parentId: string | null;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Which files and folders an action covers. */
+export interface FileSelection {
+  fileIds: string[];
+  folderIds: string[];
+}
+
+/**
+ * How the API wants a file sent. `multipart`: in fixed-size parts to object storage.
+ * `form`: one request (local disk in dev). `done`: nothing to send (an empty file).
+ */
+export type UploadPlan =
+  | { strategy: "multipart"; id: string; partSize: number; partCount: number; direct: boolean }
+  | { strategy: "form" }
+  | { strategy: "done"; package: WorkPackage };
+
+/** What a ZIP download holds and where the hub fetches each file from. */
+export interface FileManifest {
+  name: string;
+  files: {
+    id: string;
+    path: string;
+    size: number | null;
+    modifiedAt: string | null;
+    /** A signed storage URL, or null when the file is fetched through the API instead. */
+    url: string | null;
+    apiPath: string | null;
+  }[];
 }
 
 export interface ActivityEntry {
@@ -419,6 +467,9 @@ export interface WorkPackage {
   milestones: Milestone[];
   payments: Payment[];
   deliverables: Deliverable[];
+  folders: DeliverableFolder[];
+  /** Only on the answer to a folder create: the folder just made. */
+  createdFolderId?: string;
   activity: ActivityEntry[];
   createdAt: string;
   /** Only present on the public portal read (showBySlug): the client's outstanding infra fees. */

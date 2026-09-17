@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { DeliverablesSection } from "@/components/admin/deliverables-section";
+import { FileBrowser } from "@/components/files/file-browser";
 import { DocumentSendModal } from "@/components/admin/document-send-modal";
 import { MilestonesSection } from "@/components/admin/milestones-section";
 import { PaymentsSection } from "@/components/admin/payments-section";
@@ -56,12 +56,15 @@ export function PackageDetail({
   clientName,
   contacts,
   savingsRate,
+  initialFolderId,
 }: {
   pkg: WorkPackage;
   clientName: string;
   contacts: Contact[];
   /** Percentage of each payment held back for savings, for the record-payment prompt. */
   savingsRate: number;
+  /** The folder open in the files section, from `?folder=`. */
+  initialFolderId?: string | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -563,8 +566,10 @@ export function PackageDetail({
       {/* Payments & gates */}
       <PaymentsSection pkg={pkg} savingsRate={savingsRate} />
 
-      {/* Deliverables */}
-      <DeliverablesSection pkg={pkg} />
+      {/* Files: the package's repository */}
+      <div id="files" className="scroll-mt-6">
+        <FileBrowser mode="admin" layout="embedded" pkg={pkg} initialFolderId={initialFolderId} />
+      </div>
 
       {/* Activity timeline */}
       <div>

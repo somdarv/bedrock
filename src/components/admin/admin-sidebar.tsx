@@ -60,6 +60,11 @@ const InfraIcon = ({ className }: IconProps) => (
     <path d="M7 7h.01M7 17h.01" />
   </svg>
 );
+const FilesIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
+    <path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2.2h7.4a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+  </svg>
+);
 const DocumentsIcon = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
     <path d="M6 2.5h7l5 5V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V3a.5.5 0 0 1 .5-.5Z" />
@@ -108,6 +113,7 @@ const NAV: Item[] = [
   { kind: "link", href: "/admin", label: "Dashboard", Icon: DashboardIcon },
   { kind: "link", href: "/admin/clients", label: "Clients", Icon: ClientsIcon },
   { kind: "link", href: "/admin/packages", label: "Work Packages", Icon: PackagesIcon, badge: "attention" },
+  { kind: "link", href: "/admin/files", label: "Files", Icon: FilesIcon },
   { kind: "link", href: "/admin/invoices", label: "Invoices", Icon: InvoicesIcon },
   { kind: "link", href: "/admin/receivables", label: "Receivables", Icon: ReceivablesIcon },
   { kind: "link", href: "/admin/savings", label: "Savings", Icon: SavingsIcon },
@@ -283,6 +289,83 @@ export function AdminSidebar({ counts }: { counts: Counts }) {
         </button>
       </div>
     </aside>
+  );
+}
+
+/* ------------------------------------------------------------- phone nav */
+
+/**
+ * The sidebar is hidden below `md`, which used to leave a phone with no way between pages.
+ * This opens the same list as a sheet from the left edge, where the sidebar lives.
+ */
+export function MobileNav({ counts }: { counts: Counts }) {
+  const pathname = usePathname();
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => setOpen(false), [pathname]);
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
+
+  const isActive = (href: string) =>
+    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  const links = [
+    ...NAV.flatMap((item) =>
+      item.kind === "link"
+        ? [{ href: item.href, label: item.label, Icon: item.Icon, count: item.badge ? counts[item.badge] : 0 }]
+        : item.children.map((c) => ({ href: c.href, label: `${item.label}: ${c.label}`, Icon: item.Icon, count: 0 })),
+    ),
+    ...FOOTER.map((f) => ({ ...f, count: 0 })),
+  ];
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open menu"
+        aria-expanded={open}
+        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-muted md:hidden"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-5 w-5" aria-hidden>
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[55] md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="drive-fade absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden />
+          <nav className="drive-slide absolute inset-y-0 left-0 flex w-[min(20rem,86vw)] flex-col overflow-y-auto bg-surface px-3 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="flex h-12 items-center px-3 pb-3">
+              <BrandLogo className="h-7" />
+            </div>
+            {links.map((l) => {
+              const active = isActive(l.href);
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(rowClass(active), "min-h-12")}
+                >
+                  <l.Icon className={iconClass(active)} />
+                  <span className="flex-1 truncate">{l.label}</span>
+                  {l.count > 0 && <CountBadge n={l.count} />}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      )}
+    </>
   );
 }
 

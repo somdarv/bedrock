@@ -2,8 +2,15 @@ import { notFound } from "next/navigation";
 import { PackageDetail } from "@/components/admin/package-detail";
 import { api, ApiError } from "@/lib/api";
 
-export default async function PackageDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PackageDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ folder?: string }>;
+}) {
   const { id } = await params;
+  const { folder } = await searchParams;
 
   const pkg = await api.packages.get(id).catch((e) => {
     if (e instanceof ApiError && e.status === 404) notFound();
@@ -22,6 +29,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       clientName={client?.name ?? "Unknown client"}
       contacts={client?.contacts ?? []}
       savingsRate={savings?.ratePercent ?? 0}
+      initialFolderId={folder ?? null}
     />
   );
 }

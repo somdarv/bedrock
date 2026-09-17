@@ -4,6 +4,7 @@ import type {
   Client,
   ClientActivity,
   ClientAsset,
+  FileManifest,
   FxState,
   HostingServer,
   InfraCharge,
@@ -19,6 +20,7 @@ import type {
   SessionUser,
   TestServerResult,
   TrackResult,
+  UploadPlan,
   VaultEntryRecord,
   VaultKeyRecord,
   VaultState,
@@ -150,17 +152,22 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify({ done }),
       }),
-    addDeliverable: async (packageId, file) => {
+    addDeliverable: async (packageId, file, folderId) => {
       // Multipart upload — no Content-Type so the boundary is set automatically.
       const form = new FormData();
       form.append("file", file);
+      if (folderId) form.append("folderId", folderId);
       const res = await fetch(`${BASE_URL}/api/admin/packages/${packageId}/deliverables`, {
         method: "POST",
         body: form,
         headers: { Accept: "application/json", ...(await authHeaders()) },
         cache: "no-store",
       });
-      if (!res.ok) throw new ApiError(res.status, res.statusText);
+      if (!res.ok) {
+        // A refused upload says why (too large, bad folder); keep that rather than "Unprocessable".
+        const body = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new ApiError(res.status, body?.message || res.statusText);
+      }
       return (await res.json()) as WorkPackage;
     },
     removeDeliverable: (packageId, deliverableId) =>
@@ -171,6 +178,62 @@ export const httpApi: BedrockApi = {
       request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/purge`, {
         method: "POST",
       }),
+    createFolder: (packageId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/folders`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updateFolder: (packageId, folderId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/folders/${folderId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    updateFile: (packageId, fileId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/deliverables/${fileId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    moveFiles: (packageId, selection, to) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/files/move`, {
+        method: "POST",
+        body: JSON.stringify({ ...selection, to }),
+      }),
+    deleteFiles: (packageId, selection) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/files/delete`, {
+        method: "POST",
+        body: JSON.stringify(selection),
+      }),
+    startUpload: (packageId, input) =>
+      request<UploadPlan>(`/api/admin/packages/${packageId}/uploads`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    signUploadParts: async (packageId, uploadId, parts) =>
+      (
+        await request<{ urls: Record<string, string> }>(
+          `/api/admin/packages/${packageId}/uploads/${uploadId}/parts`,
+          { method: "POST", body: JSON.stringify({ parts }) },
+        )
+      ).urls,
+    completeUpload: (packageId, uploadId, parts) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/uploads/${uploadId}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ parts }),
+      }),
+    abortUpload: async (packageId, uploadId) => {
+      await request<unknown>(`/api/admin/packages/${packageId}/uploads/${uploadId}`, {
+        method: "DELETE",
+      });
+    },
+    fileManifest: (packageId, selection) =>
+      request<FileManifest>(`/api/admin/packages/${packageId}/files/manifest`, {
+        method: "POST",
+        body: JSON.stringify(selection),
+      }),
+    portalManifest: (slug, folderId) =>
+      request<FileManifest>(
+        `/api/p/${slug}/files/manifest${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`,
+      ),
     recordPayment: (packageId, input) =>
       request<WorkPackage>(`/api/admin/packages/${packageId}/payments`, {
         method: "POST",
