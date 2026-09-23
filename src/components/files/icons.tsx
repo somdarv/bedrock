@@ -10,7 +10,9 @@ import { extensionOf } from "@/lib/files/tree";
 
 type P = { className?: string };
 
-function Svg({ className, children }: P & { children: React.ReactNode }) {
+/** The shared drawing surface: 24px grid, 1.6 stroke, round joins. Exported so other modules
+ *  (the plan) draw in the same hand instead of starting their own icon set. */
+export function Glyph({ className, children }: P & { children: React.ReactNode }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -26,6 +28,8 @@ function Svg({ className, children }: P & { children: React.ReactNode }) {
     </svg>
   );
 }
+
+const Svg = Glyph;
 
 export const FolderIcon = ({ className }: P) => (
   <Svg className={className}>

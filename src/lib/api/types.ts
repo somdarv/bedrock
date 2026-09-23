@@ -354,6 +354,8 @@ export interface Deliverable {
   id: string;
   /** The folder it is filed in, or null for the package root. */
   folderId: string | null;
+  /** The plan item this file satisfies, or null (docs/PLAN.md). */
+  planItemId: string | null;
   type: DeliverableType;
   filename: string;
   /** Bytes. Null only for files uploaded before sizes were recorded. */
@@ -368,6 +370,68 @@ export interface Deliverable {
   processingStatus: ProcessingStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+/* ----------------------------------------------------------------- the plan */
+
+/**
+ * The plan (docs/PLAN.md): what we agreed to do, who asked for it, and who owes the next move.
+ * It carries no money. The quote's line items stay the only priced list.
+ */
+export type PlanState = "proposed" | "agreed" | "doing" | "done" | "shelved";
+
+/** Which side of the table. */
+export type PlanSide = "us" | "client";
+
+/** `internal` never leaves the server for a client link. */
+export type PlanVisibility = "shared" | "internal";
+
+export interface PlanComment {
+  id: string;
+  side: PlanSide;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface PlanItem {
+  id: string;
+  position: number;
+  title: string;
+  note: string | null;
+  state: PlanState;
+  /** Who owes the next move. */
+  waitingOn: PlanSide;
+  raisedBy: PlanSide;
+  visibility: PlanVisibility;
+  dueDate: string | null;
+  /** Set when a client signed it off from the project link, with the name they gave. */
+  approvedAt: string | null;
+  approvedBy: string | null;
+  shelvedReason: string | null;
+  /** Files in the repository filed against this item. */
+  fileIds: string[];
+  comments: PlanComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlanItemInput {
+  title?: string;
+  note?: string | null;
+  state?: PlanState;
+  waitingOn?: PlanSide;
+  raisedBy?: PlanSide;
+  visibility?: PlanVisibility;
+  dueDate?: string | null;
+  shelvedReason?: string | null;
+}
+
+/** What a client asks for from their link. */
+export interface PlanRequestInput {
+  title: string;
+  note?: string | null;
+  name?: string | null;
 }
 
 /** A folder in a package's file repository. A null parent is the package root. */
@@ -468,6 +532,8 @@ export interface WorkPackage {
   payments: Payment[];
   deliverables: Deliverable[];
   folders: DeliverableFolder[];
+  /** The plan. On a client link this holds the shared items only. */
+  planItems: PlanItem[];
   /** Only on the answer to a folder create: the folder just made. */
   createdFolderId?: string;
   activity: ActivityEntry[];

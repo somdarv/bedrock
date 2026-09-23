@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { PortalPayButton } from "@/components/portal/portal-pay-button";
 import { FileBrowser } from "@/components/files/file-browser";
+import { PlanBoard } from "@/components/plan/plan-board";
 import {
   api,
   ApiError,
@@ -403,6 +404,9 @@ export default async function ClientPortalPage({
           </div>
         </section>
       )}
+
+      {/* The plan: what we agreed, what is in hand, and what is waiting on them */}
+      {pkg.planItems.length > 0 && <PlanBoard mode="client" pkg={pkg} slug={slug} />}
 
       {/* Files: previews for everyone, originals once the balance allows */}
       {pkg.deliverables.length > 0 && (

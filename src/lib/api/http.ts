@@ -234,6 +234,45 @@ export const httpApi: BedrockApi = {
       request<FileManifest>(
         `/api/p/${slug}/files/manifest${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`,
       ),
+    createPlanItem: (packageId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/plan`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    updatePlanItem: (packageId, itemId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/plan/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    removePlanItem: (packageId, itemId) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/plan/${itemId}`, {
+        method: "DELETE",
+      }),
+    reorderPlan: (packageId, ids) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/plan/reorder`, {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
+    commentOnPlan: (packageId, itemId, body) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/plan/${itemId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body }),
+      }),
+    approvePlanItem: (slug, itemId, name) =>
+      request<WorkPackage>(`/api/p/${slug}/plan/${itemId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    requestPlanItem: (slug, input) =>
+      request<WorkPackage>(`/api/p/${slug}/plan/requests`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    clientCommentOnPlan: (slug, itemId, body, name) =>
+      request<WorkPackage>(`/api/p/${slug}/plan/${itemId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body, name }),
+      }),
     recordPayment: (packageId, input) =>
       request<WorkPackage>(`/api/admin/packages/${packageId}/payments`, {
         method: "POST",

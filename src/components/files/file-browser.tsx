@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   createFolder,
   deleteItems,
+  fileUnderPlanItem,
   freeUpStorage,
   moveItems,
   renameFile,
@@ -38,6 +39,7 @@ import {
 } from "./drive-ui";
 import { FileCard, FileRow, FolderCard, FolderRow, type ItemHandlers, type ItemKind } from "./file-items";
 import { FileViewer, type ViewerSource } from "./file-viewer";
+import { PaperclipIcon } from "@/components/plan/plan-icons";
 import {
   ArrowUpRightIcon,
   CheckIcon,
@@ -57,6 +59,7 @@ import {
   TrashIcon,
   UploadIcon,
 } from "./icons";
+import { FileUnderDialog } from "./file-under-dialog";
 import { MoveDialog } from "./move-dialog";
 import { UploadTray } from "./upload-tray";
 
@@ -228,6 +231,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const [pageMenu, setPageMenu] = React.useState<MenuAnchor | null>(null);
   const [uploadMenu, setUploadMenu] = React.useState<MenuAnchor | null>(null);
   const [moving, setMoving] = React.useState<string[] | null>(null);
+  const [filing, setFiling] = React.useState<Deliverable | null>(null);
   const [deleting, setDeleting] = React.useState<string[] | null>(null);
   const [purging, setPurging] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -620,6 +624,13 @@ export function FileBrowser(props: FileBrowserProps) {
     if (!admin) return items;
     if (!many) {
       items.push({ label: "Rename", icon: <PencilIcon />, hint: "F2", onSelect: () => setRenaming(k) });
+    }
+    if (!many && file && pkg.planItems.length > 0) {
+      items.push({
+        label: file.planItemId ? "Change what it is for" : "File under a plan item",
+        icon: <PaperclipIcon />,
+        onSelect: () => setFiling(file),
+      });
     }
     if (!fine && !selected.has(k)) {
       // A phone has no shift-click; this, or a long press, starts picking several.
@@ -1111,6 +1122,32 @@ export function FileBrowser(props: FileBrowserProps) {
             onSelect: () => setPurging(true),
           },
         ]}
+      />
+
+      <FileUnderDialog
+        file={filing}
+        items={pkg.planItems}
+        busy={busy}
+        onClose={() => setFiling(null)}
+        onPick={(planItemId) => {
+          const target = filing;
+          setFiling(null);
+          if (!target) return;
+          void (async () => {
+            setBusy(true);
+            const res = await fileUnderPlanItem(pkg.id, target.id, planItemId);
+            setBusy(false);
+            if (!res.ok) return toast(res.error, "danger");
+            apply(res.pkg);
+            toast(
+              planItemId
+                ? `Filed under “${pkg.planItems.find((i) => i.id === planItemId)?.title ?? "the plan"}”.`
+                : "Unfiled from the plan.",
+              "success",
+            );
+            router.refresh();
+          })();
+        }}
       />
 
       <MoveDialog

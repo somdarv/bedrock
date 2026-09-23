@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { FileBrowser } from "@/components/files/file-browser";
+import { PlanBoard } from "@/components/plan/plan-board";
 import { DocumentSendModal } from "@/components/admin/document-send-modal";
 import { MilestonesSection } from "@/components/admin/milestones-section";
 import { PaymentsSection } from "@/components/admin/payments-section";
@@ -584,6 +585,11 @@ export function PackageDetail({
 
       {/* Payments & gates */}
       <PaymentsSection pkg={pkg} savingsRate={savingsRate} />
+
+      {/* The plan: what we agreed, before what we delivered */}
+      <div id="plan" className="scroll-mt-6">
+        <PlanBoard mode="admin" layout="embedded" pkg={pkg} />
+      </div>
 
       {/* Files: the package's repository */}
       <div id="files" className="scroll-mt-6">

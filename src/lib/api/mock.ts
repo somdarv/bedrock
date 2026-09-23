@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type FileManifest, type FileSelection, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -267,6 +267,42 @@ const packages: WorkPackage[] = [
         paidAt: "2026-06-15T10:12:00Z",
       },
     ],
+    planItems: [
+      seedPlanItem("pl_1", 0, "Logo concepts, three directions", {
+        state: "done",
+        note: "Presented on the call. They picked the second one.",
+        approvedAt: "2026-06-19T09:20:00Z",
+        approvedBy: "Ama Boateng",
+      }),
+      seedPlanItem("pl_2", 1, "Business card, front and back", { state: "doing" }),
+      seedPlanItem("pl_3", 2, "Brand guidelines, short version", { state: "agreed" }),
+      seedPlanItem("pl_4", 3, "Send us the staff photographs", {
+        state: "agreed",
+        waitingOn: "client",
+        note: "High resolution, landscape if possible.",
+      }),
+      seedPlanItem("pl_5", 4, "Social media templates for launch week", {
+        state: "proposed",
+        raisedBy: "client",
+        comments: [
+          {
+            id: "pc_1",
+            side: "client",
+            author: "Ama Boateng",
+            body: "Can we add templates for the launch posts?",
+            createdAt: "2026-06-21T14:02:00Z",
+          },
+        ],
+      }),
+      seedPlanItem("pl_6", 5, "Vehicle branding", {
+        state: "shelved",
+        shelvedReason: "Parked until the second van arrives",
+      }),
+      seedPlanItem("pl_7", 6, "Chase the balance before handover", {
+        state: "agreed",
+        visibility: "internal",
+      }),
+    ],
     folders: [
       { id: "fd_logos", parentId: null, name: "Logos", createdAt: "2026-06-16T09:00:00Z", updatedAt: "2026-06-16T09:00:00Z" },
       { id: "fd_final", parentId: "fd_logos", name: "Final", createdAt: "2026-06-18T09:00:00Z", updatedAt: "2026-06-18T09:00:00Z" },
@@ -296,6 +332,35 @@ const packages: WorkPackage[] = [
   },
 ];
 
+/** A plan item for the seeded project. Defaults match what the API writes on create. */
+function seedPlanItem(
+  id: string,
+  position: number,
+  title: string,
+  extra: Partial<PlanItem> = {},
+): PlanItem {
+  const at = "2026-06-16T09:00:00Z";
+  return {
+    id,
+    position,
+    title,
+    note: null,
+    state: "agreed",
+    waitingOn: "us",
+    raisedBy: "us",
+    visibility: "shared",
+    dueDate: null,
+    approvedAt: null,
+    approvedBy: null,
+    shelvedReason: null,
+    fileIds: [],
+    comments: [],
+    createdAt: at,
+    updatedAt: at,
+    ...extra,
+  };
+}
+
 /** A ready, previewed file for the seeded repository. */
 function seedFile(
   id: string,
@@ -309,6 +374,7 @@ function seedFile(
   return {
     id,
     folderId,
+    planItemId: null,
     type,
     filename,
     size,
@@ -321,6 +387,32 @@ function seedFile(
     createdAt: at,
     updatedAt: at,
   };
+}
+
+function planStateWord(state: PlanItem["state"]) {
+  return state === "doing" ? "in progress" : state;
+}
+
+function clientName(name: string | null | undefined) {
+  const clean = (name ?? "").replace(/\s+/g, " ").trim();
+  return clean !== "" ? clean.slice(0, 118) : "The client";
+}
+
+function mockComment(side: PlanComment["side"], author: string, body: string): PlanComment {
+  return {
+    id: `pc_${crypto.randomUUID().slice(0, 8)}`,
+    side,
+    author,
+    body: body.trim(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** An internal item is not on the client's link, so it cannot be acted on from there either. */
+function sharedPlanItem(pkg: WorkPackage, itemId: string): PlanItem {
+  const item = pkg.planItems.find((i) => i.id === itemId && i.visibility === "shared");
+  if (!item) throw new ApiError(404, "Plan item not found");
+  return item;
 }
 
 function packageById(id: string): WorkPackage {
@@ -534,8 +626,13 @@ export const mockApi: BedrockApi = {
         "Work package",
       );
       settleDeliverables(pkg);
-      // The portal read carries the bill-to block (invoice/receipt PDFs are built from it).
-      return { ...pkg, billTo: billToFor(pkg.clientId) };
+      // The portal read carries the bill-to block (invoice/receipt PDFs are built from it), and
+      // the plan cut down to what is shared.
+      return {
+        ...pkg,
+        billTo: billToFor(pkg.clientId),
+        planItems: pkg.planItems.filter((i) => i.visibility === "shared"),
+      };
     },
     async startPayment(slug) {
       await delay();
@@ -585,6 +682,7 @@ export const mockApi: BedrockApi = {
         payments: [],
         deliverables: [],
         folders: [],
+        planItems: [],
         activity: [activity],
         createdAt: now,
       };
@@ -737,6 +835,7 @@ export const mockApi: BedrockApi = {
       const deliverable: Deliverable = {
         id: `dl_${crypto.randomUUID().slice(0, 8)}`,
         folderId: mockFolder(pkg, folderId),
+        planItemId: null,
         type,
         filename: file.name,
         size: file.size,
@@ -815,6 +914,13 @@ export const mockApi: BedrockApi = {
         file.filename = ext && !extensionOf(name) ? `${name}.${ext}` : name;
       }
       if (input.folderId !== undefined) file.folderId = mockFolder(pkg, input.folderId);
+      if (input.planItemId !== undefined) {
+        const id = input.planItemId;
+        if (id && !pkg.planItems.some((i) => i.id === id)) {
+          throw new ApiError(422, "That item is not part of this package.");
+        }
+        file.planItemId = id;
+      }
       file.updatedAt = new Date().toISOString();
       return pkg;
     },
@@ -845,6 +951,159 @@ export const mockApi: BedrockApi = {
       const removed = before - pkg.deliverables.length;
       if (removed > 0) logActivity(pkg, "deliverable_removed", `Removed ${removed} file(s).`);
       return pkg;
+    },
+    async createPlanItem(packageId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const now = new Date().toISOString();
+      pkg.planItems.push({
+        id: `pl_${crypto.randomUUID().slice(0, 8)}`,
+        position: pkg.planItems.length,
+        title: input.title.trim(),
+        note: input.note?.trim() || null,
+        state: input.state ?? "agreed",
+        waitingOn: input.waitingOn ?? "us",
+        raisedBy: input.raisedBy ?? "us",
+        visibility: input.visibility ?? "shared",
+        dueDate: input.dueDate ?? null,
+        approvedAt: null,
+        approvedBy: null,
+        shelvedReason: input.shelvedReason ?? null,
+        fileIds: [],
+        comments: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      logActivity(pkg, "plan_item_added", `Added "${input.title.trim()}" to the plan.`);
+      return pkg;
+    },
+    async updatePlanItem(packageId, itemId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const item = found(
+        pkg.planItems.find((i) => i.id === itemId),
+        "Plan item",
+      );
+      // What was approved is not what it says now.
+      if (input.title !== undefined && input.title.trim() !== item.title) {
+        item.approvedAt = null;
+        item.approvedBy = null;
+      }
+      const before = item.state;
+      Object.assign(item, {
+        ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+        ...(input.note !== undefined ? { note: input.note?.trim() || null } : {}),
+        ...(input.state !== undefined ? { state: input.state } : {}),
+        ...(input.waitingOn !== undefined ? { waitingOn: input.waitingOn } : {}),
+        ...(input.raisedBy !== undefined ? { raisedBy: input.raisedBy } : {}),
+        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+        ...(input.dueDate !== undefined ? { dueDate: input.dueDate || null } : {}),
+        ...(input.shelvedReason !== undefined
+          ? { shelvedReason: input.shelvedReason?.trim() || null }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      });
+      if (item.state !== "shelved") item.shelvedReason = null;
+      if (input.state && input.state !== before) {
+        logActivity(pkg, "plan_item_state", `"${item.title}" is now ${planStateWord(item.state)}.`);
+      }
+      return pkg;
+    },
+    async removePlanItem(packageId, itemId) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const item = found(
+        pkg.planItems.find((i) => i.id === itemId),
+        "Plan item",
+      );
+      pkg.planItems = pkg.planItems.filter((i) => i.id !== itemId);
+      logActivity(pkg, "plan_item_removed", `Removed "${item.title}" from the plan.`);
+      return pkg;
+    },
+    async reorderPlan(packageId, ids) {
+      await delay(100);
+      const pkg = packageById(packageId);
+      ids.forEach((id, position) => {
+        const item = pkg.planItems.find((i) => i.id === id);
+        if (item) item.position = position;
+      });
+      pkg.planItems.sort((a, b) => a.position - b.position);
+      return pkg;
+    },
+    async commentOnPlan(packageId, itemId, body) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const item = found(
+        pkg.planItems.find((i) => i.id === itemId),
+        "Plan item",
+      );
+      item.comments.push(mockComment("us", "Admin", body));
+      return pkg;
+    },
+    async approvePlanItem(slug, itemId, name) {
+      await delay(150);
+      const pkg = found(
+        packages.find((p) => p.publicSlug === slug),
+        "Work package",
+      );
+      const item = sharedPlanItem(pkg, itemId);
+      if (item.state !== "done") {
+        throw new ApiError(409, "That is not finished yet, so there is nothing to approve.");
+      }
+      item.approvedAt = new Date().toISOString();
+      item.approvedBy = clientName(name);
+      item.waitingOn = "us";
+      logActivity(
+        pkg,
+        "plan_item_approved",
+        `${item.approvedBy} approved "${item.title}" from the project link.`,
+      );
+      return { ...pkg, planItems: pkg.planItems.filter((i) => i.visibility === "shared") };
+    },
+    async requestPlanItem(slug, input) {
+      await delay(150);
+      const pkg = found(
+        packages.find((p) => p.publicSlug === slug),
+        "Work package",
+      );
+      const now = new Date().toISOString();
+      const item: PlanItem = {
+        id: `pl_${crypto.randomUUID().slice(0, 8)}`,
+        position: pkg.planItems.length,
+        title: input.title.trim(),
+        note: input.note?.trim() || null,
+        state: "proposed",
+        waitingOn: "us",
+        raisedBy: "client",
+        visibility: "shared",
+        dueDate: null,
+        approvedAt: null,
+        approvedBy: null,
+        shelvedReason: null,
+        fileIds: [],
+        comments: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      pkg.planItems.push(item);
+      logActivity(
+        pkg,
+        "plan_item_requested",
+        `${clientName(input.name)} asked for "${item.title}" from the project link.`,
+      );
+      return { ...pkg, planItems: pkg.planItems.filter((i) => i.visibility === "shared") };
+    },
+    async clientCommentOnPlan(slug, itemId, body, name) {
+      await delay(150);
+      const pkg = found(
+        packages.find((p) => p.publicSlug === slug),
+        "Work package",
+      );
+      const item = sharedPlanItem(pkg, itemId);
+      item.comments.push(mockComment("client", clientName(name), body));
+      item.waitingOn = "us";
+      logActivity(pkg, "plan_comment", `${clientName(name)} commented on "${item.title}".`);
+      return { ...pkg, planItems: pkg.planItems.filter((i) => i.visibility === "shared") };
     },
     async startUpload() {
       await delay(80);

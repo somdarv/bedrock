@@ -41,6 +41,20 @@ export async function renameFile(packageId: string, fileId: string, filename: st
   );
 }
 
+/**
+ * File this file under a plan item, or `null` to unfile it. That is the join between the two
+ * halves: the client sees the files under the thing they approved (docs/PLAN.md).
+ */
+export async function fileUnderPlanItem(
+  packageId: string,
+  fileId: string,
+  planItemId: string | null,
+) {
+  return run(packageId, "Could not file that.", () =>
+    api.packages.updateFile(packageId, fileId, { planItemId }),
+  );
+}
+
 export async function moveItems(packageId: string, selection: FileSelection, to: string | null) {
   return run(packageId, "Could not move those items.", () =>
     api.packages.moveFiles(packageId, selection, to),

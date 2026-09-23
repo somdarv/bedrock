@@ -3,6 +3,7 @@
 > Living context for continuing work across sessions. **Last updated: 2026-07-06.**
 > Read this first, then [ARCHITECTURE.md](./ARCHITECTURE.md), [DOCUMENT-CODES.md](./DOCUMENT-CODES.md), [ROADMAP.md](./ROADMAP.md).
 > The client work repository (folders, large uploads, ZIP downloads) has its own doc: [FILES.md](./FILES.md).
+> The plan (agreed work, both sides, client approvals) has its own doc: [PLAN.md](./PLAN.md).
 
 ---
 
@@ -89,6 +90,12 @@ Key backend env (`.env`): `DB_CONNECTION=pgsql` (db `bedrock`), `DELIVERABLES_DI
   `GET /api/deliverables/{id}/preview`. Admin previews the **clean original** via a Next proxy
   (`/api/admin/deliverables/[packageId]/[deliverableId]`) that forwards the Sanctum token
   server-side. Backfill with `php artisan media:regenerate`.
+
+- **The plan** (2026-09-23) — a shared list of agreed work per project, in five states
+  (proposed, agreed, in progress, done, shelved), with a side that owes the next move, internal
+  items the client never sees, comments both ways, files filed against an item, and the client's
+  own approve and request from their link. It carries **no money**: the quote's line items stay
+  the only priced list. See [PLAN.md](./PLAN.md). Notes pages and a board view are still to come.
 
 **Still mock / not built — the road to full potential (priority order in §9):**
 - **Paystack** — Pay button is a placeholder; payments entered **manually**. Real flow (init

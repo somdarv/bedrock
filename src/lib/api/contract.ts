@@ -25,6 +25,8 @@ import type {
   MilestoneInput,
   PaymentInput,
   PaymentSession,
+  PlanItemInput,
+  PlanRequestInput,
   ReminderRuleInput,
   ReminderSettings,
   SavingsState,
@@ -114,7 +116,12 @@ export interface BedrockApi {
     updateFile(
       packageId: string,
       fileId: string,
-      input: { filename?: string; folderId?: string | null },
+      input: {
+        filename?: string;
+        folderId?: string | null;
+        /** The plan item this file satisfies, or null to unfile it (docs/PLAN.md). */
+        planItemId?: string | null;
+      },
     ): Promise<WorkPackage>;
     moveFiles(packageId: string, selection: FileSelection, to: string | null): Promise<WorkPackage>;
     /** Deletes the files, the folders and everything inside them, from storage too. */
@@ -140,6 +147,26 @@ export interface BedrockApi {
     fileManifest(packageId: string, selection: FileSelection): Promise<FileManifest>;
     /** The client's ZIP: unlocked files only, one folder or everything. */
     portalManifest(slug: string, folderId: string | null): Promise<FileManifest>;
+
+    // ----- The plan (docs/PLAN.md). Nothing here changes a price. -----
+    createPlanItem(packageId: string, input: PlanItemInput & { title: string }): Promise<WorkPackage>;
+    updatePlanItem(packageId: string, itemId: string, input: PlanItemInput): Promise<WorkPackage>;
+    removePlanItem(packageId: string, itemId: string): Promise<WorkPackage>;
+    /** The new order, top to bottom. */
+    reorderPlan(packageId: string, ids: string[]): Promise<WorkPackage>;
+    commentOnPlan(packageId: string, itemId: string, body: string): Promise<WorkPackage>;
+
+    // ----- The same plan, from the client's link. Answers with the portal shape. -----
+    /** Sign off something we marked done. `name` is what they typed, not a verified identity. */
+    approvePlanItem(slug: string, itemId: string, name: string | null): Promise<WorkPackage>;
+    /** Ask for something. It lands on our side as `proposed`. */
+    requestPlanItem(slug: string, input: PlanRequestInput): Promise<WorkPackage>;
+    clientCommentOnPlan(
+      slug: string,
+      itemId: string,
+      body: string,
+      name: string | null,
+    ): Promise<WorkPackage>;
     /**
      * Record a confirmed payment and run the two-gate logic. In production this is
      * driven by the verified Paystack webhook; admin entry covers offline payments.
