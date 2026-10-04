@@ -11,7 +11,7 @@ import { EmptyState, Spinner } from "@/components/ui/states";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
-import { balance, effectiveTotal, type PaymentKind, type WorkPackage } from "@/lib/api";
+import { balance, effectiveTotal, savings, type PaymentKind, type WorkPackage } from "@/lib/api";
 import {
   computePaymentPlan,
   downloadGateOpen,
@@ -47,11 +47,19 @@ export function PaymentsSection({
   const deferred = !gatesApply(pkg);
   // What is owed but not yet on an invoice — the amount "Raise invoice" would ask for.
   const toBill = Math.max(0, bal - pkg.invoicedOutstanding);
+  const saved = savings(pkg);
+  // Priced, then discounted to nothing. There is no invoice to raise, by decision, so "Not
+  // invoiced" in warning colour would read as a job someone forgot to bill.
+  const waived =
+    total <= 0 && saved > 0 && paid <= 0 && pkg.invoicedOutstanding <= 0 && pkg.invoicedPaid <= 0;
 
   // Suggest the next sensible payment for the modal.
   const suggested =
     paid <= 0
-      ? { kind: (plan.rule === "full" ? "full" : "deposit") as PaymentKind, amount: plan.depositDue }
+      ? {
+          kind: (plan.rule === "full" ? "full" : "deposit") as PaymentKind,
+          amount: plan.depositDue,
+        }
       : { kind: "final" as PaymentKind, amount: Math.max(bal, 0) };
 
   function handleDone(paid: number) {
@@ -74,16 +82,16 @@ export function PaymentsSection({
         </div>
       </div>
 
-      <p className="mb-4 text-sm text-muted-foreground">
+      <p className="text-muted-foreground mb-4 text-sm">
         {deferred ? (
           <>
-            Deferred billing — the work runs ungated and is invoiced after it lands. Nothing is
-            held back from the client while this is unpaid.
+            Deferred billing. The work runs ungated and is invoiced after it lands. Nothing is held
+            back from the client while it is unpaid.
           </>
         ) : (
           <>
             {plan.rule === "full"
-              ? `Small job — ${formatCedis(plan.total)} due 100% upfront.`
+              ? `Small job. ${formatCedis(plan.total)} due 100% upfront.`
               : `${formatCedis(plan.depositDue)} deposit (40%) to start · ${formatCedis(plan.finalDue)} balance (60%) on delivery.`}{" "}
             Confirmed in production by the verified Paystack webhook.
           </>
@@ -96,18 +104,20 @@ export function PaymentsSection({
           <GateCard
             label="Delivery"
             open
-            openText="Open — files are not held back on this package."
+            openText="Files are not held back on this package."
             closedText=""
           />
           <GateCard
             label="Billed"
-            openLabel="Invoiced"
+            openLabel={waived ? "Waived" : "Invoiced"}
             closedLabel="Not invoiced"
-            open={pkg.invoicedOutstanding > 0 || (bal <= 0 && pkg.invoicedPaid > 0)}
+            open={waived || pkg.invoicedOutstanding > 0 || (bal <= 0 && pkg.invoicedPaid > 0)}
             openText={
-              pkg.invoicedOutstanding > 0
-                ? `${formatCedis(pkg.invoicedOutstanding)} invoiced, awaiting payment.`
-                : "Invoiced and settled."
+              waived
+                ? `${formatCedis(saved)} discounted in full. Nothing to invoice.`
+                : pkg.invoicedOutstanding > 0
+                  ? `${formatCedis(pkg.invoicedOutstanding)} invoiced, awaiting payment.`
+                  : "Invoiced and settled."
             }
             closedText={
               toBill > 0
@@ -121,20 +131,20 @@ export function PaymentsSection({
           <GateCard
             label="Start gate"
             open={startOpen}
-            openText="Open — deposit received, work can begin."
-            closedText="Closed — awaiting the deposit."
+            openText="Deposit received. Work can begin."
+            closedText="Awaiting the deposit."
           />
           <GateCard
             label="Download gate"
             open={dlOpen}
-            openText="Open — balance cleared, originals unlocked."
-            closedText="Closed — originals stay locked until the balance is zero."
+            openText="Balance cleared. Originals unlocked."
+            closedText="Originals stay locked until the balance is zero."
           />
         </div>
       )}
 
       {/* Totals / receipt */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface p-4">
+      <div className="bg-surface mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
         <div className="flex gap-6 text-sm">
           <div>
             <div className="text-muted-foreground">Total</div>
@@ -149,7 +159,7 @@ export function PaymentsSection({
             <div className="font-semibold">{formatCedis(bal)}</div>
           </div>
         </div>
-        {fullyPaid && <Badge variant="success">Paid in full — receipt sent</Badge>}
+        {fullyPaid && <Badge variant="success">Paid in full, receipt sent</Badge>}
       </div>
 
       {pkg.payments.length === 0 ? (
@@ -172,7 +182,7 @@ export function PaymentsSection({
                 <TD className="font-medium capitalize">{p.kind}</TD>
                 <TD className="text-right">{formatCedis(p.amount)}</TD>
                 <TD className="text-muted-foreground">{paymentMethodLabel(p.method)}</TD>
-                <TD className="font-mono text-xs text-muted-foreground">
+                <TD className="text-muted-foreground font-mono text-xs">
                   {p.paystackReference ?? "—"}
                 </TD>
                 <TD className="text-muted-foreground">
@@ -217,12 +227,12 @@ function GateCard({
   closedLabel?: string;
 }) {
   return (
-    <div className="rounded-lg border bg-surface p-4">
+    <div className="bg-surface rounded-lg border p-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
         <Badge variant={open ? "success" : "warning"}>{open ? openLabel : closedLabel}</Badge>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{open ? openText : closedText}</p>
+      <p className="text-muted-foreground mt-1 text-xs">{open ? openText : closedText}</p>
     </div>
   );
 }
@@ -253,12 +263,7 @@ function RaiseInvoiceButton({ pkg, amount }: { pkg: WorkPackage; amount: number 
   // the last step rather than the opening one. Requiring a send first meant the client received a
   // priced document before the invoice could be raised at all.
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={handleClick}
-      disabled={pending || amount <= 0}
-    >
+    <Button size="sm" variant="outline" onClick={handleClick} disabled={pending || amount <= 0}>
       {pending ? <Spinner /> : null}
       Raise invoice
     </Button>
@@ -329,14 +334,14 @@ function RecordPaymentModal({
         </Field>
 
         {slice > 0 && (
-          <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
-            {formatCedis(slice)} of this goes to savings ({savingsRate}%). It is added to the
-            ledger automatically; move the money when you can.
+          <p className="bg-muted/50 rounded-md px-3 py-2 text-sm">
+            {formatCedis(slice)} of this goes to savings ({savingsRate}%). It is added to the ledger
+            automatically; move the money when you can.
           </p>
         )}
 
         {state.error && (
-          <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{state.error}</p>
+          <p className="bg-danger-soft text-danger rounded-md px-3 py-2 text-sm">{state.error}</p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">

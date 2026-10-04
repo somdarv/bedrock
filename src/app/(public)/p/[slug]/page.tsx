@@ -81,6 +81,18 @@ export default async function ClientPortalPage({
   const settled = owed <= 0 && paid > 0;
   // Nothing priced, invoiced or paid: there is no bill to show yet, so show none.
   const unpriced = billed <= 0 && paid <= 0;
+  /*
+   * Priced, then discounted to nothing. That is a decision, not a missing price, and the client
+   * may already hold the ₵0.00 invoice that records it. Telling them "no amount has been set,
+   * we will send the invoice" contradicts the document in their hand.
+   */
+  const waived = unpriced && saved > 0;
+  const waiverLabel = packageDiscount(pkg) > 0 ? pkg.discountLabel?.trim() || null : null;
+  // The project invoice is drawn from the figures above, so it is only offered when there are
+  // figures: an unpriced project would hand the client a ₵0.00 invoice while the real one sits
+  // on its own link. A waived project's ₵0.00 is the real figure, so it keeps its invoice.
+  const showInvoice = total > 0 || waived;
+  const showReceipt = paid > 0;
   const milestones = [...pkg.milestones].sort((a, b) => a.position - b.position);
   // With a schedule in place the client pays the next step, not the whole outstanding sum.
   const nextDue = milestones.find((m) => m.status === "pending") ?? null;
@@ -140,22 +152,21 @@ export default async function ClientPortalPage({
         <div className={unpriced ? "" : "border-border mt-6 border-t pt-5"}>
           {settled ? (
             <p className="text-success flex items-center gap-2 text-sm font-medium">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-                aria-hidden
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
+              <CheckMark />
               {deferred
                 ? "Paid in full. Thank you."
                 : "Paid in full. Thank you. Your files are unlocked below."}
             </p>
+          ) : waived ? (
+            <div>
+              <p className="text-success flex items-center gap-2 text-sm font-medium">
+                <CheckMark />
+                Nothing to pay on this project.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {waiverLabel ?? "Your discount"} covers it in full.
+              </p>
+            </div>
           ) : unpriced ? (
             <p className="text-muted-foreground text-sm">
               No amount has been set for this project yet. We will send the invoice when it is
@@ -192,53 +203,54 @@ export default async function ClientPortalPage({
           )}
         </div>
 
-        {/* Downloadable documents. The project invoice is drawn from the figures above, so it is
-            only offered when there are figures: an unpriced project would hand the client a
-            ₵0.00 invoice while the real one sits on its own link. */}
-        <div className="border-border mt-5 flex flex-wrap gap-4 border-t pt-4 text-sm">
-          {total > 0 && (
-            <a
-              href={`/p/${slug}/invoice`}
-              target="_blank"
-              rel="noopener"
-              className="text-foreground inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-4 w-4"
-                aria-hidden
+        {/* Downloadable documents. With neither to offer the row goes too, or it leaves an empty
+            ruled band at the foot of the card. */}
+        {(showInvoice || showReceipt) && (
+          <div className="border-border mt-5 flex flex-wrap gap-4 border-t pt-4 text-sm">
+            {showInvoice && (
+              <a
+                href={`/p/${slug}/invoice`}
+                target="_blank"
+                rel="noopener"
+                className="text-foreground inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
               >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6M9 15l3 3 3-3" />
-              </svg>
-              Invoice (PDF)
-            </a>
-          )}
-          {paid > 0 && (
-            <a
-              href={`/p/${slug}/receipt`}
-              target="_blank"
-              rel="noopener"
-              className="text-foreground inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-4 w-4"
-                aria-hidden
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-4 w-4"
+                  aria-hidden
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6M9 15l3 3 3-3" />
+                </svg>
+                Invoice (PDF)
+              </a>
+            )}
+            {showReceipt && (
+              <a
+                href={`/p/${slug}/receipt`}
+                target="_blank"
+                rel="noopener"
+                className="text-foreground inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
               >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6M9 15l3 3 3-3" />
-              </svg>
-              Receipt (PDF)
-            </a>
-          )}
-        </div>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-4 w-4"
+                  aria-hidden
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6M9 15l3 3 3-3" />
+                </svg>
+                Receipt (PDF)
+              </a>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Payment schedule — the client's staged milestones (paid vs due) */}
@@ -419,5 +431,22 @@ export default async function ClientPortalPage({
         />
       )}
     </div>
+  );
+}
+
+function CheckMark() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }
