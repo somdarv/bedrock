@@ -120,6 +120,7 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 | Shammah Preparatory School | `SHM` |
 | Stellar Edge School | `STE` |
 | Swad International Kitchen & Bar | `SWAD` |
+| Wundow Salifu Abraham Mangariba | `WUNDOW` |
 
 Assigned once per client and reused across their documents.
 
@@ -150,7 +151,7 @@ Assigned once per client and reused across their documents.
 |----------|-------|
 | Top machine line | Verify URL (`hub.saharabasetech.com/verify/{ID}`) |
 | Letterhead (right) | Short `Ref:` |
-| Footer (left) | Approved by · Employee ID · **Document ID** · Generated on System · Timestamp · **Verification serial** |
+| Footer (left) | **Document ID** · Generated on System · Timestamp · **Verification serial** (no approver line since 2026-10-04) |
 | Footer (right) | QR code (encodes Verify URL) · "Scan to verify" |
 
 ---

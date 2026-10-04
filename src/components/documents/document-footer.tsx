@@ -5,10 +5,12 @@ import { useDocumentState } from "./document-context";
 import { VerifyStamp } from "./verify-stamp";
 
 /**
- * Shared document footer: approver (default identity for now), the system metadata,
- * and the verify QR. Document ID is the stable ref; the timestamp and serial are the
- * dynamic values minted at prepare time, so they read "pending" until the document
- * is prepared.
+ * Shared document footer: the system metadata and the verify QR. Document ID is the
+ * stable ref; the timestamp and serial are the dynamic values minted at prepare time,
+ * so they read "pending" until the document is prepared.
+ *
+ * No "Approved by" line. The user dropped it on 2026-10-04 for every document from then
+ * on. Records still carry an approver for the API; the sheet just does not print it.
  */
 export function DocumentFooter({ record }: { record: DocumentRecord }) {
   const { prepared, status } = useDocumentState();
@@ -29,10 +31,7 @@ export function DocumentFooter({ record }: { record: DocumentRecord }) {
       {/* Stacks on a phone so the long document ID is not squeezed against the QR stamp. */}
       <div className="mt-7 flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[length:var(--doc-t-sm)] font-semibold text-[var(--doc-ink)]">
-            Approved by {record.approver.name}
-          </p>
-          <dl className="mt-4 space-y-2">
+          <dl className="space-y-2">
             {meta.map(([label, value]) => (
               <div key={label} className="flex flex-wrap gap-x-2 text-[length:var(--doc-t-micro)]">
                 <dt className="text-[var(--doc-ink-soft)]">{label}:</dt>

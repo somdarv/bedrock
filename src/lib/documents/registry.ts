@@ -83,6 +83,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20261004-PRO-WUNDOW-60",
+    reference: "PRO-WUNDOW-60",
+    category: "proposals",
+    type: "Proposal",
+    title: "Campaign Branding & Digital Services for Wundow Salifu Abraham Mangariba",
+    client: "Wundow Salifu Abraham Mangariba",
+    project: "Campaign Branding & Digital Services",
+    issueDate: "4 October 2026",
+    validUntil: "25 October 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20260902-PRO-SWAD-59",
     reference: "PRO-SWAD-59",
     category: "proposals",
