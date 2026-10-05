@@ -148,6 +148,18 @@ export const OpenIcon = ({ className }: P) => (
     <circle cx="12" cy="12" r="2.8" />
   </Svg>
 );
+export const LinkIcon = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M10.2 13.8a3.6 3.6 0 0 0 5.1 0l3.3-3.3a3.6 3.6 0 0 0-5.1-5.1l-1.2 1.2" />
+    <path d="M13.8 10.2a3.6 3.6 0 0 0-5.1 0l-3.3 3.3a3.6 3.6 0 0 0 5.1 5.1l1.2-1.2" />
+  </Svg>
+);
+export const ShareIcon = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M12 14.5V4.5M8 8.5l4-4 4 4" />
+    <path d="M8.5 11H7a1.5 1.5 0 0 0-1.5 1.5V18A1.5 1.5 0 0 0 7 19.5h10a1.5 1.5 0 0 0 1.5-1.5v-5.5A1.5 1.5 0 0 0 17 11h-1.5" />
+  </Svg>
+);
 export const ArrowUpRightIcon = ({ className }: P) => (
   <Svg className={className}>
     <path d="M7.5 16.5 16.5 7.5M9 7.5h7.5V15" />

@@ -472,6 +472,55 @@ export interface FileManifest {
   }[];
 }
 
+/** What a share link covers. `project` is every file in the package. */
+export type ShareKind = "file" | "folder" | "project";
+
+/**
+ * A link that anyone holding it can open without signing in (docs/FILES.md, "Sharing by link").
+ * One per file, folder or project. Only the operator's reads carry these.
+ */
+export interface FileShare {
+  id: string;
+  token: string;
+  kind: ShareKind;
+  fileId: string | null;
+  folderId: string | null;
+  allowDownload: boolean;
+  /** Locked files can be downloaded through this link too. Off unless someone chose it. */
+  includeLocked: boolean;
+  expiresAt: string | null;
+  lastOpenedAt: string | null;
+  createdAt: string;
+}
+
+/** A link's settings. Anything left out stays as it was. */
+export interface FileShareInput {
+  allowDownload?: boolean;
+  includeLocked?: boolean;
+  expiresAt?: string | null;
+}
+
+/** One row of the list of every link out there. */
+export interface SharedLink extends FileShare {
+  name: string;
+  packageId: string;
+  packageTitle: string;
+  clientName: string | null;
+}
+
+/**
+ * What a share link shows. A folder link's folder is the top of the tree: its own files and
+ * folders carry a null parent. `locked` on a file means this link may not hand it over.
+ */
+export interface SharedView {
+  kind: ShareKind;
+  name: string;
+  allowDownload: boolean;
+  expiresAt: string | null;
+  folders: DeliverableFolder[];
+  files: Deliverable[];
+}
+
 export interface ActivityEntry {
   id: string;
   event: string;
@@ -536,6 +585,10 @@ export interface WorkPackage {
   planItems: PlanItem[];
   /** Only on the answer to a folder create: the folder just made. */
   createdFolderId?: string;
+  /** Only on the operator's reads: the live share links. Never on a client's. */
+  shares?: FileShare[];
+  /** Only on the answer to a share create: the link just made or changed. */
+  shareId?: string;
   activity: ActivityEntry[];
   createdAt: string;
   /** Only present on the public portal read (showBySlug): the client's outstanding infra fees. */

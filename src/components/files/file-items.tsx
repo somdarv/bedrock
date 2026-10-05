@@ -4,7 +4,7 @@ import * as React from "react";
 import type { Deliverable, DeliverableFolder } from "@/lib/api/types";
 import { baseName, formatBytes, plural, shortDate } from "@/lib/files/tree";
 import { cn } from "@/lib/utils";
-import { CheckIcon, FileGlyph, FolderFilledIcon, LockIcon, MoreIcon, PlayIcon } from "./icons";
+import { CheckIcon, FileGlyph, FolderFilledIcon, LinkIcon, LockIcon, MoreIcon, PlayIcon } from "./icons";
 import type { MenuAnchor } from "./drive-ui";
 
 /**
@@ -31,6 +31,8 @@ export interface ItemHandlers {
 
 interface Common {
   selected: boolean;
+  /** A share link reaches this item. */
+  shared?: boolean;
   renaming: boolean;
   selectable: boolean;
   editable: boolean;
@@ -202,7 +204,18 @@ function fileMeta(file: Deliverable) {
   return [formatBytes(file.size), shortDate(file.createdAt)].filter(Boolean).join(" · ");
 }
 
-function StateChip({ file, owner }: { file: Deliverable; owner: boolean }) {
+/** The link mark beside an item anyone with a share link can open. */
+function SharedMark() {
+  return (
+    <span className="inline-flex shrink-0 text-[var(--doc-ink-soft)]" title="Shared by link">
+      <LinkIcon className="h-3.5 w-3.5" />
+      <span className="sr-only">Shared by link</span>
+    </span>
+  );
+}
+
+/** `lockedLabel` is what a locked file says to whoever is looking: the operator, the client, a link. */
+function StateChip({ file, lockedLabel }: { file: Deliverable; lockedLabel: string }) {
   if (file.archived) {
     return <Chip>Archived</Chip>;
   }
@@ -213,7 +226,7 @@ function StateChip({ file, owner }: { file: Deliverable; owner: boolean }) {
     return (
       <Chip>
         <LockIcon className="h-3 w-3" />
-        {owner ? "Locked" : "Unlocks when paid"}
+        {lockedLabel}
       </Chip>
     );
   }
@@ -365,7 +378,8 @@ export const FolderCard = React.memo(function FolderCard({
           </p>
         )}
         {!c.renaming && (
-          <p className="mt-0.5 text-xs whitespace-nowrap text-[var(--doc-ink-soft)]">
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs whitespace-nowrap text-[var(--doc-ink-soft)]">
+            {c.shared && <SharedMark />}
             {stats.files === 0 ? "Empty" : `${plural(stats.files, "file")} · ${formatBytes(stats.bytes)}`}
           </p>
         )}
@@ -400,7 +414,10 @@ export const FolderRow = React.memo(function FolderRow({
             <RenameField initial={folder.name} isFile={false} onDone={(n) => h.onRename("folder", folder.id, n)} />
           </div>
         ) : (
-          <p className="truncate text-[15px] font-semibold text-[var(--doc-ink)] sm:text-sm">{folder.name}</p>
+          <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-semibold text-[var(--doc-ink)] sm:text-sm">
+            <span className="truncate">{folder.name}</span>
+            {c.shared && <SharedMark />}
+          </p>
         )}
         <p className="truncate text-xs text-[var(--doc-ink-soft)] md:hidden">
           {stats.files === 0 ? "Empty" : `${plural(stats.files, "file")} · ${formatBytes(stats.bytes)}`}
@@ -418,9 +435,9 @@ export const FolderRow = React.memo(function FolderRow({
 
 export const FileCard = React.memo(function FileCard({
   file,
-  owner,
+  lockedLabel,
   ...c
-}: Common & { file: Deliverable; owner: boolean }) {
+}: Common & { file: Deliverable; lockedLabel: string }) {
   const h = c.handlers;
   return (
     <div
@@ -434,7 +451,7 @@ export const FileCard = React.memo(function FileCard({
       <div className="pointer-events-none relative aspect-[4/3] overflow-hidden rounded-[0.8rem] bg-[var(--doc-paper)]">
         <Thumb file={file} variant="tile" />
         <span className="absolute bottom-2 left-2 flex gap-1">
-          <StateChip file={file} owner={owner} />
+          <StateChip file={file} lockedLabel={lockedLabel} />
         </span>
       </div>
       {c.selectable && (
@@ -457,7 +474,12 @@ export const FileCard = React.memo(function FileCard({
               {file.filename}
             </p>
           )}
-          {!c.renaming && <p className="truncate text-xs text-[var(--doc-ink-soft)] tabular-nums">{fileMeta(file)}</p>}
+          {!c.renaming && (
+            <p className="flex items-center gap-1.5 text-xs text-[var(--doc-ink-soft)] tabular-nums">
+              {c.shared && <SharedMark />}
+              <span className="truncate">{fileMeta(file)}</span>
+            </p>
+          )}
         </div>
         <MenuButton label={file.filename} onOpen={(a) => h.onMenu("file", file.id, a)} className="-mr-0.5" />
       </div>
@@ -467,9 +489,9 @@ export const FileCard = React.memo(function FileCard({
 
 export const FileRow = React.memo(function FileRow({
   file,
-  owner,
+  lockedLabel,
   ...c
-}: Common & { file: Deliverable; owner: boolean }) {
+}: Common & { file: Deliverable; lockedLabel: string }) {
   const h = c.handlers;
   return (
     <div role="row" className={cn(surface(c.selected), "drive-row drive-grid-row")}>
@@ -485,8 +507,9 @@ export const FileRow = React.memo(function FileRow({
             <RenameField initial={file.filename} isFile onDone={(n) => h.onRename("file", file.id, n)} />
           </div>
         ) : (
-          <p className="truncate text-[15px] font-medium text-[var(--doc-ink)] sm:text-sm" title={file.filename}>
-            {file.filename}
+          <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-medium text-[var(--doc-ink)] sm:text-sm" title={file.filename}>
+            <span className="truncate">{file.filename}</span>
+            {c.shared && <SharedMark />}
           </p>
         )}
         <p className="truncate text-xs text-[var(--doc-ink-soft)] tabular-nums md:hidden">{fileMeta(file)}</p>
@@ -497,7 +520,7 @@ export const FileRow = React.memo(function FileRow({
         {file.processingStatus === "processing" ? (
           <Cell>Preparing preview</Cell>
         ) : (
-          <StateChip file={file} owner={owner} />
+          <StateChip file={file} lockedLabel={lockedLabel} />
         )}
       </div>
       <MenuButton label={file.filename} onOpen={(a) => h.onMenu("file", file.id, a)} />

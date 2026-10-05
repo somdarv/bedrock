@@ -2,30 +2,35 @@
 
 import * as React from "react";
 import Link from "next/link";
+import type { SharedLink } from "@/lib/api/types";
 import type { ClientSummary, FileIndexEntry } from "@/lib/files/overview";
 import { projectFilesHref } from "@/lib/files/overview";
 import { formatBytes, plural, shortDate } from "@/lib/files/tree";
 import { cn } from "@/lib/utils";
 import { FieldPill } from "./drive-ui";
 import { ChevronRightIcon, FileGlyph, FolderFilledIcon, LockIcon, SearchIcon } from "./icons";
+import { SharedLinks } from "./shared-links";
 
 /**
  * /admin/files: the repository's front door. What arrived lately comes first, because that is
- * what the operator usually came for; then every client as a folder. The search looks through
- * every file in every project.
+ * what the operator usually came for; then every live share link; then every client as a folder.
+ * The search looks through every file in every project.
  */
 export function FilesOverview({
   clients,
   files,
+  links,
 }: {
   clients: ClientSummary[];
   files: FileIndexEntry[];
+  links: SharedLink[];
 }) {
   const [query, setQuery] = React.useState("");
   const q = query.trim().toLowerCase();
   const totalBytes = clients.reduce((s, c) => s + c.bytes, 0);
   const withFiles = clients.filter((c) => c.files > 0);
   const recent = files.slice(0, 6);
+  const fileFolders = React.useMemo(() => new Map(files.map((f) => [f.id, f.folderId])), [files]);
 
   const results = React.useMemo(() => {
     if (!q) return [];
@@ -116,6 +121,8 @@ export function FilesOverview({
               </div>
             </div>
           )}
+
+          <SharedLinks links={links} fileFolders={fileFolders} />
 
           <div className="mt-8">
             <h2 className="mb-2 px-1 text-[13px] font-semibold text-[var(--doc-ink-soft)]">Clients</h2>

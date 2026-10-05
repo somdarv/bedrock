@@ -8,6 +8,7 @@ import type {
   ClientNotifyEvent,
   FileManifest,
   FileSelection,
+  FileShareInput,
   FxInput,
   FxState,
   HostingServer,
@@ -32,6 +33,8 @@ import type {
   SavingsState,
   ServerMetrics,
   SessionUser,
+  SharedLink,
+  SharedView,
   TestServerInput,
   TestServerResult,
   TrackResult,
@@ -184,6 +187,30 @@ export interface BedrockApi {
      * Paying it clears the package's balance.
      */
     bill(packageId: string): Promise<Invoice>;
+  };
+  /**
+   * Share links (docs/FILES.md): a file, a folder or a whole project's files, for anyone holding
+   * the link. One link per thing. Removing a link is how it stops working, and sharing the same
+   * thing again makes a new one.
+   */
+  shares: {
+    /** Every link out there, across all projects, newest first. */
+    list(): Promise<SharedLink[]>;
+    /**
+     * Turn on the link to a file or a folder, or to the whole project when both are null. If one
+     * exists already its settings change instead. The answer names it in `shareId`.
+     */
+    create(
+      packageId: string,
+      target: { fileId: string | null; folderId: string | null },
+      input: FileShareInput,
+    ): Promise<WorkPackage>;
+    update(packageId: string, shareId: string, input: FileShareInput): Promise<WorkPackage>;
+    remove(packageId: string, shareId: string): Promise<WorkPackage>;
+    /** PUBLIC: what the link shows. 404 when it is not active, 410 once it has ended. */
+    open(token: string): Promise<SharedView>;
+    /** PUBLIC: what a ZIP from the link holds. Null is everything the link covers. */
+    manifest(token: string, folderId: string | null): Promise<FileManifest>;
   };
   infrastructure: {
     /** Hosting servers we monitor; optionally scoped to one client (null = Sahara's own). */

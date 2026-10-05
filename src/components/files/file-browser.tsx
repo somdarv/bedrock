@@ -3,7 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Deliverable, DeliverableFolder, FileSelection, WorkPackage } from "@/lib/api/types";
+import type {
+  Deliverable,
+  DeliverableFolder,
+  FileSelection,
+  FileShare,
+  SharedView,
+  WorkPackage,
+} from "@/lib/api/types";
 import { useToast } from "@/components/ui/toast";
 import {
   createFolder,
@@ -13,7 +20,9 @@ import {
   moveItems,
   renameFile,
   renameFolder,
+  shareItem,
 } from "@/lib/files/actions";
+import { copyText, shareUrl } from "@/lib/files/share";
 import {
   childFolders,
   filesIn,
@@ -49,6 +58,7 @@ import {
   DownloadIcon,
   FolderPlusIcon,
   GridIcon,
+  LinkIcon,
   ListIcon,
   LockIcon,
   MoreIcon,
@@ -56,11 +66,13 @@ import {
   OpenIcon,
   PencilIcon,
   SearchIcon,
+  ShareIcon,
   TrashIcon,
   UploadIcon,
 } from "./icons";
 import { FileUnderDialog } from "./file-under-dialog";
 import { MoveDialog } from "./move-dialog";
+import { ShareDialog, type ShareTarget } from "./share-dialog";
 import { UploadTray } from "./upload-tray";
 
 /**
@@ -68,8 +80,9 @@ import { UploadTray } from "./upload-tray";
  * files, a path you can click back along, and a selection you act on together.
  *
  * `admin` is the operator's view: upload (files or whole folders, by button or by dropping),
- * new folder, rename, move (menu or drag), delete, download as ZIP. `client` is the portal:
- * browse, preview, and download what is unlocked, a file or a folder at a time.
+ * new folder, rename, move (menu or drag), delete, download as ZIP, share by link. `client` is
+ * the portal: browse, preview, and download what is unlocked, a file or a folder at a time.
+ * `shared` is a share link opened by anyone: the same as the portal, rooted at what was shared.
  *
  * On a desktop a click selects and a double-click opens, as in Drive. On a phone a tap opens,
  * and the tick box starts a selection.
@@ -92,7 +105,27 @@ export type FileBrowserProps =
       slug: string;
       apiBase: string;
       initialFolderId?: string | null;
+    }
+  | {
+      mode: "shared";
+      /** What the link shows. A shared folder is the root here. */
+      view: SharedView;
+      token: string;
+      apiBase: string;
+      initialFolderId?: string | null;
     };
+
+type Data = { folders: DeliverableFolder[]; files: Deliverable[]; shares: FileShare[] };
+
+function dataOf(source: WorkPackage | SharedView): Data {
+  return "kind" in source
+    ? { folders: source.folders, files: source.files, shares: [] }
+    : { folders: source.folders ?? [], files: source.deliverables, shares: source.shares ?? [] };
+}
+
+/** One key per thing a link can cover: a file, a folder, or the project itself. */
+const shareKey = (s: Pick<FileShare, "fileId" | "folderId">) =>
+  s.fileId ? `f:${s.fileId}` : s.folderId ? `d:${s.folderId}` : "project";
 
 const SORTS = ["name", "newest", "size"] as const;
 type Sort = (typeof SORTS)[number];
@@ -112,25 +145,34 @@ function toSelection(keys: Iterable<string>): FileSelection {
 }
 
 export function FileBrowser(props: FileBrowserProps) {
-  const { pkg, mode } = props;
+  const { mode } = props;
   const admin = mode === "admin";
+  const shared = mode === "shared";
   const embedded = props.mode === "admin" && props.layout === "embedded";
+  // A share link has no package on this side, only what the link shows.
+  const pkg = props.mode === "shared" ? null : props.pkg;
+  const packageId = pkg?.id ?? "";
+  const title = props.mode === "shared" ? props.view.name : props.pkg.title;
+  const planItems = pkg?.planItems ?? [];
+  const downloadsOn = props.mode !== "shared" || props.view.allowDownload;
   const router = useRouter();
   const { toast } = useToast();
   const fine = useFinePointer();
 
   /* ------------------------------------------------------------ data */
 
-  const [data, setData] = React.useState({ folders: pkg.folders ?? [], files: pkg.deliverables });
+  const source = props.mode === "shared" ? props.view : props.pkg;
+  const [data, setData] = React.useState<Data>(() => dataOf(source));
   React.useEffect(() => {
-    setData({ folders: pkg.folders ?? [], files: pkg.deliverables });
-  }, [pkg]);
+    setData(dataOf(source));
+  }, [source]);
   const dataRef = React.useRef(data);
   dataRef.current = data;
-  const { folders, files } = data;
+  const { folders, files, shares } = data;
 
   const apply = React.useCallback((next: WorkPackage) => {
-    setData({ folders: next.folders ?? [], files: next.deliverables });
+    // Every admin answer carries the links; keep what we had if one ever does not.
+    setData((prev) => ({ folders: next.folders ?? [], files: next.deliverables, shares: next.shares ?? prev.shares }));
   }, []);
 
   // Previews are made after upload; look again until they are all in.
@@ -245,14 +287,14 @@ export function FileBrowser(props: FileBrowserProps) {
   /* --------------------------------------------------------- uploads */
 
   const refreshSoon = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const uploads = useUploads(pkg.id, (next) => {
+  const uploads = useUploads(packageId, (next) => {
     apply(next);
     // The activity log and nav badges live outside this component; refresh once things settle.
     if (refreshSoon.current) clearTimeout(refreshSoon.current);
     refreshSoon.current = setTimeout(() => router.refresh(), 1500);
   });
 
-  const rootLabel = admin ? pkg.title : "All files";
+  const rootLabel = admin || shared ? title : "All files";
   const nameOf = (id: string | null) =>
     id ? dataRef.current.folders.find((f) => f.id === id)?.name ?? "folder" : rootLabel;
 
@@ -274,7 +316,7 @@ export function FileBrowser(props: FileBrowserProps) {
           ids.set(p, existing.id);
           continue;
         }
-        const res = await createFolder(pkg.id, name, parent);
+        const res = await createFolder(packageId, name, parent);
         if (!res.ok || !res.pkg.createdFolderId) {
           toast(res.ok ? "Could not create a folder for the upload." : res.error, "danger");
           return;
@@ -289,7 +331,7 @@ export function FileBrowser(props: FileBrowserProps) {
       });
       uploads.add(requests);
     },
-    [admin, pkg.id, apply, toast, uploads, rootLabel],
+    [admin, packageId, apply, toast, uploads, rootLabel],
   );
 
   const onPicked = (list: FileList | null, withDirs: boolean) => {
@@ -318,11 +360,13 @@ export function FileBrowser(props: FileBrowserProps) {
   const downloadHref = React.useCallback(
     (f: Deliverable): string | null => {
       if (f.archived) return null;
-      if (props.mode === "admin") return `/api/admin/deliverables/${pkg.id}/${f.id}?download=1`;
-      return f.locked ? null : `${props.apiBase}/api/p/${props.slug}/deliverables/${f.id}/download`;
+      if (props.mode === "admin") return `/api/admin/deliverables/${packageId}/${f.id}?download=1`;
+      if (f.locked || !downloadsOn) return null;
+      if (props.mode === "shared") return `${props.apiBase}/api/s/${props.token}/files/${f.id}/download`;
+      return `${props.apiBase}/api/p/${props.slug}/deliverables/${f.id}/download`;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pkg.id, props.mode],
+    [packageId, props.mode, downloadsOn],
   );
 
   const startDownload = React.useCallback(
@@ -332,18 +376,21 @@ export function FileBrowser(props: FileBrowserProps) {
         const f = dataRef.current.files.find((x) => x.id === sel.fileIds[0]);
         const href = f && downloadHref(f);
         if (href) window.location.assign(href);
-        else toast(f?.locked ? "That file unlocks when the balance is paid." : "That file is no longer stored.");
+        else if (!downloadsOn) toast("Downloads are off for this link.");
+        else if (f?.locked) toast(shared ? "That file can be previewed but not downloaded yet." : "That file unlocks when the balance is paid.");
+        else toast("That file is no longer stored.");
         return;
       }
-      if (props.mode === "client") {
+      if (props.mode !== "admin") {
         const folder = sel.folderIds[0];
-        window.location.assign(`/p/${props.slug}/zip${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`);
+        const base = props.mode === "shared" ? `/s/${props.token}/zip` : `/p/${props.slug}/zip`;
+        window.location.assign(`${base}${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`);
         return;
       }
       // A form post hands the download to the browser's own manager, with its progress bar.
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = `/api/admin/packages/${pkg.id}/files/zip`;
+      form.action = `/api/admin/packages/${packageId}/files/zip`;
       for (const [name, ids] of [["fileIds", sel.fileIds], ["folderIds", sel.folderIds]] as const) {
         for (const id of ids) {
           const input = document.createElement("input");
@@ -359,13 +406,13 @@ export function FileBrowser(props: FileBrowserProps) {
       toast("Your download is starting. Large folders take a moment.");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pkg.id, props.mode, downloadHref, toast],
+    [packageId, props.mode, downloadHref, toast],
   );
 
   const downloadAll = () => {
-    if (props.mode === "client") startDownload(folderId ? [key("folder", folderId)] : []);
+    if (props.mode !== "admin") startDownload(folderId ? [key("folder", folderId)] : []);
     else if (folderId) startDownload([key("folder", folderId)]);
-    else window.location.assign(`/api/admin/packages/${pkg.id}/files/zip`);
+    else window.location.assign(`/api/admin/packages/${packageId}/files/zip`);
   };
 
   const rename = React.useCallback(
@@ -374,17 +421,18 @@ export function FileBrowser(props: FileBrowserProps) {
       if (!name) return;
       const before = dataRef.current;
       setData({
+        ...before,
         folders: kind === "folder" ? before.folders.map((f) => (f.id === id ? { ...f, name } : f)) : before.folders,
         files: kind === "file" ? before.files.map((f) => (f.id === id ? { ...f, filename: name } : f)) : before.files,
       });
-      const res = kind === "folder" ? await renameFolder(pkg.id, id, name) : await renameFile(pkg.id, id, name);
+      const res = kind === "folder" ? await renameFolder(packageId, id, name) : await renameFile(packageId, id, name);
       if (res.ok) apply(res.pkg);
       else {
         setData(before);
         toast(res.error, "danger");
       }
     },
-    [pkg.id, apply, toast],
+    [packageId, apply, toast],
   );
 
   const move = React.useCallback(
@@ -392,11 +440,12 @@ export function FileBrowser(props: FileBrowserProps) {
       const sel = toSelection(keys);
       const before = dataRef.current;
       setData({
+        ...before,
         folders: before.folders.map((f) => (sel.folderIds.includes(f.id) ? { ...f, parentId: to } : f)),
         files: before.files.map((f) => (sel.fileIds.includes(f.id) ? { ...f, folderId: to } : f)),
       });
       setSelected(new Set());
-      const res = await moveItems(pkg.id, sel, to);
+      const res = await moveItems(packageId, sel, to);
       if (res.ok) {
         apply(res.pkg);
         toast(`Moved ${plural(keys.length, "item")} to ${nameOf(to)}.`, "success");
@@ -406,7 +455,7 @@ export function FileBrowser(props: FileBrowserProps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pkg.id, apply, toast],
+    [packageId, apply, toast],
   );
 
   const remove = async (keys: string[]) => {
@@ -415,12 +464,13 @@ export function FileBrowser(props: FileBrowserProps) {
     const gone = withDescendants(before.folders, sel.folderIds);
     setBusy(true);
     setData({
+      ...before,
       folders: before.folders.filter((f) => !gone.has(f.id)),
       files: before.files.filter((f) => !sel.fileIds.includes(f.id) && !(f.folderId && gone.has(f.folderId))),
     });
     setDeleting(null);
     setSelected(new Set());
-    const res = await deleteItems(pkg.id, sel);
+    const res = await deleteItems(packageId, sel);
     setBusy(false);
     if (res.ok) {
       apply(res.pkg);
@@ -434,7 +484,7 @@ export function FileBrowser(props: FileBrowserProps) {
 
   const newFolder = async () => {
     setBusy(true);
-    const res = await createFolder(pkg.id, "Untitled folder", folderId);
+    const res = await createFolder(packageId, "Untitled folder", folderId);
     setBusy(false);
     if (!res.ok) return toast(res.error, "danger");
     apply(res.pkg);
@@ -446,13 +496,60 @@ export function FileBrowser(props: FileBrowserProps) {
 
   const purge = async () => {
     setBusy(true);
-    const res = await freeUpStorage(pkg.id);
+    const res = await freeUpStorage(packageId);
     setBusy(false);
     setPurging(false);
     if (!res.ok) return toast(res.error, "danger");
     apply(res.pkg);
     toast("Originals removed from storage. Previews stay.", "success");
     router.refresh();
+  };
+
+  /* ---------------------------------------------------------- sharing */
+
+  const [sharing, setSharing] = React.useState<{ fileId: string | null; folderId: string | null } | null>(null);
+  const sharedKeys = React.useMemo(() => new Set(shares.map(shareKey)), [shares]);
+
+  /** The link already out there for a thing, if there is one. */
+  const shareOf = (t: { fileId: string | null; folderId: string | null }) =>
+    shares.find((x) => shareKey(x) === shareKey(t)) ?? null;
+
+  const targetOf = (t: { fileId: string | null; folderId: string | null }): ShareTarget | null => {
+    if (t.fileId) {
+      const f = files.find((x) => x.id === t.fileId);
+      return f ? { kind: "file", ...t, name: f.filename, locked: f.locked && !f.archived ? 1 : 0 } : null;
+    }
+    if (t.folderId) {
+      const d = folders.find((x) => x.id === t.folderId);
+      return d ? { kind: "folder", ...t, name: d.name, locked: folderStats(folders, files, d.id).locked } : null;
+    }
+    return { kind: "project", ...t, name: title, locked: files.filter((f) => f.locked && !f.archived).length };
+  };
+
+  const targetFor = (k: string) => {
+    const [kind, id] = split(k);
+    return kind === "file" ? { fileId: id, folderId: null } : { fileId: null, folderId: id };
+  };
+
+  /**
+   * Drive's "Copy link": one press makes the link if there is none yet and puts it on the
+   * clipboard. Its settings stay at the defaults until someone opens Share.
+   */
+  const copyLink = (t: { fileId: string | null; folderId: string | null }) => {
+    const name = targetOf(t)?.name ?? "this";
+    const existing = shareOf(t);
+    const link = existing
+      ? Promise.resolve(shareUrl(existing.token))
+      : shareItem(packageId, t).then((res) => {
+          if (!res.ok) throw new Error(res.error);
+          apply(res.pkg);
+          const made = res.pkg.shares?.find((x) => x.id === res.pkg.shareId);
+          if (!made) throw new Error("Could not make the link.");
+          return shareUrl(made.token);
+        });
+    copyText(link)
+      .then(() => toast(`Link to “${name}” copied.`, "success"))
+      .catch((e: unknown) => toast(e instanceof Error && e.message ? e.message : "Could not copy the link.", "danger"));
   };
 
   /* -------------------------------------------------- item handlers */
@@ -599,13 +696,13 @@ export function FileBrowser(props: FileBrowserProps) {
     const file = kind === "file" ? files.find((f) => f.id === id) : undefined;
     const inside = kind === "folder" ? stats.get(id) : undefined;
     // A client can only take a folder that holds something unlocked.
-    const canDownload =
+    const canDownload = downloadsOn && (
       many ||
       (file
         ? downloadHref(file) !== null
         : inside
           ? (admin ? inside.files : inside.files - inside.locked) > 0
-          : false);
+          : false));
 
     const items: MenuItem[] = [];
     if (!many) {
@@ -623,9 +720,11 @@ export function FileBrowser(props: FileBrowserProps) {
     });
     if (!admin) return items;
     if (!many) {
+      items.push({ label: "Share", icon: <ShareIcon />, onSelect: () => setSharing(targetFor(k)) });
+      items.push({ label: "Copy link", icon: <LinkIcon />, onSelect: () => copyLink(targetFor(k)) });
       items.push({ label: "Rename", icon: <PencilIcon />, hint: "F2", onSelect: () => setRenaming(k) });
     }
-    if (!many && file && pkg.planItems.length > 0) {
+    if (!many && file && planItems.length > 0) {
       items.push({
         label: file.planItemId ? "Change what it is for" : "File under a plan item",
         icon: <PaperclipIcon />,
@@ -668,7 +767,7 @@ export function FileBrowser(props: FileBrowserProps) {
         if (f.archived) {
           return { src: f.hasPreview ? f.previewUrl : null, as: f.hasPreview ? "image" : null, downloadHref: null };
         }
-        const original = `/api/admin/deliverables/${pkg.id}/${f.id}`;
+        const original = `/api/admin/deliverables/${packageId}/${f.id}`;
         return {
           src: f.type === "file" ? null : original,
           as: f.type === "file" ? null : f.type,
@@ -682,17 +781,22 @@ export function FileBrowser(props: FileBrowserProps) {
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pkg.id, props.mode, downloadHref],
+    [packageId, props.mode, downloadHref],
   );
 
   /* ------------------------------------------------------------ render */
 
   const selection = [...selected];
   const showCheck = selection.length > 0;
-  const heading = current?.name ?? (admin ? (embedded ? "Files" : pkg.title) : "Your files");
+  const heading = current?.name ?? (admin ? (embedded ? "Files" : title) : shared ? title : "Your files");
+  const Heading = shared ? "h1" : "h2";
+  const lockedLabel = admin ? "Locked" : shared ? "Preview only" : "Unlocks when paid";
+  const here = folderId ? key("folder", folderId) : "project";
   const empty = shownFolders.length === 0 && shownFiles.length === 0;
   const storedOriginals = files.some((f) => !f.archived);
   const common = { selectable: admin, editable: admin && fine, showCheck, handlers };
+  const sharedFolder = (id: string) => admin && sharedKeys.has(key("folder", id));
+  const sharedFile = (id: string) => admin && sharedKeys.has(key("file", id));
   const trail: Crumb[] = props.mode === "admin" ? props.trail ?? [] : [];
 
   const crumbs: { label: string; id: string | null }[] = [
@@ -802,14 +906,14 @@ export function FileBrowser(props: FileBrowserProps) {
                 <ChevronLeftIcon />
               </IconButton>
             )}
-            <h2
+            <Heading
               className={cn(
                 "min-w-0 truncate font-display font-semibold tracking-[-0.025em] text-[var(--doc-ink)]",
                 embedded || !admin ? "text-[1.5rem] leading-tight" : "text-[1.75rem] leading-tight sm:text-[var(--doc-t-h2)]",
               )}
             >
               {q ? `Results for “${query.trim()}”` : heading}
-            </h2>
+            </Heading>
           </div>
           <p className="mt-1 text-sm text-[var(--doc-ink-soft)] tabular-nums">
             {scope.length === 0 ? (
@@ -818,6 +922,7 @@ export function FileBrowser(props: FileBrowserProps) {
               <>
                 {plural(scope.length, "file")} · {formatBytes(totalBytes(scope))}
                 {admin && lockedCount > 0 && ` · ${lockedCount} locked until paid`}
+                {admin && !q && sharedKeys.has(here) && " · Shared by link"}
               </>
             )}
           </p>
@@ -827,7 +932,7 @@ export function FileBrowser(props: FileBrowserProps) {
           <div className="flex flex-wrap items-center gap-2">
             {embedded && (
               <Link
-                href={`/admin/packages/${pkg.id}/files${folderId ? `?folder=${folderId}` : ""}`}
+                href={`/admin/packages/${packageId}/files${folderId ? `?folder=${folderId}` : ""}`}
                 className="inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-[var(--doc-ink-body)] hover:bg-[var(--doc-fill)] sm:h-10"
               >
                 Full view <ArrowUpRightIcon className="h-4 w-4" />
@@ -859,7 +964,7 @@ export function FileBrowser(props: FileBrowserProps) {
               <MoreIcon />
             </IconButton>
           </div>
-        ) : openCount > 0 ? (
+        ) : openCount > 0 && downloadsOn ? (
           <Pill tone="ink" onClick={downloadAll}>
             <DownloadIcon className="h-4 w-4" />
             {folderId ? "Download this folder" : "Download all"}
@@ -867,7 +972,7 @@ export function FileBrowser(props: FileBrowserProps) {
         ) : null}
       </header>
 
-      {!admin && lockedCount > 0 && (
+      {props.mode === "client" && lockedCount > 0 && (
         <div className="mt-5 flex items-start gap-3 rounded-[var(--doc-r-inset)] bg-[var(--doc-fill)] px-5 py-4">
           <LockIcon className="mt-0.5 text-[var(--doc-ink)]" />
           <p className="text-sm leading-relaxed text-[var(--doc-ink-body)]">
@@ -875,6 +980,16 @@ export function FileBrowser(props: FileBrowserProps) {
               {lockedCount === scope.length ? "These files" : `${plural(lockedCount, "file")}`} unlock when the balance is paid.
             </strong>{" "}
             You can look at the previews now.
+          </p>
+        </div>
+      )}
+      {shared && (!downloadsOn || lockedCount > 0) && (
+        <div className="mt-5 flex items-start gap-3 rounded-[var(--doc-r-inset)] bg-[var(--doc-fill)] px-5 py-4">
+          <LockIcon className="mt-0.5 text-[var(--doc-ink)]" />
+          <p className="text-sm leading-relaxed font-semibold text-[var(--doc-ink)]">
+            {!downloadsOn
+              ? "Downloads are off for this link."
+              : `${lockedCount === scope.length ? "These files" : plural(lockedCount, "file")} can be previewed but not downloaded yet.`}
           </p>
         </div>
       )}
@@ -896,6 +1011,11 @@ export function FileBrowser(props: FileBrowserProps) {
             <BarAction label="Download" onClick={() => startDownload(selection)}>
               <DownloadIcon className="h-4 w-4" />
             </BarAction>
+            {selection.length === 1 && (
+              <BarAction label="Share" onClick={() => setSharing(targetFor(selection[0]))}>
+                <ShareIcon className="h-4 w-4" />
+              </BarAction>
+            )}
             <BarAction label="Move" onClick={() => setMoving(selection)}>
               <MoveIcon className="h-4 w-4" />
             </BarAction>
@@ -916,7 +1036,7 @@ export function FileBrowser(props: FileBrowserProps) {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={admin ? "Search this project" : "Search your files"}
+              placeholder={admin ? "Search this project" : shared ? "Search these files" : "Search your files"}
               aria-label="Search files"
               className="pl-10"
             />
@@ -969,9 +1089,10 @@ export function FileBrowser(props: FileBrowserProps) {
         {empty ? (
           <EmptyState
             admin={admin}
+            shared={shared}
             searching={Boolean(q)}
             query={query.trim()}
-            place={current?.name ?? null}
+            place={current?.name ?? (shared ? title : null)}
             onUpload={() => fileInput.current?.click()}
           />
         ) : view === "grid" ? (
@@ -988,6 +1109,7 @@ export function FileBrowser(props: FileBrowserProps) {
                       selected={selected.has(key("folder", f.id))}
                       renaming={renaming === key("folder", f.id)}
                       dropTarget={dropFolder === f.id}
+                      shared={sharedFolder(f.id)}
                       {...common}
                     />
                   ))}
@@ -1002,7 +1124,8 @@ export function FileBrowser(props: FileBrowserProps) {
                     <FileCard
                       key={f.id}
                       file={f}
-                      owner={admin}
+                      lockedLabel={lockedLabel}
+                      shared={sharedFile(f.id)}
                       selected={selected.has(key("file", f.id))}
                       renaming={renaming === key("file", f.id)}
                       {...common}
@@ -1030,6 +1153,7 @@ export function FileBrowser(props: FileBrowserProps) {
                 selected={selected.has(key("folder", f.id))}
                 renaming={renaming === key("folder", f.id)}
                 dropTarget={dropFolder === f.id}
+                shared={sharedFolder(f.id)}
                 {...common}
               />
             ))}
@@ -1037,7 +1161,8 @@ export function FileBrowser(props: FileBrowserProps) {
               <FileRow
                 key={f.id}
                 file={f}
-                owner={admin}
+                lockedLabel={lockedLabel}
+                shared={sharedFile(f.id)}
                 selected={selected.has(key("file", f.id))}
                 renaming={renaming === key("file", f.id)}
                 {...common}
@@ -1105,7 +1230,7 @@ export function FileBrowser(props: FileBrowserProps) {
       />
       <Menu
         anchor={pageMenu}
-        title={pkg.title}
+        title={title}
         onClose={() => setPageMenu(null)}
         items={[
           {
@@ -1113,6 +1238,11 @@ export function FileBrowser(props: FileBrowserProps) {
             icon: <DownloadIcon />,
             disabled: scope.every((f) => f.archived),
             onSelect: downloadAll,
+          },
+          {
+            label: folderId ? "Share this folder" : "Share the whole project",
+            icon: <ShareIcon />,
+            onSelect: () => setSharing({ fileId: null, folderId }),
           },
           {
             label: "Free up storage",
@@ -1126,7 +1256,7 @@ export function FileBrowser(props: FileBrowserProps) {
 
       <FileUnderDialog
         file={filing}
-        items={pkg.planItems}
+        items={planItems}
         busy={busy}
         onClose={() => setFiling(null)}
         onPick={(planItemId) => {
@@ -1135,13 +1265,13 @@ export function FileBrowser(props: FileBrowserProps) {
           if (!target) return;
           void (async () => {
             setBusy(true);
-            const res = await fileUnderPlanItem(pkg.id, target.id, planItemId);
+            const res = await fileUnderPlanItem(packageId, target.id, planItemId);
             setBusy(false);
             if (!res.ok) return toast(res.error, "danger");
             apply(res.pkg);
             toast(
               planItemId
-                ? `Filed under “${pkg.planItems.find((i) => i.id === planItemId)?.title ?? "the plan"}”.`
+                ? `Filed under “${planItems.find((i) => i.id === planItemId)?.title ?? "the plan"}”.`
                 : "Unfiled from the plan.",
               "success",
             );
@@ -1201,10 +1331,23 @@ export function FileBrowser(props: FileBrowserProps) {
         }
       >
         <p className="text-[15px] leading-relaxed">
-          Every original in {pkg.title} is removed from storage ({formatBytes(totalBytes(files.filter((f) => !f.archived)))}).
+          Every original in {title} is removed from storage ({formatBytes(totalBytes(files.filter((f) => !f.archived)))}).
           Previews and the file list stay. The client can no longer download. Do this once the work is delivered and paid for.
         </p>
       </Dialog>
+
+      {admin && (
+        <ShareDialog
+          packageId={packageId}
+          target={sharing ? targetOf(sharing) : null}
+          share={sharing ? shareOf(sharing) : null}
+          onClose={() => setSharing(null)}
+          onChange={(next) => {
+            apply(next);
+            router.refresh();
+          }}
+        />
+      )}
 
       <FileViewer
         files={shownFiles}
@@ -1283,20 +1426,24 @@ function CrumbButton({
 
 function EmptyState({
   admin,
+  shared,
   searching,
   query,
   place,
   onUpload,
 }: {
   admin: boolean;
+  shared: boolean;
   searching: boolean;
   query: string;
   place: string | null;
   onUpload: () => void;
 }) {
   const [title, body] = searching
-    ? [`Nothing called “${query}”`, "Search looks through every folder in this project."]
-    : admin
+    ? [`Nothing called “${query}”`, shared ? "Search looks through every folder here." : "Search looks through every folder in this project."]
+    : shared
+      ? [`${place ?? "This folder"} is empty`, "Anything added to it will show up here."]
+      : admin
       ? place
         ? [`${place} is empty`, "Drop files or a whole folder here, or upload from your computer."]
         : ["No files yet", "Drop the finished work here, or upload it from your computer. The client sees it on their project page."]

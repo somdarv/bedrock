@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -456,6 +456,72 @@ function mockManifest(pkg: WorkPackage, files: Deliverable[], selection: FileSel
   };
 }
 
+/* -------------------------------------------------------------- share links */
+
+/** 40 characters from 62, like FileShare::mintToken in the API. */
+function mockToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(40)), (b) => chars[b % 62]).join("");
+}
+
+function shareName(pkg: WorkPackage, share: FileShare) {
+  if (share.kind === "file") return pkg.deliverables.find((d) => d.id === share.fileId)?.filename ?? "File";
+  if (share.kind === "folder") return pkg.folders.find((f) => f.id === share.folderId)?.name ?? "Folder";
+  return pkg.title;
+}
+
+function describeShare(pkg: WorkPackage, share: FileShare) {
+  if (share.kind === "file") return `"${shareName(pkg, share)}"`;
+  if (share.kind === "folder") return `the "${shareName(pkg, share)}" folder`;
+  return "every file in the project";
+}
+
+/** Mirrors FileShare::files() and folders(): what a link reaches, decided when it is opened. */
+function shareReach(pkg: WorkPackage, share: FileShare) {
+  if (share.kind === "file") return { folders: [], files: pkg.deliverables.filter((d) => d.id === share.fileId) };
+  if (share.kind === "project") return { folders: pkg.folders, files: pkg.deliverables };
+  const inside = withDescendants(pkg.folders, [share.folderId!]);
+  return {
+    folders: pkg.folders.filter((f) => f.id !== share.folderId && inside.has(f.id)),
+    files: pkg.deliverables.filter((d) => d.folderId && inside.has(d.folderId)),
+  };
+}
+
+function findShare(token: string) {
+  for (const pkg of packages) {
+    const share = pkg.shares?.find((s) => s.token === token);
+    if (!share) continue;
+    if (share.expiresAt && new Date(share.expiresAt) < new Date()) {
+      throw new ApiError(410, "This link has stopped working.");
+    }
+    return { pkg, share };
+  }
+  throw new ApiError(404, "This link is not active. Ask the person who sent it for a new one.");
+}
+
+function shareSettings(input: FileShareInput): Partial<FileShare> {
+  if (input.expiresAt && new Date(input.expiresAt) <= new Date()) {
+    throw new ApiError(422, "The end date has to be in the future.");
+  }
+  const out: Partial<FileShare> = {};
+  if (input.allowDownload !== undefined) out.allowDownload = input.allowDownload;
+  if (input.includeLocked !== undefined) out.includeLocked = input.includeLocked;
+  if (input.expiresAt !== undefined) out.expiresAt = input.expiresAt;
+  return out;
+}
+
+/** A deleted file or folder takes its link with it, as the foreign keys do in the API. */
+function dropOrphanShares(pkg: WorkPackage) {
+  if (!pkg.shares) return;
+  pkg.shares = pkg.shares.filter((s) =>
+    s.fileId
+      ? pkg.deliverables.some((d) => d.id === s.fileId)
+      : s.folderId
+        ? pkg.folders.some((f) => f.id === s.folderId)
+        : true,
+  );
+}
+
 function found<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new ApiError(404, `${what} not found`);
   return value;
@@ -632,6 +698,8 @@ export const mockApi: BedrockApi = {
         ...pkg,
         billTo: billToFor(pkg.clientId),
         planItems: pkg.planItems.filter((i) => i.visibility === "shared"),
+        // Share tokens are the operator's. A client holding one could get past the payment gate.
+        shares: undefined,
       };
     },
     async startPayment(slug) {
@@ -866,6 +934,7 @@ export const mockApi: BedrockApi = {
       if (idx === -1) throw new ApiError(404, "Deliverable not found");
       const [removed] = pkg.deliverables.splice(idx, 1);
       processingUntil.delete(deliverableId);
+      dropOrphanShares(pkg);
       logActivity(pkg, "deliverable_removed", `Removed "${removed.filename}".`);
       return pkg;
     },
@@ -948,6 +1017,7 @@ export const mockApi: BedrockApi = {
         (d) => !selection.fileIds.includes(d.id) && !(d.folderId && folders.has(d.folderId)),
       );
       pkg.folders = pkg.folders.filter((f) => !folders.has(f.id));
+      dropOrphanShares(pkg);
       const removed = before - pkg.deliverables.length;
       if (removed > 0) logActivity(pkg, "deliverable_removed", `Removed ${removed} file(s).`);
       return pkg;
@@ -1371,6 +1441,107 @@ export const mockApi: BedrockApi = {
       syncPackageBilling(pkg.id);
       logActivity(pkg, "package_billed", `Invoice raised for ${formatCedis(outstanding)} (draft).`);
       return hydrateInvoice(invoice);
+    },
+  },
+  shares: {
+    async list() {
+      await delay();
+      return packages
+        .flatMap((pkg) =>
+          (pkg.shares ?? []).map((share) => ({
+            ...share,
+            name: shareName(pkg, share),
+            packageId: pkg.id,
+            packageTitle: pkg.title,
+            clientName: clients.find((c) => c.id === pkg.clientId)?.name ?? null,
+          })),
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    async create(packageId, target, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const fileId = target.fileId ?? null;
+      const folderId = mockFolder(pkg, target.folderId);
+      if (fileId && folderId) throw new ApiError(422, "A link goes to a file or a folder, not both.");
+      if (fileId && !pkg.deliverables.some((d) => d.id === fileId)) {
+        throw new ApiError(422, "That file is not part of this package.");
+      }
+      const settings = shareSettings(input);
+      pkg.shares ??= [];
+      let share = pkg.shares.find((s) => s.fileId === fileId && s.folderId === folderId);
+      if (!share) {
+        share = {
+          id: `sh_${crypto.randomUUID().slice(0, 8)}`,
+          token: mockToken(),
+          kind: fileId ? "file" : folderId ? "folder" : "project",
+          fileId,
+          folderId,
+          allowDownload: true,
+          includeLocked: false,
+          expiresAt: null,
+          lastOpenedAt: null,
+          createdAt: new Date().toISOString(),
+        };
+        pkg.shares.unshift(share);
+        logActivity(pkg, "file_shared", `Shared ${describeShare(pkg, share)} by link.`);
+      }
+      Object.assign(share, settings);
+      return { ...pkg, shareId: share.id };
+    },
+    async update(packageId, shareId, input) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const share = found(pkg.shares?.find((s) => s.id === shareId), "Link");
+      Object.assign(share, shareSettings(input));
+      return pkg;
+    },
+    async remove(packageId, shareId) {
+      await delay(120);
+      const pkg = packageById(packageId);
+      const share = found(pkg.shares?.find((s) => s.id === shareId), "Link");
+      pkg.shares = (pkg.shares ?? []).filter((s) => s.id !== shareId);
+      logActivity(pkg, "file_unshared", `Turned off the link to ${describeShare(pkg, share)}.`);
+      return pkg;
+    },
+    async open(token) {
+      await delay();
+      const { pkg, share } = findShare(token);
+      share.lastOpenedAt = new Date().toISOString();
+      settleDeliverables(pkg);
+      const { folders, files } = shareReach(pkg, share);
+      const root = share.kind === "folder" ? share.folderId : null;
+      const lift = (id: string | null) => (share.kind === "file" || id === root ? null : id);
+      return {
+        kind: share.kind,
+        name: shareName(pkg, share),
+        allowDownload: share.allowDownload,
+        expiresAt: share.expiresAt,
+        folders: folders.map((f) => ({ ...f, parentId: lift(f.parentId) })),
+        files: files.map((f) => ({
+          ...f,
+          folderId: lift(f.folderId),
+          planItemId: null,
+          locked: f.locked && !share.includeLocked,
+        })),
+      };
+    },
+    async manifest(token, folderId) {
+      await delay();
+      const { pkg, share } = findShare(token);
+      if (!share.allowDownload) throw new ApiError(403, "Downloads are off for this link.");
+      const open = shareReach(pkg, share).files.filter(
+        (f) => !f.archived && (!f.locked || share.includeLocked),
+      );
+      if (open.length === 0) throw new ApiError(403, "These files can be previewed but not downloaded yet.");
+      const from = folderId ?? (share.kind === "folder" ? share.folderId : null);
+      return mockManifest(
+        pkg,
+        open,
+        share.kind === "file"
+          ? { fileIds: open.map((f) => f.id), folderIds: [] }
+          : { fileIds: [], folderIds: from ? [from] : [] },
+      );
     },
   },
   infrastructure: {
@@ -2101,7 +2272,7 @@ export const mockApi: BedrockApi = {
       return {
         token: "mock-track-token",
         client: { id: client.id, name: client.name },
-        packages: packages.filter((p) => p.clientId === client.id),
+        packages: packages.filter((p) => p.clientId === client.id).map((p) => ({ ...p, shares: undefined })),
       };
     },
   },

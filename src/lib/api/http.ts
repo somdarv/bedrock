@@ -18,6 +18,8 @@ import type {
   SavingsState,
   ServerMetrics,
   SessionUser,
+  SharedLink,
+  SharedView,
   TestServerResult,
   TrackResult,
   UploadPlan,
@@ -299,6 +301,28 @@ export const httpApi: BedrockApi = {
       }),
     bill: (packageId) =>
       request<Invoice>(`/api/admin/packages/${packageId}/bill`, { method: "POST" }),
+  },
+  shares: {
+    list: async () => (await request<{ shares: SharedLink[] }>(`/api/admin/shares`)).shares,
+    create: (packageId, target, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/shares`, {
+        method: "POST",
+        body: JSON.stringify({ ...target, ...input }),
+      }),
+    update: (packageId, shareId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/shares/${shareId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    remove: (packageId, shareId) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/shares/${shareId}`, {
+        method: "DELETE",
+      }),
+    open: (token) => request<SharedView>(`/api/s/${encodeURIComponent(token)}`),
+    manifest: (token, folderId) =>
+      request<FileManifest>(
+        `/api/s/${encodeURIComponent(token)}/manifest${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`,
+      ),
   },
   infrastructure: {
     listServers: async (clientId) => {

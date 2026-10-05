@@ -1,6 +1,6 @@
 "use server";
 
-import { api, ApiError, type FileSelection, type WorkPackage } from "@/lib/api";
+import { api, ApiError, type FileSelection, type FileShareInput, type WorkPackage } from "@/lib/api";
 import { revalidateFiles } from "./server";
 
 /**
@@ -71,4 +71,27 @@ export async function freeUpStorage(packageId: string) {
   return run(packageId, "Could not free up storage.", () =>
     api.packages.purgeDeliverables(packageId),
   );
+}
+
+/* ------------------------------------------------------------ share links */
+
+/**
+ * Turn on the link to a file, a folder, or the whole project (both null). Sharing something that
+ * already has a link changes that link instead. The answer's `shareId` names it.
+ */
+export async function shareItem(
+  packageId: string,
+  target: { fileId: string | null; folderId: string | null },
+  input: FileShareInput = {},
+) {
+  return run(packageId, "Could not make the link.", () => api.shares.create(packageId, target, input));
+}
+
+export async function updateShare(packageId: string, shareId: string, input: FileShareInput) {
+  return run(packageId, "Could not change the link.", () => api.shares.update(packageId, shareId, input));
+}
+
+/** The link stops working for everyone who has it. Sharing again makes a new one. */
+export async function stopSharing(packageId: string, shareId: string) {
+  return run(packageId, "Could not turn the link off.", () => api.shares.remove(packageId, shareId));
 }

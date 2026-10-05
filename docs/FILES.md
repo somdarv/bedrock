@@ -2,7 +2,8 @@
 
 > How a work package's files are stored, shown, uploaded and handed over. Built 2026-09-17.
 > Frontend: `src/components/files/`, `src/lib/files/`. API: `Admin\PackageFileController`,
-> `App\Services\Files\`.
+> `App\Services\Files\`. Share links (section 5, added 2026-10-05): `Admin\FileShareController`,
+> `SharedFileController`, `App\Models\FileShare`, and `/s/[token]` on the hub.
 
 Every package has a repository that behaves like a shared drive: folders inside folders, files
 filed into them, renames, moves, bulk delete, and downloads a folder at a time. The operator sees
@@ -18,6 +19,7 @@ has unlocked.
 | `/admin/packages/{id}/files` | One project's repository, full width. `?folder=` opens a folder. |
 | `/admin/packages/{id}` | The same browser, embedded under the project's money and scope. |
 | `/p/{slug}` | The client's view: browse, preview, download what is unlocked. |
+| `/s/{token}` | A share link: one file, one folder, or a whole project's files, for anyone holding it. |
 
 One component serves all of them: `FileBrowser` with `mode="admin"` or `mode="client"`.
 
@@ -112,7 +114,62 @@ after seven days by default.)
 Admin downloads post a hidden form to the ZIP route so the browser's own download manager takes
 over; a client uses a plain link.
 
-## 5. Storage housekeeping
+## 5. Sharing by link
+
+Drive's "anyone with the link". The operator shares a file, a folder or the whole project, and
+whoever opens the link sees it with no sign-in.
+
+**Where.** Right-click (or the item's menu) gives *Share* and *Copy link*. The selection bar has
+*Share* when one item is picked. The page menu has *Share this folder* or *Share the whole
+project*. Shared items carry a link mark. `/admin/files` lists every live link under *Shared by
+link*, with copy and turn off.
+
+**The model.**
+
+```
+file_shares   id, work_package_id, deliverable_id?, folder_id?, token (40 chars, unique),
+              allow_download, include_locked, expires_at?, last_opened_at?, timestamps
+```
+
+- No file and no folder means the whole project.
+- One link per thing. Sharing the same thing again changes that link's settings.
+- Turning a link off **deletes the row**. A leaked link can never come back; sharing again mints
+  a new token.
+- Deleting the file or folder deletes its link (foreign key cascade).
+- What a folder link reaches is decided when it is opened (`FileShare::files()`, `folders()`).
+  A file added later shows up. A file moved out drops out.
+
+**The payment gate still stands.** A locked file can be previewed through a link but not
+downloaded, unless the operator turns on *Also hand over the locked files* for that link
+(`include_locked`). That only affects the link. The client's own page keeps the gate.
+
+**Tokens never reach the client.** `WorkPackage::toApi()` leaves `shares` out, because that shape
+also feeds the portal and the phone lookup. A client holding a link with `include_locked` could
+get past the gate. Admin endpoints answer with `toAdminApi()`, which adds them. A test holds this.
+
+**Endpoints.**
+
+```
+GET    /api/admin/shares                              every link, for the overview
+POST   /api/admin/packages/{id}/shares                turn on (fileId | folderId | neither)
+PATCH  /api/admin/packages/{id}/shares/{share}        allowDownload, includeLocked, expiresAt
+DELETE /api/admin/packages/{id}/shares/{share}        turn off
+GET    /api/s/{token}                                 what the link shows (not throttled)
+GET    /api/s/{token}/files/{file}/download           signed URL redirect (60 a minute)
+GET    /api/s/{token}/manifest?folderId=              ZIP manifest (30 a minute)
+```
+
+The page read is not throttled because the hub makes it for every visitor from one address. A
+40-character token is not guessed. A folder link's folder is the root of what the page receives:
+its own children carry a null parent, so the page never learns where it sits in the project.
+
+Unknown and turned-off tokens both answer 404. An ended link answers 410. The page says *This link
+is not active* or *This link has ended*. Link pages are `noindex` and send no Referer.
+
+`last_opened_at` is stamped at most once a minute. The page refreshes itself while previews are
+being made, and that is not a new visit.
+
+## 6. Storage housekeeping
 
 | Command | What it does |
 |---|---|
@@ -123,7 +180,7 @@ over; a client uses a plain link.
 "Free up storage" on a project still deletes the originals and keeps the previews, for work that
 is delivered and paid for.
 
-## 6. Previews
+## 7. Previews
 
 Images, PDFs and videos get a generated preview; everything else shows its extension as a tile
 (`FileGlyph`), which costs no request at all. `hasPreview` on the API tells the browser which is
@@ -133,7 +190,7 @@ A 2 GB video is never read into memory: `MediaPipeline` streams a PDF or video t
 file, and reads a video straight from a signed URL when FFmpeg is available, so it only pulls the
 first seconds. Images above 60 MB keep their icon, because GD would need the whole bitmap.
 
-## 7. Gotchas
+## 8. Gotchas
 
 - **Chrome sticks a `position: sticky` element to the scroll container's content edge**, and the
   admin shell's `<main>` has padding, which left a strip where content slid under the toolbar.
