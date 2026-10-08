@@ -298,7 +298,7 @@ const QUESTIONS = [
   "Is Google Analytics set up on your website?",
   "Is your Google profile set up for both branches?",
   "Who answers your messages on WhatsApp and social media today?",
-  "Do you already record where new patients come from?",
+  "How do bookings work today, and what do you record for each one?",
   "Do you offer home visits, or progress updates for families?",
   "Which local languages do your physios speak?",
 ];
@@ -619,7 +619,7 @@ const CALENDAR: {
         also: [
           { tone: "date", text: "World Diabetes Day, 14 Nov" },
           { tone: "yours", text: "Idea session for December" },
-          { tone: "ours", text: "Lead tracker ready" },
+          { tone: "ours", text: "Lead system live" },
         ],
       },
       {
@@ -801,6 +801,11 @@ const NEEDS: { you: string; so: string; otherwise: string }[] = [
     otherwise: "The month starts late",
   },
   {
+    you: "You give us access to your accounts",
+    so: "Every enquiry is counted automatically",
+    otherwise: "Counts rest on memory",
+  },
+  {
     you: "A physio gives us 30 minutes of ideas a month",
     so: "Every post starts from a real case",
     otherwise: "We work from general advice",
@@ -973,24 +978,56 @@ const LANES: { label: string; tone: Tone; steps: string[] }[] = [
   },
 ];
 
-/* ── 18 How we count every enquiry ──────────────────────────────────── */
+/* ── 18 How every enquiry is counted ────────────────────────────────── */
 
 /**
- * The user asked how a lead tracker works and where its numbers come from. Two kinds of
- * number: people who get in touch (counted by the clinic in one shared sheet) and audience
- * figures (each platform's own, plus Google Analytics). Both meet in our monthly report.
+ * Counts must not rest on anyone typing them in. The user rejected a shared sheet on
+ * 2026-10-08: a client who wanted to talk the work down could under-report, and the numbers
+ * would go against us. So the clinic is onboarded onto our lead system and every source feeds
+ * it automatically. Checked that day:
+ *
+ *  - WhatsApp "coexistence" lets a number keep the WhatsApp Business app while every chat is
+ *    mirrored to the Cloud API, so our system sees each one.
+ *  - Instagram and Facebook messages arrive by webhook through Meta's messaging APIs.
+ *  - TikTok's Business Messaging API sends inbound messages by webhook. Its reach is still
+ *    patchy, hence "where TikTok allows it".
+ *  - The Business Profile Performance API reports call clicks, direction requests and
+ *    website clicks, given manager access.
+ *  - Ghana virtual numbers from call-tracking providers forward to the desk and log calls.
+ *
+ * Walk-ins are the one count entered by hand. Campaign codes give an independent check there.
  */
-const TRACK_PEOPLE = ["Messages on any platform", "Phone calls", "Walk-ins"];
-const TRACK_NUMBERS = [
-  "Views and follows, from each platform",
-  "Website visits, from Google Analytics",
-  "Calls and directions, from your Google profile",
+const TRACK_SOURCES: { name: string; how: string; auto: boolean }[] = [
+  {
+    name: "WhatsApp",
+    how: "Your number links to our system. You keep using the app.",
+    auto: true,
+  },
+  {
+    name: "Instagram and Facebook",
+    how: "Each message reaches our system as it arrives.",
+    auto: true,
+  },
+  { name: "TikTok", how: "The same, where TikTok allows it.", auto: true },
+  {
+    name: "Every “Message us” link",
+    how: "Our tracked link records the click and the post.",
+    auto: true,
+  },
+  { name: "Phone calls", how: "A tracked number rings your desk and logs the call.", auto: true },
+  { name: "Your Google profile", how: "Calls, directions and clicks, read daily.", auto: true },
+  { name: "Your website", how: "Google Analytics and our booking form.", auto: true },
+  {
+    name: "Walk-ins",
+    how: "Your desk asks how they heard of you, and taps the answer.",
+    auto: false,
+  },
 ];
 
 const TRACKER_ROWS: [string, string, string, string][] = [
-  ["4 Nov", "TikTok", "Back pain from driving", "Booked, Tema"],
-  ["5 Nov", "Instagram", "Care for a mother after a stroke", "Call back Friday"],
-  ["6 Nov", "Walk-in", "Heard the podcast", "Booked, East Legon"],
+  ["4 Nov", "TikTok message", "Posture Check: traffic", "Booked, Tema"],
+  ["5 Nov", "Instagram message", "Podcast clip 3", "Call back Friday"],
+  ["6 Nov", "Walk-in, code HOME", "Welcome Home", "Booked, East Legon"],
 ];
 
 /* ── 19 Your website ────────────────────────────────────────────────── */
@@ -1020,7 +1057,7 @@ const CAPTURE: { title: string; sub: string }[] = [
 /* ── 20 Where to start ──────────────────────────────────────────────── */
 
 const START: Step[] = [
-  { tone: "ours", sub: "November", title: "Content starts. The lead tracker goes live." },
+  { tone: "ours", sub: "November", title: "Content starts. The lead system goes live." },
   { tone: "yours", sub: "November", title: "You choose one offer for January" },
   { tone: "ours", sub: "December", title: "We plan your website update" },
   { tone: "ours", sub: "January", title: "The updated site goes live with the campaign" },
@@ -1066,7 +1103,8 @@ const COVERED = [
   "Filming, with our own cameras, lights and microphones",
   "Editing and design",
   "Posting on five platforms",
-  "Setting up the lead tracker and reply guide",
+  "Our lead system, set up and running",
+  "A reply guide for your team",
   "A report every month",
 ];
 
@@ -1078,12 +1116,50 @@ const COMPARE: [string, string, string][] = [
   ["Posts", `About ${PER_MONTH}`, `About ${PER_MONTH * MONTHS_IN_PLAN}`],
 ];
 
+/* ── 24 How we start ────────────────────────────────────────────────── */
+
+/**
+ * The steps of engagement the user set on 2026-10-08: a mutual NDA, an MOU, a baseline audit
+ * to measure progress against, account access, a two-month pilot, then a review where both
+ * sides decide. Joint steps take the neutral fill: they belong to neither colour.
+ */
+const ENGAGE: { who: "Both of us" | "Us" | "You"; title: string; detail: string }[] = [
+  {
+    who: "Both of us",
+    title: "A mutual NDA",
+    detail: "Each side keeps the other’s information private.",
+  },
+  { who: "Both of us", title: "An MOU", detail: "We write down what each side does." },
+  {
+    who: "Us",
+    title: "A baseline audit",
+    detail: "Your website, social media and Google profile, measured before we start.",
+  },
+  {
+    who: "You",
+    title: "Access to your accounts",
+    detail: "Partner access for us. You stay the owner of every account.",
+  },
+  { who: "Both of us", title: "A two-month pilot", detail: "November and December." },
+  {
+    who: "Both of us",
+    title: "A review",
+    detail: "We compare the numbers with the baseline. Then we decide together.",
+  },
+];
+
+const ENGAGE_TONE: Record<(typeof ENGAGE)[number]["who"], StepTone> = {
+  "Both of us": "raised",
+  Us: "ours",
+  You: "yours",
+};
+
 /* ── Next steps ─────────────────────────────────────────────────────── */
 
 const NEXT: Step[] = [
   { tone: "raised", sub: "1", title: "You read the plan" },
   { tone: "raised", sub: "2", title: "You tell us what to change" },
-  { tone: "raised", sub: "3", title: "We start in November" },
+  { tone: "raised", sub: "3", title: "We send the NDA" },
 ];
 
 /* ── Appendix ───────────────────────────────────────────────────────── */
@@ -2156,7 +2232,11 @@ function Machine() {
   );
 }
 
-/** The funnel narrowing down the left. Each step shows where people fall out, then the fix. */
+/**
+ * The funnel narrowing down the left. Each step shows where people fall out, then the fix.
+ * The first column carries a slim label, lighter than the other two, so the stages read as
+ * one person moving down: someone who sees a post, then trusts you, and so on.
+ */
 function Funnel() {
   const row =
     "grid gap-1.5 sm:grid-cols-[15rem_1.25rem_minmax(0,1fr)_1.25rem_minmax(0,1fr)] sm:items-center sm:gap-2";
@@ -2164,7 +2244,17 @@ function Funnel() {
   return (
     <div className="avoid-break mt-8 space-y-2">
       <div className={cn(row, "hidden sm:grid")}>
-        <span />
+        <span className="flex justify-center">
+          <span
+            className={cn(
+              "rounded-[var(--doc-r-chip)] bg-[var(--doc-fill-quiet)] px-4 py-1 font-semibold",
+              MICRO,
+              BODY,
+            )}
+          >
+            Someone who&hellip;
+          </span>
+        </span>
         <span />
         <span className={cn(head, XS, INK, TONE.clay)}>Where people get lost</span>
         <span />
@@ -2276,66 +2366,82 @@ function HumanReply() {
 }
 
 /**
- * Two kinds of number, two routes, one report. People who get in touch are counted by the
- * clinic in the lead tracker. Audience figures come from each platform and from Google.
+ * Every source feeds our lead system on its own. Walk-ins are the one count typed in by hand,
+ * so they alone take the clinic's colour and the "Your desk" tag. Both sides read one screen.
  */
 function TrackerFlow() {
-  const lane = "grid gap-2 sm:grid-cols-[minmax(0,1fr)_1.25rem_11rem] sm:items-center sm:gap-2.5";
-  const source = cn(
-    "rounded-[var(--doc-r-inset)] bg-[var(--doc-fill-quiet)] px-3.5 py-2",
-    XS,
-    BODY,
-  );
   return (
-    <div className="avoid-break mt-7 grid gap-3 sm:grid-cols-[minmax(0,1fr)_1.25rem_10rem] sm:items-stretch sm:gap-2.5">
-      <div className="space-y-5">
-        <div>
-          <p className={cn("mb-2 font-semibold", MICRO, SOFT)}>People who get in touch</p>
-          <div className={lane}>
-            <div className="space-y-1">
-              {TRACK_PEOPLE.map((t) => (
-                <p key={t} className={source}>
-                  {t}
-                </p>
-              ))}
-            </div>
-            <Arrow className="mx-auto rotate-90 sm:rotate-0" />
-            <div className={cn("rounded-[var(--doc-r-inset)] px-4 py-4", TONE.yours)}>
-              <p className={cn("font-bold", SM, INK)}>The lead tracker</p>
-              <p className={cn("mt-1", XS, BODY)}>One shared Google Sheet. A row per enquiry.</p>
-            </div>
+    <div className="avoid-break mt-7 grid gap-3 sm:grid-cols-[minmax(0,1fr)_1.25rem_11rem] sm:items-stretch sm:gap-2.5">
+      <div className="space-y-1">
+        {TRACK_SOURCES.map((s) => (
+          <div
+            key={s.name}
+            className={cn(
+              "grid items-center gap-x-3 gap-y-1 rounded-[var(--doc-r-inset)] px-4 py-2 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto]",
+              s.auto ? "bg-[var(--doc-fill-quiet)]" : TONE.yoursLight,
+            )}
+          >
+            <p className={cn("font-semibold", XS, INK)}>{s.name}</p>
+            <p className={cn(MICRO, BODY)}>{s.how}</p>
+            <span
+              className={cn(
+                "justify-self-start rounded-[var(--doc-r-chip)] px-2.5 py-0.5 font-semibold whitespace-nowrap",
+                MICRO,
+                INK,
+                s.auto ? TONE.ours : "bg-[var(--doc-paper)]",
+              )}
+            >
+              {s.auto ? "Automatic" : "Your desk"}
+            </span>
           </div>
-        </div>
-        <div>
-          <p className={cn("mb-2 font-semibold", MICRO, SOFT)}>Numbers we count</p>
-          <div className={lane}>
-            <div className="space-y-1">
-              {TRACK_NUMBERS.map((t) => (
-                <p key={t} className={source}>
-                  {t}
-                </p>
-              ))}
-            </div>
-            <Arrow className="mx-auto rotate-90 sm:rotate-0" />
-            <div className={cn("rounded-[var(--doc-r-inset)] px-4 py-4", TONE.oursLight)}>
-              <p className={cn("font-bold", SM, INK)}>We collect them</p>
-              <p className={cn("mt-1", XS, SOFT)}>Every week, from every source</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
       <Arrow className="mx-auto rotate-90 sm:rotate-0 sm:self-center" />
-      <div
-        className={cn("flex flex-col justify-center rounded-[var(--doc-r-panel)] p-5", TONE.ours)}
-      >
-        <p className={cn("text-[length:var(--doc-t-lead)] leading-snug font-bold", INK)}>
-          Our monthly report
-        </p>
-        <p className={cn("mt-2", XS, SOFT)}>
-          Views, messages, bookings, and the posts that brought them.
-        </p>
+      <div className="flex flex-col justify-center">
+        <div className={cn("rounded-[var(--doc-r-panel)] p-5", TONE.ours)}>
+          <p className={cn("text-[length:var(--doc-t-lead)] leading-snug font-bold", INK)}>
+            Our lead system
+          </p>
+          <p className={cn("mt-2", XS, SOFT)}>
+            Every enquiry in one place. You see the same screen we do.
+          </p>
+        </div>
+        <Arrow className="mx-auto my-2 h-4 w-4 rotate-90" />
+        <div className={cn("rounded-[var(--doc-r-inset)] px-4 py-3", TONE.oursLight)}>
+          <p className={cn("font-bold", SM, INK)}>Our monthly report</p>
+          <p className={cn("mt-0.5", MICRO, SOFT)}>Measured against your baseline</p>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** The steps of engagement in order. Who carries each one sits at the end of its row. */
+function EngageSteps() {
+  return (
+    <ol className="avoid-break mt-7">
+      {ENGAGE.map((e, i) => {
+        const tone = ENGAGE_TONE[e.who];
+        return (
+          <li key={e.title}>
+            {i > 0 && <Arrow className="my-1 ml-6 h-4 w-4 rotate-90" />}
+            <div
+              className={cn(
+                "grid items-center gap-x-4 gap-y-1 rounded-[var(--doc-r-inset)] px-5 py-3.5 sm:grid-cols-[1.5rem_11rem_minmax(0,1fr)_5.5rem]",
+                STEP_BG[tone],
+              )}
+            >
+              <span className={cn("font-bold tabular-nums", SM, STEP_SOFT[tone])}>{i + 1}</span>
+              <p className={cn("font-bold", SM, INK)}>{e.title}</p>
+              <p className={cn(XS, STEP_SOFT[tone])}>{e.detail}</p>
+              <span className={cn("font-semibold sm:text-right", MICRO, STEP_SOFT[tone])}>
+                {e.who}
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -2517,6 +2623,11 @@ function WeekTrack({ label, sub, mark }: { label: string; sub: string; mark: Mar
  *  - The clinic already has a website. We update it. A fresher look is mentioned as a later
  *    talk, never sold here.
  *  - Nothing promises followers, virality or bookings. Part 22 says why.
+ *  - Counts are automatic. The clinic is onboarded onto our lead system and every source
+ *    feeds it; only walk-ins are typed in. Never offer a shared sheet: a client could
+ *    under-report and the numbers would count against us.
+ *  - The engagement runs NDA, MOU, baseline audit, account access, a two-month pilot, then
+ *    a joint review. Progress is always measured against the audit's baseline.
  */
 export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
   return (
@@ -2979,23 +3090,23 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
       <Part>
         <div className="avoid-break">
           <Bridge>To improve, we need to count what happens.</Bridge>
-          <Head n={18}>How we count every enquiry</Head>
+          <Head n={18}>How every enquiry is counted</Head>
           <P className="mt-4">
-            Two kinds of number feed the plan. People who get in touch are counted by your team.
-            Audience numbers come from the platforms and from Google.
+            We set you up on our lead system. Each platform reports into it on its own. Nobody types
+            the numbers in, so both sides can trust them.
           </P>
           <TrackerFlow />
         </div>
 
         <div className="avoid-break mt-8">
-          <P>The lead tracker is a simple sheet. Here are three example rows.</P>
+          <P>Three example entries. The first three columns fill themselves.</P>
           <div className="mt-5 overflow-x-auto">
             <table className="doc-table min-w-[34rem] table-fixed">
               <thead>
                 <tr>
                   <th className="w-[13%]">Date</th>
-                  <th className="w-[18%]">Came from</th>
-                  <th className="w-[40%]">Asked about</th>
+                  <th className="w-[27%]">Came from</th>
+                  <th className="w-[31%]">Post that brought them</th>
                   <th>Result</th>
                 </tr>
               </thead>
@@ -3012,9 +3123,17 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
             </table>
           </div>
           <Note className="mt-3">
-            A row takes about a minute. Each week we look at it with you. Each month it goes into
-            the report.
+            Your team marks the result, or our booking form does. A patient who shows a campaign
+            code tells us the post on their own. Each week we look at the numbers with you.
           </Note>
+          <div className={cn("mt-6 rounded-[var(--doc-r-panel)] p-5", TONE.yoursLight)}>
+            <p className={cn("font-bold", SM, INK)}>What this needs from you</p>
+            <p className={cn("mt-1.5", XS, BODY)}>
+              Partner access to your social media accounts, your Google profile and your website
+              figures. The person who set them up can add us in a few minutes. You stay the owner of
+              every account. If you already use a system of your own, we connect to it instead.
+            </p>
+          </div>
         </div>
       </Part>
 
@@ -3039,9 +3158,7 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
       {/* 20 Start */}
       <Part>
         <div className="avoid-break">
-          <Bridge>
-            Content first, then the lead tracker, then the website. Here is the order.
-          </Bridge>
+          <Bridge>Content first, then the lead system, then the website. Here is the order.</Bridge>
           <Head n={20}>Where to start</Head>
           <Steps steps={START} className="mt-6" />
           <Note className="mt-4">Offers and prices are your call. We design the materials.</Note>
@@ -3106,13 +3223,17 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
               <Bullet size="sm">Likes, comments, shares and saves.</Bullet>
               <Bullet size="sm">New followers.</Bullet>
               <Bullet size="sm">Profile visits, link clicks, and taps on WhatsApp or call.</Bullet>
-              <Bullet size="sm">Messages, callbacks and bookings in the lead tracker.</Bullet>
+              <Bullet size="sm">Messages, calls and bookings in our lead system.</Bullet>
               <Bullet size="sm">
-                New patients who found you on social media, counted by your front desk.
+                New patients who found you on social media, by post and by campaign code.
               </Bullet>
             </BulletList>
 
             <P className="mt-6">
+              We measure each of these against the baseline from our first audit. That is how both
+              sides see progress.
+            </P>
+            <P className="mt-3">
               Growth on social media is slow. It is never guaranteed. We aim for steady growth each
               month in reach, engagement and messages. By the end, people recognise the clinic. And
               you own a library of videos that keeps working after we finish.
@@ -3180,9 +3301,38 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
             </dl>
           </div>
           <Note className="mt-4">
-            If you need something special, we put it before you and agree together how to do it.
-            Payment dates are open to discussion.
+            The first two months are a pilot. If you need something special, we put it before you
+            and agree together how to do it. Payment dates are open to discussion.
           </Note>
+        </div>
+      </Part>
+
+      {/* 24 How we start */}
+      <Part>
+        <div className="avoid-break">
+          <Bridge>That is the plan and its price. Here is how we would begin.</Bridge>
+          <Head n={24}>How we start working together</Head>
+          <P className="mt-4">Six steps, in this order.</P>
+          <EngageSteps />
+        </div>
+
+        <div className={cn("avoid-break mt-6 rounded-[var(--doc-r-panel)] p-6 sm:p-8", TONE.yours)}>
+          <p className={cn("text-[length:var(--doc-t-lead)] font-bold", INK)}>
+            Why a two-month pilot
+          </p>
+          <P className="mt-3">
+            We both want fair value for what we put in. The pilot shows you how we work, whether the
+            price suits you, and whether you like the quality.
+          </P>
+          <P className="mt-3">
+            At the end, we review it together. If both sides want to go on, we agree the terms
+            again. If the results are not there, we change the strategy. If you choose someone else,
+            that is your call.
+          </P>
+          <P className="mt-3">
+            <strong>What we value most is giving you value for your money.</strong> And doing work
+            we are proud of.
+          </P>
         </div>
       </Part>
 
