@@ -993,9 +993,15 @@ const LANES: { label: string; tone: Tone; steps: string[] }[] = [
  *    patchy, hence "where TikTok allows it".
  *  - The Business Profile Performance API reports call clicks, direction requests and
  *    website clicks, given manager access.
- *  - Ghana virtual numbers from call-tracking providers forward to the desk and log calls.
+ *  - Calls are counted from taps on each platform's Call button: the Google profile, Instagram
+ *    and Facebook insights, and Analytics on the website. No tracked number. The user keeps that
+ *    as an in-house option, outside this proposal.
+ *  - Instagram and TikTok captions cannot carry a link. So a post is matched by a word said in
+ *    the video, or by the code on a bio or story link (ig.me and m.me pass it on as `ref`).
+ *  - The system keeps no message text. It reads each message once for a code, then drops it.
+ *    Patients write about their health, which Act 843 treats as special personal data.
  *
- * Walk-ins are the one count entered by hand. Campaign codes give an independent check there.
+ * Walk-ins and callers who dialled by hand are asked at the desk. That is the one manual count.
  */
 const TRACK_SOURCES: { name: string; how: string; auto: boolean }[] = [
   {
@@ -1010,15 +1016,20 @@ const TRACK_SOURCES: { name: string; how: string; auto: boolean }[] = [
   },
   { name: "TikTok", how: "The same, where TikTok allows it.", auto: true },
   {
-    name: "Every “Message us” link",
-    how: "Our tracked link records the click and the post.",
+    name: "Links in bios and stories",
+    how: "Each click is counted. Instagram and TikTok allow links only here.",
     auto: true,
   },
-  { name: "Phone calls", how: "A tracked number rings your desk and logs the call.", auto: true },
+  {
+    name: "A word in each video",
+    how: "Our system spots it in the first message.",
+    auto: true,
+  },
+  { name: "Phone calls", how: "Taps on your Call button, counted by each platform.", auto: true },
   { name: "Your Google profile", how: "Calls, directions and clicks, read daily.", auto: true },
   { name: "Your website", how: "Google Analytics and our booking form.", auto: true },
   {
-    name: "Walk-ins",
+    name: "Walk-ins and callers",
     how: "Your desk asks how they heard of you, and taps the answer.",
     auto: false,
   },
@@ -1129,7 +1140,11 @@ const ENGAGE: { who: "Both of us" | "Us" | "You"; title: string; detail: string 
     title: "A mutual NDA",
     detail: "Each side keeps the other’s information private.",
   },
-  { who: "Both of us", title: "An MOU", detail: "We write down what each side does." },
+  {
+    who: "Both of us",
+    title: "An MOU",
+    detail: "We write down what each side does, patient data included.",
+  },
   {
     who: "Us",
     title: "A baseline audit",
@@ -3093,7 +3108,8 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
           <Head n={18}>How every enquiry is counted</Head>
           <P className="mt-4">
             We set you up on our lead system. Each platform reports into it on its own. Nobody types
-            the numbers in, so both sides can trust them.
+            the numbers in, so both sides can trust them. It counts messages. It never keeps what
+            your patients write.
           </P>
           <TrackerFlow />
         </div>
@@ -3365,9 +3381,10 @@ export function NadkofContentPlan({ record }: { record: DocumentRecord }) {
       {/* Sign-off */}
       <Section avoidBreak className="mb-14">
         <p className="text-[length:var(--doc-t-body)] font-semibold text-[var(--doc-ink)]">
-          Richard Somda, Creative Director
+          Richard Somda
         </p>
-        <Note className="mt-1">Saharabase Technologies</Note>
+        <Note className="mt-1">Creative Director</Note>
+        <Note>Saharabase Technologies</Note>
       </Section>
 
       {/* ── APPENDIX ─────────────────────────────────────────────── */}
