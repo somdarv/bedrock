@@ -998,6 +998,9 @@ const LANES: { label: string; tone: Tone; steps: string[] }[] = [
  *    as an in-house option, outside this proposal.
  *  - Instagram and TikTok captions cannot carry a link. So a post is matched by a word said in
  *    the video, or by the code on a bio or story link (ig.me and m.me pass it on as `ref`).
+ *    We set each word when we plan the video and enter it with the post. One word per video,
+ *    never reused, and never one people write by chance. The word gives the video, not the
+ *    platform the person watched on.
  *  - The system keeps no message text. It reads each message once for a code, then drops it.
  *    Patients write about their health, which Act 843 treats as special personal data.
  *
@@ -1021,8 +1024,8 @@ const TRACK_SOURCES: { name: string; how: string; auto: boolean }[] = [
     auto: true,
   },
   {
-    name: "A word in each video",
-    how: "Our system spots it in the first message.",
+    name: "A code word in each video",
+    how: "Viewers send us the word, like TRAFFIC. It tells us which video they saw.",
     auto: true,
   },
   { name: "Phone calls", how: "Taps on your Call button, counted by each platform.", auto: true },
