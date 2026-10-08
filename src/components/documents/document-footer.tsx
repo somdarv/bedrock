@@ -11,14 +11,23 @@ import { VerifyStamp } from "./verify-stamp";
  *
  * No "Approved by" line. The user dropped it on 2026-10-04 for every document from then
  * on. Records still carry an approver for the API; the sheet just does not print it.
+ *
+ * `showSystem={false}` drops the "Generated on system" line from one sheet. The user asked
+ * for it off the Nadkof plan on 2026-10-08; other documents keep it until told otherwise.
  */
-export function DocumentFooter({ record }: { record: DocumentRecord }) {
+export function DocumentFooter({
+  record,
+  showSystem = true,
+}: {
+  record: DocumentRecord;
+  showSystem?: boolean;
+}) {
   const { prepared, status } = useDocumentState();
   const ready = status === "ready" && prepared;
 
   const meta: [string, string][] = [
     ["Document ID", record.id],
-    ["Generated on system", record.system],
+    ...(showSystem ? ([["Generated on system", record.system]] as [string, string][]) : []),
     ["Time", ready ? prepared!.preparedAt : "— pending preparation —"],
     ...(ready ? ([["Verification serial", prepared!.serial]] as [string, string][]) : []),
   ];

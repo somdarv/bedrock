@@ -385,6 +385,11 @@
     page-break-inside: avoid;
     break-inside: avoid;
   }
+  /* Starts a new printed page, so a cover can sit on page one by itself. */
+  .page-start {
+    page-break-before: always;
+    break-before: page;
+  }
   h1,
   h2,
   h3 {

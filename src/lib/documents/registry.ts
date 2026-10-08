@@ -83,12 +83,12 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
-    id: "SAH-BD-20261008-PRO-LADKOV-61",
-    reference: "PRO-LADKOV-61",
+    id: "SAH-BD-20261008-PRO-NADKOF-61",
+    reference: "PRO-NADKOF-61",
     category: "proposals",
     type: "Proposal",
-    title: "Three-Month Social Media Content Plan for Ladkov Physiotherapy",
-    client: "Ladkov Physiotherapy",
+    title: "Three-Month Social Media Content Plan for Nadkof Physiotherapy and Wellness Centre",
+    client: "Nadkof Physiotherapy and Wellness Centre",
     project: "Social Media Content Plan",
     issueDate: "8 October 2026",
     validUntil: "29 October 2026",

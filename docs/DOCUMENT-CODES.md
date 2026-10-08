@@ -121,7 +121,7 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 | Stellar Edge School | `STE` |
 | Swad International Kitchen & Bar | `SWAD` |
 | Wundow Salifu Abraham Mangariba | `WUNDOW` |
-| Ladkov Physiotherapy | `LADKOV` |
+| Nadkof Physiotherapy and Wellness Centre | `NADKOF` |
 
 Assigned once per client and reused across their documents.
 
