@@ -2,6 +2,7 @@ import type { DocumentRecord } from "@/lib/documents/registry";
 import { DeiGratiaFeeSchedule } from "./dei-gratia-fee-schedule";
 import { DropynFeeSchedule } from "./dropyn-fee-schedule";
 import { GreaterHeightsProposal } from "./greater-heights-proposal";
+import { LadkovContentPlan } from "./ladkov-content-plan";
 import { ShammahSchoolMisProposal } from "./shammah-school-mis-proposal";
 import { StellarEdgeSchoolProposal } from "./stellar-edge-school-proposal";
 import { SwadKitchenBarProposal } from "./swad-kitchen-bar-proposal";
@@ -24,6 +25,7 @@ const BODIES: Record<string, (record: DocumentRecord) => React.ReactNode> = {
   "SAH-BD-20260901-PRO-STE-58": (record) => <StellarEdgeSchoolProposal record={record} />,
   "SAH-BD-20260902-PRO-SWAD-59": (record) => <SwadKitchenBarProposal record={record} />,
   "SAH-BD-20261004-PRO-WUNDOW-60": (record) => <WundowCampaignProposal record={record} />,
+  "SAH-BD-20261008-PRO-LADKOV-61": (record) => <LadkovContentPlan record={record} />,
 };
 
 export function hasDocumentBody(id: string): boolean {
