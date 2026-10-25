@@ -1,6 +1,8 @@
 import { ApiError, type BedrockApi } from "./contract";
 import type {
   AdminSession,
+  Brief,
+  BriefSummary,
   Client,
   ClientActivity,
   ClientAsset,
@@ -13,6 +15,7 @@ import type {
   Invoice,
   InvoicesOutstanding,
   PaymentSession,
+  PublicBrief,
   PublicInvoice,
   ReminderSettings,
   SavingsState,
@@ -482,6 +485,21 @@ export const httpApi: BedrockApi = {
       request<TrackResult>(`/api/track/verify`, {
         method: "POST",
         body: JSON.stringify({ phone, code }),
+      }),
+  },
+  briefs: {
+    list: () => request<BriefSummary[]>(`/api/admin/briefs`),
+    get: (id) => request<Brief>(`/api/admin/briefs/${id}`),
+    open: (token) => request<PublicBrief>(`/api/b/${encodeURIComponent(token)}`),
+    save: (token, answers) =>
+      request<PublicBrief>(`/api/b/${encodeURIComponent(token)}`, {
+        method: "PUT",
+        body: JSON.stringify({ answers }),
+      }),
+    send: (token, answers) =>
+      request<PublicBrief>(`/api/b/${encodeURIComponent(token)}/send`, {
+        method: "POST",
+        body: JSON.stringify({ answers }),
       }),
   },
 };

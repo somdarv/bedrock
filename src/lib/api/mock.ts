@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Brief, type BriefSummary, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -2276,7 +2276,72 @@ export const mockApi: BedrockApi = {
       };
     },
   },
+  briefs: {
+    async list() {
+      await delay();
+      return briefs.map(briefSummary);
+    },
+    async get(id) {
+      await delay();
+      const brief = found(briefs.find((b) => b.id === id), "Brief");
+      return { ...briefSummary(brief), answers: brief.answers };
+    },
+    async open(token) {
+      await delay();
+      return publicBrief(found(briefs.find((b) => b.token === token), "Brief"));
+    },
+    async save(token, answers) {
+      await delay();
+      const brief = found(briefs.find((b) => b.token === token), "Brief");
+      Object.assign(brief, { answers, savedAt: new Date().toISOString() });
+      return publicBrief(brief);
+    },
+    async send(token, answers) {
+      await delay();
+      const brief = found(briefs.find((b) => b.token === token), "Brief");
+      const now = new Date().toISOString();
+      Object.assign(brief, { answers, savedAt: now, sentAt: brief.sentAt ?? now });
+      return publicBrief(brief);
+    },
+  },
 };
+
+/* ------------------------------------------------------------------- briefs */
+
+/** One sample brief, so /b/mock-brief and the admin list open without the API. */
+const briefs: Brief[] = [
+  {
+    id: "01JBRIEFMOCK0000000000000",
+    form: "hanna-bizflow",
+    name: "Hanna",
+    token: "mock-brief",
+    answeredCount: 0,
+    answers: {},
+    savedAt: null,
+    sentAt: null,
+    createdAt: "2026-10-25T09:00:00Z",
+  },
+];
+
+function briefSummary(brief: Brief): BriefSummary {
+  const answeredCount = Object.entries(brief.answers).filter(
+    ([key, value]) => !key.endsWith(".other") && (Array.isArray(value) ? value.length > 0 : value.trim() !== ""),
+  ).length;
+  return {
+    id: brief.id,
+    form: brief.form,
+    name: brief.name,
+    token: brief.token,
+    answeredCount,
+    savedAt: brief.savedAt,
+    sentAt: brief.sentAt,
+    createdAt: brief.createdAt,
+  };
+}
+
+function publicBrief(brief: Brief) {
+  return { form: brief.form, name: brief.name, answers: brief.answers, savedAt: brief.savedAt, sentAt: brief.sentAt };
+}
 
 let vaultKey: VaultKeyRecord | null = null;
 const vaultEntries: VaultEntryRecord[] = [];

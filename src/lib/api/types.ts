@@ -1158,3 +1158,36 @@ export interface VaultState {
   key: VaultKeyRecord | null;
   entries: VaultEntryRecord[];
 }
+
+/* ------------------------------------------------------------------ briefs */
+
+/**
+ * Answers to a brief, keyed by question id. A choice question holds a list; the rest hold text.
+ * A question with an "Other" choice keeps what was typed for it under `<id>.other`.
+ */
+export type BriefAnswers = Record<string, string | string[]>;
+
+/** A brief as the person holding its link sees it. It never carries the row id. */
+export interface PublicBrief {
+  form: string;
+  name: string;
+  answers: BriefAnswers;
+  savedAt: string | null;
+  sentAt: string | null;
+}
+
+/** A brief, our side. */
+export interface BriefSummary {
+  id: string;
+  form: string;
+  name: string;
+  token: string;
+  answeredCount: number;
+  savedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface Brief extends BriefSummary {
+  answers: BriefAnswers;
+}

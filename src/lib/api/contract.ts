@@ -1,5 +1,8 @@
 import type {
   AdminSession,
+  Brief,
+  BriefAnswers,
+  BriefSummary,
   Client,
   ClientActivity,
   ClientAsset,
@@ -22,6 +25,7 @@ import type {
   InvoicePaymentInput,
   InvoicesOutstanding,
   LineItemInput,
+  PublicBrief,
   PublicInvoice,
   MilestoneInput,
   PaymentInput,
@@ -324,6 +328,21 @@ export interface BedrockApi {
     request(phone: string): Promise<{ message: string }>;
     /** Verify the code → a scoped token + that client's packages. */
     verify(phone: string, code: string): Promise<TrackResult>;
+  };
+  /**
+   * Briefs: scoping questions sent to one person by private link. The questions are frontend
+   * code (lib/briefs); the API only keeps the answers. A brief is made with
+   * `php artisan briefs:create <form> <name>`.
+   */
+  briefs: {
+    list(): Promise<BriefSummary[]>;
+    get(id: string): Promise<Brief>;
+    /** PUBLIC: the brief behind a link. 404 when the link is not active. */
+    open(token: string): Promise<PublicBrief>;
+    /** PUBLIC: save every answer at once. The last save wins. */
+    save(token: string, answers: BriefAnswers): Promise<PublicBrief>;
+    /** PUBLIC: save and mark it sent. Answers may still change after. */
+    send(token: string, answers: BriefAnswers): Promise<PublicBrief>;
   };
 }
 

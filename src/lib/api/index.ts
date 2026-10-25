@@ -46,6 +46,8 @@ export const api: BedrockApi = {
   settings: isLive("settings") || isLive("packages") ? httpApi.settings : mockApi.settings,
   // Track (public phone+OTP) rides the packages switch too.
   track: isLive("track") || isLive("packages") ? httpApi.track : mockApi.track,
+  // Briefs ride the packages switch too: same admin surface, same API.
+  briefs: isLive("briefs") || isLive("packages") ? httpApi.briefs : mockApi.briefs,
 };
 
 export * from "./contract";
