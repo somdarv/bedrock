@@ -122,6 +122,7 @@ Derived from the client's name: a memorable token, uppercased, `A–Z0–9`, ≤
 | Swad International Kitchen & Bar | `SWAD` |
 | Wundow Salifu Abraham Mangariba | `WUNDOW` |
 | Nadkof Physiotherapy and Wellness Centre | `NADKOF` |
+| Ghana Student Awards | `GSA` |
 
 Assigned once per client and reused across their documents.
 

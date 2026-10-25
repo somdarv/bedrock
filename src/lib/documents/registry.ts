@@ -83,6 +83,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20261022-PRO-GSA-62",
+    reference: "PRO-GSA-62",
+    category: "proposals",
+    type: "Proposal",
+    title: "Campaign, Branding and Voting for the Ghana Student Awards",
+    client: "Ghana Student Awards",
+    project: "Awards Campaign",
+    issueDate: "22 October 2026",
+    validUntil: "12 November 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20261008-PRO-NADKOF-61",
     reference: "PRO-NADKOF-61",
     category: "proposals",
