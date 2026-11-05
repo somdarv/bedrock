@@ -20,6 +20,15 @@ export interface DocumentApprover {
   employeeId: string;
 }
 
+/** Who accepted a contract online. The phone number comes only through the signing link. */
+export interface DocumentAcceptance {
+  name: string;
+  party: string;
+  /** ISO timestamp, stamped by the server. */
+  at: string;
+  phone?: string | null;
+}
+
 export interface DocumentRecord {
   /** Stable, complex Document ID / verify ref, e.g. "SAH-BD-20260630-BIL-DYN-52". */
   id: string;
@@ -53,6 +62,8 @@ export interface DocumentRecord {
    * catch a doctored total, so it is shown on the verification page when present.
    */
   amount?: string | null;
+  /** Set once a contract has been accepted online. */
+  acceptance?: DocumentAcceptance | null;
 }
 
 /**
@@ -82,6 +93,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 };
 
 const REGISTRY: DocumentRecord[] = [
+  {
+    id: "SAH-BD-20261105-CON-GSA-64",
+    reference: "CON-GSA-64",
+    category: "proposals",
+    type: "Contract",
+    title: "Contract for the Awards Campaign",
+    client: "Ghana Student Awards",
+    project: "Awards Campaign",
+    issueDate: "5 November 2026",
+    validUntil: null,
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
   {
     id: "SAH-BD-20261101-BIL-GSA-63",
     reference: "BIL-GSA-63",

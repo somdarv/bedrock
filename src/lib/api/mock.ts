@@ -2276,6 +2276,18 @@ export const mockApi: BedrockApi = {
       };
     },
   },
+  // Signing needs the real API: a mock signature would prove nothing.
+  contracts: {
+    async list() {
+      return [];
+    },
+    async open() {
+      throw new ApiError(404, "This link is not active.");
+    },
+    async accept() {
+      throw new ApiError(404, "This link is not active.");
+    },
+  },
   briefs: {
     async list() {
       await delay();

@@ -655,7 +655,7 @@ const gsaCampaign: BriefForm = {
   title: "What we need from you",
   greeting: "Hello,",
   intro: [
-    "Thank you for accepting our fee.",
+    "Thank you for signing our contract.",
     "To do the work, we need some things from you. They are all on this page, in parts.",
     "Fill in a part when you have it. Then press Send for that part.",
     "Your answers save as you type. You can stop and come back to this link at any time.",
@@ -668,7 +668,7 @@ const gsaCampaign: BriefForm = {
       key: "start",
       title: "To start",
       questions: [
-        { id: "pay1", kind: "note", text: "Pay the first GHS 5,000. We start work when it is paid." },
+        { id: "pay1", kind: "note", text: "Your fee is GHS 7,000. You pay it once, in full, by 5 January 2027. You do not pay anything now." },
       ],
     },
     {
@@ -701,7 +701,7 @@ const gsaCampaign: BriefForm = {
         { id: "address", kind: "text", text: "The website name you want. For example, ghanastudentawards.com." },
         { id: "hosting", kind: "yn", text: "Buy the website name and the hosting. Hosting is the space where the website lives. We will tell you which ones to buy. Then give us the logins for both: the website name account and the hosting account. Send the logins to us privately on WhatsApp. Do not type passwords on this form." },
         { id: "template", kind: "file", text: "Fill in our website template. We will send it to you. It shows every page of the website. For each part, it says what words we need. When you finish, send it back to us." },
-        { id: "voting", kind: "text", text: "The link to your voting system. Also the name and phone number of the person who runs it, or of the developer who built it. We need them to join voting to the website." },
+        { id: "voting", kind: "text", text: "The link to your voting system. Also the name and phone number of your engineer. Your engineers join voting to the website, so we need to work with them." },
         { id: "pastphotos", kind: "either", text: "Photos from past awards, if you have any. You can also send a link to them, like a Google Drive link." },
       ],
     },
@@ -717,7 +717,7 @@ const gsaCampaign: BriefForm = {
         { id: "voteclose", kind: "date", text: "When does voting close?" },
         { id: "night", kind: "text", text: "The date, time and place of the awards night. If you do not know yet, tell us when you will know." },
         { id: "howvote", kind: "text", text: "Explain how nominating and voting work, step by step. We want to understand the whole process. Also send the link, the short code, and the price of one vote.", long: true },
-        { id: "nomflow", kind: "note", text: "Nominees and their photos come in through the nomination form. We will give your team a portal. There, you can accept nominations. You can also add nominations by hand." },
+        { id: "nomlist", kind: "file", text: "One full list of nominees, taken from your voting system. For each one, send the full name, school, category and a clear photo. Send it at least 1 week before voting opens." },
       ],
     },
     {
@@ -732,7 +732,7 @@ const gsaCampaign: BriefForm = {
         { id: "post2", kind: "text", text: "Picture post 2. Write the headline, the short words under it, and the call to action.", long: true },
         { id: "video", kind: "text", text: "Animated video. Write the words for each part of the video, in order. End with the call to action.", long: true },
         { id: "imagery", kind: "either", text: "The pictures for the posts. Send the photos you want us to use. Or tell us the kind of picture you want, like students on stage, a trophy or a school." },
-        { id: "posts", kind: "note", text: "Send this part 3 days before the first post of the week goes out." },
+        { id: "posts", kind: "note", text: "Send this part 1 week before that week starts." },
       ],
     },
     {

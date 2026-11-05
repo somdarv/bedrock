@@ -1,4 +1,5 @@
-import { ApiError, type BedrockApi } from "./contract";
+import { ApiError, type BedrockApi, type ContractLink } from "./contract";
+import type { DocumentRecord } from "@/lib/documents/registry";
 import type {
   AdminSession,
   Brief,
@@ -486,6 +487,15 @@ export const httpApi: BedrockApi = {
       request<TrackResult>(`/api/track/verify`, {
         method: "POST",
         body: JSON.stringify({ phone, code }),
+      }),
+  },
+  contracts: {
+    list: () => request<ContractLink[]>(`/api/admin/contracts`),
+    open: (token) => request<DocumentRecord>(`/api/contracts/${encodeURIComponent(token)}`),
+    accept: (token, input) =>
+      request<DocumentRecord>(`/api/contracts/${encodeURIComponent(token)}/accept`, {
+        method: "POST",
+        body: JSON.stringify(input),
       }),
   },
   briefs: {

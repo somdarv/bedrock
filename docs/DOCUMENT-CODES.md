@@ -163,3 +163,19 @@ Assigned once per client and reused across their documents.
 `bedrock-api` **generates** the Document ID, short reference, verification serial, and
 timestamp (see `DocumentReferenceService` and `POST /api/documents`, `.../prepare`).
 `bedrock` **renders** them. This document is the contract between the two.
+
+---
+
+## 11. Contracts signed online
+
+A contract can be read and signed from a private link, `hub.saharabasetech.com/c/{token}`. One
+person types a name and phone number, ticks that they may sign, and accepts it for the company
+named on it. The first acceptance stands. See `contract-signing.tsx` and `ContractController`.
+
+- `Document::openForSigning($party)` makes the link and stamps the document. It is safe to run
+  again, so the seeder calls it on every deploy.
+- The link appears only behind the sign-in, under Documents, Proposals, Contracts to sign. It is
+  the key to signing, so it never goes in `DocumentResource`.
+- The signing link and our side show the phone number. `/d`, `/doc` and `/verify` show the name
+  and the date, because the Document ID is printed on every copy.
+- Once a contract has been accepted, its words stay as they are. A change needs a new contract.

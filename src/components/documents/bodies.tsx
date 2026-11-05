@@ -3,6 +3,7 @@ import { DeiGratiaFeeSchedule } from "./dei-gratia-fee-schedule";
 import { DropynFeeSchedule } from "./dropyn-fee-schedule";
 import { GreaterHeightsProposal } from "./greater-heights-proposal";
 import { GsaAwardsProposal } from "./gsa-awards-proposal";
+import { GsaContract } from "./gsa-contract";
 import { GsaFeeBreakdown } from "./gsa-fee-breakdown";
 import { NadkofContentPlan } from "./nadkof-content-plan";
 import { ShammahSchoolMisProposal } from "./shammah-school-mis-proposal";
@@ -30,6 +31,7 @@ const BODIES: Record<string, (record: DocumentRecord) => React.ReactNode> = {
   "SAH-BD-20261008-PRO-NADKOF-61": (record) => <NadkofContentPlan record={record} />,
   "SAH-BD-20261022-PRO-GSA-62": (record) => <GsaAwardsProposal record={record} />,
   "SAH-BD-20261101-BIL-GSA-63": (record) => <GsaFeeBreakdown record={record} />,
+  "SAH-BD-20261105-CON-GSA-64": (record) => <GsaContract record={record} />,
 };
 
 export function hasDocumentBody(id: string): boolean {

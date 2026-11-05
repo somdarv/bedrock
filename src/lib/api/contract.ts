@@ -1,3 +1,4 @@
+import type { DocumentAcceptance, DocumentRecord } from "@/lib/documents/registry";
 import type {
   AdminSession,
   Brief,
@@ -337,6 +338,14 @@ export interface BedrockApi {
    * `php artisan briefs:create <form> <name>`; a project's needs list with `forPackage`, which
    * puts each of its parts on the plan, waiting on the client.
    */
+  contracts: {
+    /** Our side: each contract signed online, with its private link and who accepted it. */
+    list(): Promise<ContractLink[]>;
+    /** PUBLIC: the contract behind a signing link. 404 when the link is not active. */
+    open(token: string): Promise<DocumentRecord>;
+    /** PUBLIC: one person accepts it. 409 once it has been accepted. */
+    accept(token: string, input: ContractAcceptInput): Promise<DocumentRecord>;
+  };
   briefs: {
     list(): Promise<BriefSummary[]>;
     get(id: string): Promise<Brief>;
@@ -370,6 +379,26 @@ export interface BedrockApi {
     /** PUBLIC: take back a file, until its part is received. */
     removeFile(token: string, fileId: string): Promise<PublicBrief>;
   };
+}
+
+export interface ContractLink {
+  id: string;
+  reference: string;
+  title: string;
+  client: string;
+  party: string;
+  token: string;
+  issueDate: string;
+  status: string;
+  acceptance: DocumentAcceptance | null;
+}
+
+export interface ContractAcceptInput {
+  name: string;
+  phone: string;
+  agreed: boolean;
+  clientIp?: string | null;
+  clientAgent?: string | null;
 }
 
 export class ApiError extends Error {

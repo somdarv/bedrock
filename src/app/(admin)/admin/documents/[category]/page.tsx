@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CATEGORY_LABELS, type DocumentCategory } from "@/lib/documents/registry";
+import { CATEGORY_LABELS, VERIFY_BASE_URL, type DocumentCategory } from "@/lib/documents/registry";
 import { listDocumentsByCategory } from "@/lib/documents/api";
+import { ContractLinks } from "@/components/admin/contract-links";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
+import { publicBaseUrl } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/states";
 
 function isCategory(v: string): v is DocumentCategory {
@@ -25,6 +28,8 @@ export default async function DocumentCategoryPage({
   if (!isCategory(category)) notFound();
 
   const docs = await listDocumentsByCategory(category);
+  // Contracts are filed under Proposals. A failure here must not take the list down with it.
+  const contracts = category === "proposals" ? await api.contracts.list().catch(() => []) : [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -37,6 +42,10 @@ export default async function DocumentCategoryPage({
           {BLURBS[category]}
         </p>
       </header>
+
+      {contracts.length > 0 && (
+        <ContractLinks contracts={contracts} origin={publicBaseUrl() || VERIFY_BASE_URL} />
+      )}
 
       {docs.length === 0 ? (
         <EmptyState

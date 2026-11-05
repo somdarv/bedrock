@@ -1,4 +1,5 @@
 import { BrandLogo } from "@/components/brand-mark";
+import { acceptedDay } from "@/lib/documents/acceptance";
 import { verifyDocument } from "@/lib/documents/api";
 
 export const metadata = { title: "Document verification" };
@@ -64,6 +65,12 @@ export default async function VerifyPage({ params }: { params: Promise<{ ref: st
               {record.validUntil && <Row label="Valid Until" value={record.validUntil} />}
               {record.amount && <Row label="Amount" value={record.amount} />}
               {record.serial && <Row label="Verification Serial" value={record.serial} />}
+              {record.acceptance && (
+                <Row
+                  label={`Accepted For ${record.acceptance.party}`}
+                  value={`${record.acceptance.name}, ${acceptedDay(record.acceptance.at)}`}
+                />
+              )}
               <Row label="Status" value={record.status.toUpperCase()} />
             </div>
 
