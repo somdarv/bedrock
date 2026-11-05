@@ -18,8 +18,8 @@ export default async function BriefsPage() {
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tightest md:text-4xl">Briefs</h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-          Questions sent by private link before a project is agreed. Answers save as they are typed,
-          so you can read them before the person presses Send.
+          Questions sent by private link. Answers save as they are typed, so you can read them before
+          the person presses Send. A project&rsquo;s needs list is made from its project page.
         </p>
       </header>
 
@@ -49,11 +49,22 @@ export default async function BriefsPage() {
                     <Link href={`/admin/briefs/${b.id}`} className="font-medium underline-offset-4 hover:underline">
                       {b.name}
                     </Link>
-                    <div className="text-xs text-subtle">{form?.title ?? b.form}</div>
+                    <div className="text-xs text-subtle">
+                      {b.projectTitle ? `Needs list for ${b.projectTitle}` : (form?.title ?? b.form)}
+                    </div>
                   </TD>
                   <TD className="tabular-nums">
-                    {b.answeredCount}
-                    {total ? <span className="text-subtle"> of about {total}</span> : null}
+                    {form?.layout === "parts" ? (
+                      <>
+                        {b.partsSent ?? 0}
+                        <span className="text-subtle"> of {b.partsTotal ?? 0} parts sent</span>
+                      </>
+                    ) : (
+                      <>
+                        {b.answeredCount}
+                        {total ? <span className="text-subtle"> of about {total}</span> : null}
+                      </>
+                    )}
                   </TD>
                   <TD className="text-muted-foreground">{b.savedAt ? when(b.savedAt) : "Not opened yet"}</TD>
                   <TD className="text-muted-foreground">{b.sentAt ? when(b.sentAt) : "Not yet"}</TD>

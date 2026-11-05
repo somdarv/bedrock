@@ -5,12 +5,17 @@ import type { BriefAnswers } from "@/lib/api";
  * in code, so wording can change without touching stored answers. Question ids are what the
  * answers are keyed by: never reuse an id for a different question.
  *
- *   one   pick one          many  tick all that apply
- *   yn    yes or no         text  a short written answer (`long` gives it more room)
+ *   one     pick one              many    tick all that apply
+ *   yn      yes or no             text    a written answer (`long` gives it more room)
+ *   date    a day, picked         file    files they attach
+ *   either  typed, or files, or both
+ *   note    a line to read, with no answer
  *
  * `other` names the choice that opens a text box; what is typed there is kept under `<id>.other`.
+ * Files are not answers: they live in the project's files, filed against the question's id, and
+ * a file question counts as answered once it holds one.
  */
-export type QuestionKind = "one" | "many" | "yn" | "text";
+export type QuestionKind = "one" | "many" | "yn" | "text" | "date" | "file" | "either" | "note";
 
 export interface Question {
   id: string;
@@ -19,14 +24,28 @@ export interface Question {
   options?: string[];
   other?: string;
   long?: boolean;
+  /** What a written answer starts with, for them to fill in: "Facebook: ", "Instagram: ". */
+  prefill?: string;
   /** Shown only when this holds. A hidden question is skipped, not counted as blank. */
   showIf?: (answers: BriefAnswers) => boolean;
 }
 
 export interface Section {
   title: string;
+  /**
+   * The part's stable name. On a needs list each part is sent on its own and tracked as a plan
+   * item under this key, so it must never change once a list is out.
+   */
+  key?: string;
+  /** The part's name on the plan, when the title reads oddly there. */
+  planTitle?: string;
   /** One plain line under the title, when the section needs it. */
   note?: string;
+  /**
+   * Repeat this part, a copy per week for example. Each copy is its own part: key `weekly-03`,
+   * title "Week 3", and its answers under `w03.<question id>`.
+   */
+  repeat?: { count: number; label: string; prefix: string; planTitle: (n: number) => string };
   showIf?: (answers: BriefAnswers) => boolean;
   questions: Question[];
 }
@@ -37,7 +56,67 @@ export interface BriefForm {
   greeting: string;
   intro: string[];
   thanks: string;
+  /**
+   * "parts": a needs list. The wide page with its parts down the side, each part sent on its
+   * own and tracked on the project's plan. Without it, the single-column questionnaire.
+   */
+  layout?: "parts";
   sections: Section[];
+}
+
+/** One part of a needs list, as the page and the plan see it, with repeats laid out. */
+export interface FormPart {
+  key: string;
+  title: string;
+  planTitle: string;
+  note?: string;
+  /** For a repeated part: which copy it is, of how many, under which heading. */
+  repeat?: { group: string; groupTitle: string; label: string; n: number; count: number };
+  /** Question ids here already carry a repeat's prefix (`w03.theme`). */
+  questions: Question[];
+  /** Whether there is anything to answer. A part of notes only is read, never sent. */
+  tracked: boolean;
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** The form's parts in order, with every repeated part laid out copy by copy. */
+export function formParts(form: BriefForm): FormPart[] {
+  return form.sections.flatMap((s, i): FormPart[] => {
+    const key = s.key ?? `part-${i + 1}`;
+    const tracked = s.questions.some((q) => q.kind !== "note");
+    if (!s.repeat) {
+      return [{ key, title: s.title, planTitle: s.planTitle ?? s.title, note: s.note, questions: s.questions, tracked }];
+    }
+    const r = s.repeat;
+    return Array.from({ length: r.count }, (_, k) => {
+      const n = k + 1;
+      return {
+        key: `${key}-${pad(n)}`,
+        title: `${r.label} ${n}`,
+        planTitle: r.planTitle(n),
+        note: s.note,
+        repeat: { group: key, groupTitle: s.title, label: r.label, n, count: r.count },
+        questions: s.questions.map((q) => ({ ...q, id: `${r.prefix}${pad(n)}.${q.id}` })),
+        tracked,
+      };
+    });
+  });
+}
+
+/** What the project's plan gets: one item per part that has something to answer. */
+export function trackedParts(form: BriefForm): { key: string; title: string; note: string }[] {
+  return formParts(form)
+    .filter((p) => p.tracked)
+    .map((p) => ({
+      key: p.key,
+      title: p.planTitle,
+      // The questions, so the plan item says what the part holds without opening the list.
+      note: p.questions
+        .filter((q) => q.kind !== "note")
+        .map((q) => `- ${q.text.split(". ")[0].replace(/\.$/, "")}`)
+        .join("\n"),
+    }));
 }
 
 /** Whether an answer is, or includes, a value. */
@@ -561,7 +640,158 @@ const hannaBizflow: BriefForm = {
   ],
 };
 
-const FORMS: Record<string, BriefForm> = { [hannaBizflow.key]: hannaBizflow };
+/**
+ * The Ghana Student Awards needs list (fee BIL-GSA-63, accepted 4 Nov 2026), for Evergreen Events
+ * & Production. Copied from the list the owner shaped on a claude.ai page (artifact
+ * LybkrQJW13B8S5JWE6KRi2, db version 20), keeping each item’s id and words. Sponsors, past photos,
+ * speakers and the programme were file only there, but they also ask for names or a link, so here
+ * they take typed words too. Part keys and
+ * question ids are what the plan and the saved answers are keyed by: never reuse one for
+ * something else. A new part added here reaches a list already out with "Update the plan" on the
+ * project page.
+ */
+const gsaCampaign: BriefForm = {
+  key: "gsa-campaign",
+  title: "What we need from you",
+  greeting: "Hello,",
+  intro: [
+    "Thank you for accepting our fee.",
+    "To do the work, we need some things from you. They are all on this page, in parts.",
+    "Fill in a part when you have it. Then press Send for that part.",
+    "Your answers save as you type. You can stop and come back to this link at any time.",
+    "Some parts come later. You do not need them now.",
+  ],
+  thanks: "Send each part when you have it. Thank you.",
+  layout: "parts",
+  sections: [
+    {
+      key: "start",
+      title: "To start",
+      questions: [
+        { id: "pay1", kind: "note", text: "Pay the first GHS 5,000. We start work when it is paid." },
+      ],
+    },
+    {
+      key: "brand",
+      title: "For your logo and colours",
+      planTitle: "Logo and colours",
+      questions: [
+        { id: "name", kind: "text", text: "The full name of the awards and the year. Write it exactly how it should look." },
+        { id: "colours", kind: "text", text: "Colours you like. Also colours you do not want.", long: true },
+        { id: "likes", kind: "file", text: "Pictures of designs or logos you like from other events. Screenshots are fine." },
+        { id: "handles", kind: "text", text: "Your social media names. Write your username next to each one. If you do not use one, leave it empty. We will put them on the designs.", long: true, prefill: "Facebook: \nInstagram: \nTikTok: \nX (Twitter): \nYouTube: \nLinkedIn: " },
+        { id: "contact", kind: "text", text: "Your phone number and email. We will put them on the designs too." },
+      ],
+    },
+    {
+      key: "partners",
+      title: "Sponsors and partners",
+      planTitle: "Sponsors and partners",
+      questions: [
+        { id: "sponsors", kind: "either", text: "The names and logos of your sponsors and partners. Include your partner schools. Send the real logo files. Do not send screenshots." },
+        { id: "sponsorlock", kind: "note", text: "Send the full list before we start the designs. After that, we will not add new sponsors or partners to any design. This is part of our contract." },
+        { id: "partnerphotos", kind: "file", text: "Photos of your sponsors and partner schools, if you have them. For example, their buildings, their people or past events." },
+      ],
+    },
+    {
+      key: "website",
+      title: "For the website",
+      planTitle: "Website",
+      questions: [
+        { id: "address", kind: "text", text: "The website name you want. For example, ghanastudentawards.com." },
+        { id: "hosting", kind: "yn", text: "Buy the website name and the hosting. Hosting is the space where the website lives. We will tell you which ones to buy. Then give us the logins for both: the website name account and the hosting account. Send the logins to us privately on WhatsApp. Do not type passwords on this form." },
+        { id: "template", kind: "file", text: "Fill in our website template. We will send it to you. It shows every page of the website. For each part, it says what words we need. When you finish, send it back to us." },
+        { id: "voting", kind: "text", text: "The link to your voting system. Also the name and phone number of the person who runs it, or of the developer who built it. We need them to join voting to the website." },
+        { id: "pastphotos", kind: "either", text: "Photos from past awards, if you have any. You can also send a link to them, like a Google Drive link." },
+      ],
+    },
+    {
+      key: "nominations",
+      title: "For the nominees",
+      planTitle: "Nominees",
+      questions: [
+        { id: "categories", kind: "either", text: "The full list of award categories. There are about 50. Spell each one correctly. You can type them here or send a file." },
+        { id: "nomopen", kind: "date", text: "When do nominations open?" },
+        { id: "nomclose", kind: "date", text: "When do nominations close?" },
+        { id: "voteopen", kind: "date", text: "When does voting open?" },
+        { id: "voteclose", kind: "date", text: "When does voting close?" },
+        { id: "night", kind: "text", text: "The date, time and place of the awards night. If you do not know yet, tell us when you will know." },
+        { id: "howvote", kind: "text", text: "Explain how nominating and voting work, step by step. We want to understand the whole process. Also send the link, the short code, and the price of one vote.", long: true },
+        { id: "nomflow", kind: "note", text: "Nominees and their photos come in through the nomination form. We will give your team a portal. There, you can accept nominations. You can also add nominations by hand." },
+      ],
+    },
+    {
+      key: "weekly",
+      title: "Every week, for 13 weeks",
+      note: "Each week, fill in this part for that week’s 3 posts. We will send you a filled-in sample first. We make the graphics from what you write. Then we send them back, and your team posts them.",
+      repeat: { count: 13, label: "Week", prefix: "w", planTitle: (n) => `Week ${n} posts` },
+      questions: [
+        { id: "theme", kind: "text", text: "The theme for the week. What is this week about? For example, nominations are open, or meet the judges." },
+        { id: "direction", kind: "text", text: "The direction for the week. What should people feel or do after they see the posts?", long: true },
+        { id: "post1", kind: "text", text: "Picture post 1. Write the headline, the short words under it, and the call to action. The call to action tells people what to do, like Vote now.", long: true },
+        { id: "post2", kind: "text", text: "Picture post 2. Write the headline, the short words under it, and the call to action.", long: true },
+        { id: "video", kind: "text", text: "Animated video. Write the words for each part of the video, in order. End with the call to action.", long: true },
+        { id: "imagery", kind: "either", text: "The pictures for the posts. Send the photos you want us to use. Or tell us the kind of picture you want, like students on stage, a trophy or a school." },
+        { id: "posts", kind: "note", text: "Send this part 3 days before the first post of the week goes out." },
+      ],
+    },
+    {
+      key: "thenight",
+      title: "For the awards night",
+      planTitle: "Awards night",
+      questions: [
+        { id: "speakers", kind: "either", text: "The speakers and special guests. Up to 10 people. For each one, send the full name, their title, and a clear photo. We also show these names on the screen when they speak." },
+        { id: "sizes", kind: "either", text: "The exact size of each print item. Give the width and the height. Say if it is in feet, inches or centimetres. Your printer can tell you. Say what each backdrop is for, like the stage or the photo wall. For each flag, also say the type, like teardrop or feather.", prefill: "Backdrop 1: \nBackdrop 2: \nBackdrop 3: \nBackdrop 4: \nPull up banner 1: \nPull up banner 2: \nPull up banner 3: \nPull up banner 4: \nFlag 1: \nFlag 2: \nFlag 3: " },
+        { id: "counts", kind: "text", text: "How many invitations, tickets and name tags do you need?" },
+        { id: "tickets", kind: "text", text: "Do you sell tickets? If yes, what types are there? What does each one cost?", long: true },
+        { id: "nametags", kind: "text", text: "The names to print on the name tags.", long: true },
+        { id: "programme", kind: "either", text: "For the programme booklet: the order of events with times, and the name of the MC. Also send any messages from the organisers, with their photos." },
+        { id: "screen", kind: "text", text: "The size of the stage screen. Ask the screen company for the width and height." },
+        { id: "clips", kind: "file", text: "Video clips from your videographer. Send the ones you want in the opening video and the promo videos." },
+      ],
+    },
+    {
+      key: "winners",
+      title: "When the winners are known",
+      planTitle: "Winners",
+      note: "You do not need to send these now. They come later, when the winners are known.",
+      questions: [
+        { id: "winnerlist", kind: "file", text: "The list of all 50 winners, with name, school and category. Send it at least 1 week before the night. We need time to print the certificates." },
+        { id: "signers", kind: "text", text: "The names and titles of the people who will sign the certificates.", long: true },
+        { id: "signatures", kind: "file", text: "The signature of each person who signs. Sign in black pen on clean white paper. Then send a clear photo or scan." },
+      ],
+    },
+    {
+      key: "after",
+      title: "After the awards night",
+      planTitle: "After the awards night",
+      note: "You do not need to send these now. Send them after the awards night.",
+      questions: [
+        { id: "nightphotos", kind: "file", text: "Photos from the night. We use them for the thank you graphics." },
+        { id: "thanks", kind: "text", text: "The names of the people and groups you want to thank.", long: true },
+      ],
+    },
+    {
+      key: "twosites",
+      title: "If you want the two other websites",
+      planTitle: "The two other websites",
+      questions: [
+        { id: "pay2", kind: "note", text: "Pay the full GHS 5,500 for both websites. We start when it is paid." },
+        { id: "siteneeds", kind: "file", text: "The sites are for the Ghana Energy Awards and the Ghana Industrialisation Week. For each site, send the same things as in the website part above. Fill in one website template for each site. Also send each site's logo." },
+      ],
+    },
+  ],
+};
+
+const FORMS: Record<string, BriefForm> = {
+  [hannaBizflow.key]: hannaBizflow,
+  [gsaCampaign.key]: gsaCampaign,
+};
+
+/** The forms a project’s needs list can be made from. */
+export const NEEDS_LIST_FORMS: { key: string; label: string }[] = [
+  { key: gsaCampaign.key, label: "Ghana Student Awards campaign" },
+];
 
 export function briefForm(key: string): BriefForm | null {
   return FORMS[key] ?? null;

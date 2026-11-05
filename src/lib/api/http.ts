@@ -3,6 +3,7 @@ import type {
   AdminSession,
   Brief,
   BriefSummary,
+  BriefUploadPlan,
   Client,
   ClientActivity,
   ClientAsset,
@@ -501,5 +502,61 @@ export const httpApi: BedrockApi = {
         method: "POST",
         body: JSON.stringify({ answers }),
       }),
+    forPackage: (packageId, input) =>
+      request<WorkPackage>(`/api/admin/packages/${packageId}/brief`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    sendPart: (token, part, answers) =>
+      request<PublicBrief>(
+        `/api/b/${encodeURIComponent(token)}/parts/${encodeURIComponent(part)}/send`,
+        { method: "POST", body: JSON.stringify({ answers }) },
+      ),
+    startUpload: (token, input) =>
+      request<BriefUploadPlan>(`/api/b/${encodeURIComponent(token)}/uploads`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    signUploadParts: async (token, uploadId, parts) =>
+      (
+        await request<{ urls: Record<string, string> }>(
+          `/api/b/${encodeURIComponent(token)}/uploads/${encodeURIComponent(uploadId)}/parts`,
+          { method: "POST", body: JSON.stringify({ parts }) },
+        )
+      ).urls,
+    completeUpload: (token, uploadId, parts) =>
+      request<PublicBrief>(
+        `/api/b/${encodeURIComponent(token)}/uploads/${encodeURIComponent(uploadId)}/complete`,
+        { method: "POST", body: JSON.stringify({ parts }) },
+      ),
+    abortUpload: async (token, uploadId) => {
+      await request<unknown>(
+        `/api/b/${encodeURIComponent(token)}/uploads/${encodeURIComponent(uploadId)}`,
+        { method: "DELETE" },
+      );
+    },
+    addFile: async (token, file, part, question) => {
+      // Multipart form: no Content-Type, so the browser's boundary is set for us.
+      const form = new FormData();
+      form.append("file", file);
+      form.append("part", part);
+      form.append("question", question);
+      const res = await fetch(`${BASE_URL}/api/b/${encodeURIComponent(token)}/files`, {
+        method: "POST",
+        body: form,
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new ApiError(res.status, body?.message || res.statusText);
+      }
+      return (await res.json()) as PublicBrief;
+    },
+    removeFile: (token, fileId) =>
+      request<PublicBrief>(
+        `/api/b/${encodeURIComponent(token)}/files/${encodeURIComponent(fileId)}`,
+        { method: "DELETE" },
+      ),
   },
 };

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { PortalPayButton } from "@/components/portal/portal-pay-button";
@@ -119,6 +120,25 @@ export default async function ClientPortalPage({
           )}
         </div>
       </header>
+
+      {/* The needs list: what they still owe us, and the way in to send it */}
+      {pkg.brief && pkg.brief.partsTotal > 0 && (
+        <section className="bg-foreground text-background flex flex-col gap-4 rounded-xl p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-xl font-semibold tracking-tight">What we need from you</h2>
+            <p className="mt-1 text-sm opacity-80">
+              {pkg.brief.partsSent} of {pkg.brief.partsTotal} parts sent.
+              {pkg.brief.partsReceived > 0 && ` We have ${pkg.brief.partsReceived}.`}
+            </p>
+          </div>
+          <Link
+            href={`/b/${pkg.brief.token}`}
+            className="bg-background text-foreground shrink-0 rounded-full px-5 py-2.5 text-center text-sm font-semibold hover:opacity-90"
+          >
+            Open the list
+          </Link>
+        </section>
+      )}
 
       {/* Payment status — the money, front and centre */}
       <section className="border-border bg-surface rounded-xl border p-6">

@@ -18,6 +18,7 @@ import { DocumentSendModal } from "@/components/admin/document-send-modal";
 import { MilestonesSection } from "@/components/admin/milestones-section";
 import { PaymentsSection } from "@/components/admin/payments-section";
 import { LineItemModal } from "@/components/admin/line-item-modal";
+import { NeedsListPanel } from "@/components/admin/needs-list-panel";
 import { PackageFormModal } from "@/components/admin/package-form-modal";
 import {
   balance,
@@ -585,6 +586,9 @@ export function PackageDetail({
 
       {/* Payments & gates */}
       <PaymentsSection pkg={pkg} savingsRate={savingsRate} />
+
+      {/* What we need from the client: their list, whose parts sit on the plan below */}
+      <NeedsListPanel pkg={pkg} clientName={clientName} />
 
       {/* The plan: what we agreed, before what we delivered */}
       <div id="plan" className="scroll-mt-6">

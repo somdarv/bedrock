@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { BriefFormView } from "@/components/briefs/brief-form";
+import { BriefWorkspace } from "@/components/briefs/brief-workspace";
 import { api, ApiError } from "@/lib/api";
 import { briefForm } from "@/lib/briefs/forms";
 
@@ -33,9 +34,15 @@ export default async function BriefPage({ params }: { params: Promise<{ token: s
     throw e;
   }
 
-  if (!briefForm(brief.form)) return <LinkClosed />;
+  const form = briefForm(brief.form);
+  if (!form) return <LinkClosed />;
 
-  return <BriefFormView token={token} initial={brief} />;
+  // A needs list: the wide page, sent part by part. Anything else: the single-column questions.
+  return form.layout === "parts" ? (
+    <BriefWorkspace token={token} initial={brief} />
+  ) : (
+    <BriefFormView token={token} initial={brief} />
+  );
 }
 
 function LinkClosed() {

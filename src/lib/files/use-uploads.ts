@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { UploadPlan, WorkPackage } from "@/lib/api/types";
+import type { PublicBrief, WorkPackage } from "@/lib/api/types";
 
 /**
  * The upload queue behind the file browser.
@@ -26,13 +26,34 @@ export interface UploadItem {
   status: UploadStatus;
   loaded: number;
   error?: string;
+  /** The server looked at this file and said no, so sending it again cannot help. */
+  refused?: boolean;
 }
 
 export interface UploadRequest {
   file: File;
-  folderId: string | null;
+  /** The file browser: the folder it goes in, or null for the root. */
+  folderId?: string | null;
+  /** Anything else the upload opens with. A needs list sends its part and question. */
+  fields?: Record<string, string>;
   destination: string;
 }
+
+/**
+ * Where a queue sends its files. Our file browser and a client’s needs list differ only in the
+ * address: POST `base` opens an upload, `base/<id>/...` carries its parts, its end and its cancel,
+ * and `formUrl` takes a whole file in one request where storage cannot take parts.
+ */
+interface UploadTarget {
+  base: string;
+  formUrl: string;
+}
+
+/** What opening an upload answers. A file with nothing to send comes back finished. */
+type OpenPlan =
+  | { strategy: "multipart"; id: string; partSize: number; partCount: number; direct: boolean }
+  | { strategy: "form" }
+  | { strategy: "done"; package?: unknown; brief?: unknown };
 
 const FILE_CONCURRENCY = 2;
 const PART_CONCURRENCY = 4;
@@ -48,15 +69,35 @@ class Cancelled extends Error {
   }
 }
 
+/** A plain no from the server: the wrong kind of file, too large, or the list is full. */
+class Refused extends Error {}
+
 interface Job {
   item: UploadItem;
   file: File;
-  folderId: string | null;
+  fields: Record<string, string>;
   controller: AbortController;
   uploadId?: string;
 }
 
+/** The file browser’s queue: our uploads into a project. */
 export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => void) {
+  return useUploadQueue<WorkPackage>(
+    {
+      base: `/api/admin/packages/${packageId}/uploads`,
+      formUrl: `/api/admin/packages/${packageId}/uploads/form`,
+    },
+    onPackage,
+  );
+}
+
+/** A needs list’s queue: files the client sends us, through their link. */
+export function useBriefUploads(token: string, onBrief: (brief: PublicBrief) => void) {
+  const key = encodeURIComponent(token);
+  return useUploadQueue<PublicBrief>({ base: `/api/b/${key}/uploads`, formUrl: `/api/b/${key}/files` }, onBrief);
+}
+
+function useUploadQueue<T>(target: UploadTarget, onPackage: (result: T) => void) {
   const [items, setItems] = React.useState<UploadItem[]>([]);
   const jobs = React.useRef(new Map<string, Job>());
   const queue = React.useRef<string[]>([]);
@@ -64,6 +105,8 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
   const flushTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const onPackageRef = React.useRef(onPackage);
   onPackageRef.current = onPackage;
+  const targetRef = React.useRef(target);
+  targetRef.current = target;
 
   const flush = React.useCallback((now = false) => {
     const publish = () => {
@@ -86,7 +129,7 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
       running.current++;
       job.item.status = "uploading";
       flush(true);
-      send(packageId, job, flush)
+      send<T>(targetRef.current, job, flush)
         .then((pkg) => {
           job.item.status = "done";
           job.item.loaded = job.item.size;
@@ -98,10 +141,11 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
           } else {
             job.item.status = "failed";
             job.item.error = e instanceof Error ? e.message : "Upload failed.";
+            job.item.refused = e instanceof Refused;
           }
           // Throw away whatever parts storage already holds.
           if (job.uploadId) {
-            void fetch(`/api/admin/packages/${packageId}/uploads/${job.uploadId}`, {
+            void fetch(`${targetRef.current.base}/${job.uploadId}`, {
               method: "DELETE",
             }).catch(() => undefined);
             job.uploadId = undefined;
@@ -113,7 +157,7 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
           pump();
         });
     }
-  }, [packageId, flush]);
+  }, [flush]);
 
   const add = React.useCallback(
     (requests: UploadRequest[]) => {
@@ -121,7 +165,7 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
         const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
         jobs.current.set(key, {
           file: r.file,
-          folderId: r.folderId,
+          fields: { ...(r.folderId ? { folderId: r.folderId } : {}), ...r.fields },
           controller: new AbortController(),
           item: {
             key,
@@ -156,12 +200,23 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
       const job = jobs.current.get(key);
       if (!job || (job.item.status !== "failed" && job.item.status !== "cancelled")) return;
       job.controller = new AbortController();
-      job.item = { ...job.item, status: "queued", loaded: 0, error: undefined };
+      job.item = { ...job.item, status: "queued", loaded: 0, error: undefined, refused: false };
       queue.current.push(key);
       flush(true);
       pump();
     },
     [flush, pump],
+  );
+
+  /** Take one finished-with row off the list: a file that failed, or one that was stopped. */
+  const dismiss = React.useCallback(
+    (key: string) => {
+      const job = jobs.current.get(key);
+      if (!job || (job.item.status !== "failed" && job.item.status !== "cancelled")) return;
+      jobs.current.delete(key);
+      flush(true);
+    },
+    [flush],
   );
 
   const clear = React.useCallback(() => {
@@ -188,35 +243,31 @@ export function useUploads(packageId: string, onPackage: (pkg: WorkPackage) => v
     return () => window.removeEventListener("beforeunload", warn);
   }, [active]);
 
-  return { items, active, add, cancel, retry, clear, cancelAll };
+  return { items, active, add, cancel, retry, dismiss, clear, cancelAll };
 }
 
 /* ---------------------------------------------------------------- transport */
 
-async function send(
-  packageId: string,
-  job: Job,
-  report: () => void,
-): Promise<WorkPackage | null> {
+async function send<T>(target: UploadTarget, job: Job, report: () => void): Promise<T | null> {
   const { file, controller } = job;
-  const plan = await json<UploadPlan>(`/api/admin/packages/${packageId}/uploads`, {
+  const plan = await json<OpenPlan>(target.base, {
     method: "POST",
     body: JSON.stringify({
       filename: file.name,
       size: file.size,
       mime: file.type || null,
-      folderId: job.folderId,
+      ...job.fields,
     }),
     signal: controller.signal,
   });
 
-  if (plan.strategy === "done") return plan.package;
+  if (plan.strategy === "done") return ((plan.package ?? plan.brief) as T | undefined) ?? null;
 
   if (plan.strategy === "form") {
     const form = new FormData();
     form.append("file", file);
-    if (job.folderId) form.append("folderId", job.folderId);
-    const res = await xhr("POST", `/api/admin/packages/${packageId}/uploads/form`, form, {
+    for (const [name, value] of Object.entries(job.fields)) form.append(name, value);
+    const res = await xhr("POST", target.formUrl, form, {
       signal: controller.signal,
       onProgress: (loaded) => {
         // The request carries the form's own boundaries too; never report more than the file.
@@ -227,11 +278,11 @@ async function send(
     if (res.status === 0) throw new Error(DROPPED);
     if (res.status < 200 || res.status >= 300) throw new Error(messageFrom(res.text, "Upload failed."));
     job.item.status = "finishing";
-    return JSON.parse(res.text) as WorkPackage;
+    return JSON.parse(res.text) as T;
   }
 
   job.uploadId = plan.id;
-  const base = `/api/admin/packages/${packageId}/uploads/${plan.id}`;
+  const base = `${target.base}/${plan.id}`;
   let direct = plan.direct && !relayForced();
   const urls = new Map<number, { url: string; at: number }>();
   const loaded = new Map<number, number>();
@@ -316,13 +367,13 @@ async function send(
 
   job.item.status = "finishing";
   report();
-  const pkg = await json<WorkPackage>(`${base}/complete`, {
+  const result = await json<T>(`${base}/complete`, {
     method: "POST",
     body: JSON.stringify({ parts: etags }),
     signal: controller.signal,
   });
   job.uploadId = undefined;
-  return pkg;
+  return result;
 }
 
 async function json<T>(url: string, init: RequestInit): Promise<T> {
@@ -334,7 +385,10 @@ async function json<T>(url: string, init: RequestInit): Promise<T> {
     throw e instanceof Error ? new Error(DROPPED) : e;
   }
   const text = await res.text();
-  if (!res.ok) throw new Error(messageFrom(text, "The server refused the upload."));
+  if (!res.ok) {
+    const message = messageFrom(text, "The server refused the upload.");
+    throw res.status === 422 ? new Refused(message) : new Error(message);
+  }
   return JSON.parse(text) as T;
 }
 

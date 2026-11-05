@@ -2,7 +2,9 @@ import type {
   AdminSession,
   Brief,
   BriefAnswers,
+  BriefPartInput,
   BriefSummary,
+  BriefUploadPlan,
   Client,
   ClientActivity,
   ClientAsset,
@@ -330,19 +332,43 @@ export interface BedrockApi {
     verify(phone: string, code: string): Promise<TrackResult>;
   };
   /**
-   * Briefs: scoping questions sent to one person by private link. The questions are frontend
-   * code (lib/briefs); the API only keeps the answers. A brief is made with
-   * `php artisan briefs:create <form> <name>`.
+   * Briefs: questions sent to one person by private link. The questions are frontend code
+   * (lib/briefs); the API only keeps the answers. A plain brief is made with
+   * `php artisan briefs:create <form> <name>`; a project's needs list with `forPackage`, which
+   * puts each of its parts on the plan, waiting on the client.
    */
   briefs: {
     list(): Promise<BriefSummary[]>;
     get(id: string): Promise<Brief>;
+    /** Make the project's needs list, or add the form's new parts to its plan. */
+    forPackage(
+      packageId: string,
+      input: { form: string; name: string; parts: BriefPartInput[] },
+    ): Promise<WorkPackage>;
     /** PUBLIC: the brief behind a link. 404 when the link is not active. */
     open(token: string): Promise<PublicBrief>;
     /** PUBLIC: save every answer at once. The last save wins. */
     save(token: string, answers: BriefAnswers): Promise<PublicBrief>;
     /** PUBLIC: save and mark it sent. Answers may still change after. */
     send(token: string, answers: BriefAnswers): Promise<PublicBrief>;
+    /** PUBLIC: one part is ready. Its plan item moves to waiting on us. */
+    sendPart(token: string, part: string, answers: BriefAnswers): Promise<PublicBrief>;
+    /** PUBLIC: open an upload for a file the client is sending (docs/FILES.md). */
+    startUpload(
+      token: string,
+      input: { filename: string; size: number; mime: string | null; part: string; question: string },
+    ): Promise<BriefUploadPlan>;
+    signUploadParts(token: string, uploadId: string, parts: number[]): Promise<Record<string, string>>;
+    completeUpload(
+      token: string,
+      uploadId: string,
+      parts: { partNumber: number; etag: string }[],
+    ): Promise<PublicBrief>;
+    abortUpload(token: string, uploadId: string): Promise<void>;
+    /** PUBLIC: the whole file in one request, where storage cannot take parts. */
+    addFile(token: string, file: File, part: string, question: string): Promise<PublicBrief>;
+    /** PUBLIC: take back a file, until its part is received. */
+    removeFile(token: string, fileId: string): Promise<PublicBrief>;
   };
 }
 

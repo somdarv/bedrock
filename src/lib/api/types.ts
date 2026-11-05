@@ -368,6 +368,11 @@ export interface Deliverable {
   /** True once the original file has been deleted from storage (preview kept). */
   archived: boolean;
   processingStatus: ProcessingStatus;
+  /** Sent to us by the client through their needs list. Never locked, never on their link. */
+  fromClient?: boolean;
+  /** The needs list part and question it was sent for. */
+  briefPart?: string | null;
+  briefQuestion?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -409,6 +414,8 @@ export interface PlanItem {
   approvedAt: string | null;
   approvedBy: string | null;
   shelvedReason: string | null;
+  /** The needs list part this item tracks, or null for ordinary work. */
+  briefPart?: string | null;
   /** Files in the repository filed against this item. */
   fileIds: string[];
   comments: PlanComment[];
@@ -439,6 +446,8 @@ export interface DeliverableFolder {
   id: string;
   parentId: string | null;
   name: string;
+  /** Holds files the client sent us ("From you"). Kept off their link. */
+  fromClient?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -583,6 +592,8 @@ export interface WorkPackage {
   folders: DeliverableFolder[];
   /** The plan. On a client link this holds the shared items only. */
   planItems: PlanItem[];
+  /** The list of what we need from the client, when the project has one. */
+  brief?: PackageBrief | null;
   /** Only on the answer to a folder create: the folder just made. */
   createdFolderId?: string;
   /** Only on the operator's reads: the live share links. Never on a client's. */
@@ -1167,6 +1178,30 @@ export interface VaultState {
  */
 export type BriefAnswers = Record<string, string | string[]>;
 
+/**
+ * One part of a needs list, the client sends each on its own. `received` is its plan item marked
+ * done: we have it.
+ */
+export interface BriefPartState {
+  /** The part's name on the plan. Null on a plain brief, which has no plan. */
+  title: string | null;
+  sentAt: string | null;
+  received: boolean;
+}
+
+/** A file the client sent through their list, as they see it. */
+export interface BriefFile {
+  id: string;
+  part: string | null;
+  question: string | null;
+  filename: string;
+  size: number | null;
+  type: DeliverableType;
+  /** A thumbnail, when one was made (pictures, PDFs, videos). */
+  previewUrl: string | null;
+  createdAt: string;
+}
+
 /** A brief as the person holding its link sees it. It never carries the row id. */
 export interface PublicBrief {
   form: string;
@@ -1174,6 +1209,12 @@ export interface PublicBrief {
   answers: BriefAnswers;
   savedAt: string | null;
   sentAt: string | null;
+  /** Only a list that belongs to a project can take files. Absent on older API builds. */
+  acceptsFiles?: boolean;
+  projectTitle?: string | null;
+  /** Keyed by part. Only parts on the plan, or already sent, appear. */
+  parts?: Record<string, BriefPartState>;
+  files?: BriefFile[];
 }
 
 /** A brief, our side. */
@@ -1182,7 +1223,13 @@ export interface BriefSummary {
   form: string;
   name: string;
   token: string;
+  /** The project it belongs to, when it is a needs list. */
+  workPackageId?: string | null;
+  projectTitle?: string | null;
   answeredCount: number;
+  partsTotal?: number;
+  partsSent?: number;
+  partsReceived?: number;
   savedAt: string | null;
   sentAt: string | null;
   createdAt: string;
@@ -1190,4 +1237,30 @@ export interface BriefSummary {
 
 export interface Brief extends BriefSummary {
   answers: BriefAnswers;
+  parts?: Record<string, BriefPartState>;
+  files?: BriefFile[];
 }
+
+/** A project's needs list, as the project read carries it. `id` is on our reads only. */
+export interface PackageBrief {
+  id?: string;
+  token: string;
+  form: string;
+  name: string;
+  partsTotal: number;
+  partsSent: number;
+  partsReceived: number;
+}
+
+/** One part of a needs list, as the plan item made for it. */
+export interface BriefPartInput {
+  key: string;
+  title: string;
+  note?: string | null;
+}
+
+/** How the API wants a client's file sent: the same shapes as the file browser's. */
+export type BriefUploadPlan =
+  | { strategy: "multipart"; id: string; partSize: number; partCount: number; direct: boolean }
+  | { strategy: "form" }
+  | { strategy: "done"; brief: PublicBrief };

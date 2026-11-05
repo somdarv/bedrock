@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Brief, type BriefSummary, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Brief, type BriefFile, type BriefPartState, type BriefSummary, type PublicBrief, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -2303,6 +2303,99 @@ export const mockApi: BedrockApi = {
       Object.assign(brief, { answers, savedAt: now, sentAt: brief.sentAt ?? now });
       return publicBrief(brief);
     },
+    async forPackage(packageId, input) {
+      await delay();
+      const pkg = found(packages.find((p) => p.id === packageId), "Package");
+      let brief = briefs.find((b) => briefExtras.get(b.id)?.packageId === packageId);
+      if (!brief) {
+        brief = {
+          id: `br_${crypto.randomUUID().slice(0, 8)}`,
+          form: input.form,
+          name: input.name,
+          token: `mock-${crypto.randomUUID().slice(0, 8)}`,
+          answeredCount: 0,
+          answers: {},
+          savedAt: null,
+          sentAt: null,
+          createdAt: new Date().toISOString(),
+        };
+        briefs.push(brief);
+        briefExtras.set(brief.id, { packageId, sentParts: {}, files: [] });
+      }
+      const have = new Set(pkg.planItems.map((i) => i.briefPart).filter(Boolean));
+      for (const part of input.parts) {
+        if (have.has(part.key)) continue;
+        const now = new Date().toISOString();
+        pkg.planItems.push({
+          id: `pi_${crypto.randomUUID().slice(0, 8)}`,
+          position: pkg.planItems.length,
+          title: part.title,
+          note: part.note ?? null,
+          state: "agreed",
+          waitingOn: "client",
+          raisedBy: "us",
+          visibility: "shared",
+          dueDate: null,
+          approvedAt: null,
+          approvedBy: null,
+          shelvedReason: null,
+          briefPart: part.key,
+          fileIds: [],
+          comments: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      return { ...pkg, brief: packageBrief(pkg) };
+    },
+    async sendPart(token, part, answers) {
+      await delay();
+      const brief = found(briefs.find((b) => b.token === token), "Brief");
+      const extras = briefExtrasFor(brief);
+      const now = new Date().toISOString();
+      extras.sentParts[part] = now;
+      Object.assign(brief, { answers, savedAt: now });
+      const item = briefPackage(brief)?.planItems.find((i) => i.briefPart === part);
+      if (item) Object.assign(item, { waitingOn: "us", state: item.state === "done" ? "agreed" : item.state });
+      return publicBrief(brief);
+    },
+    // The mock keeps files in memory, so it takes them in one request like the local disk.
+    async startUpload() {
+      await delay();
+      return { strategy: "form" as const };
+    },
+    async signUploadParts() {
+      throw new ApiError(501, "The mock takes files in one request.");
+    },
+    async completeUpload() {
+      throw new ApiError(501, "The mock takes files in one request.");
+    },
+    async abortUpload() {
+      await delay();
+    },
+    async addFile(token, file, part, question) {
+      await delay(400);
+      const brief = found(briefs.find((b) => b.token === token), "Brief");
+      const extras = briefExtrasFor(brief);
+      extras.files.push({
+        id: `bf_${crypto.randomUUID().slice(0, 8)}`,
+        part,
+        question,
+        filename: file.name,
+        size: file.size,
+        type: typeFromName(file.name),
+        previewUrl: null,
+        createdAt: new Date().toISOString(),
+      });
+      return publicBrief(brief);
+    },
+    async removeFile(token, fileId) {
+      await delay();
+      const brief = found(briefs.find((b) => b.token === token), "Brief");
+      const extras = briefExtrasFor(brief);
+      extras.files = extras.files.filter((f) => f.id !== fileId);
+      return publicBrief(brief);
+    },
   },
 };
 
@@ -2339,8 +2432,61 @@ function briefSummary(brief: Brief): BriefSummary {
   };
 }
 
-function publicBrief(brief: Brief) {
-  return { form: brief.form, name: brief.name, answers: brief.answers, savedAt: brief.savedAt, sentAt: brief.sentAt };
+/** What the mock keeps beside a brief: the project it belongs to, sent parts, and files. */
+const briefExtras = new Map<string, { packageId: string | null; sentParts: Record<string, string>; files: BriefFile[] }>();
+
+function briefExtrasFor(brief: Brief) {
+  let extras = briefExtras.get(brief.id);
+  if (!extras) {
+    extras = { packageId: null, sentParts: {}, files: [] };
+    briefExtras.set(brief.id, extras);
+  }
+  return extras;
+}
+
+function briefPackage(brief: Brief) {
+  const packageId = briefExtras.get(brief.id)?.packageId;
+  return packageId ? packages.find((p) => p.id === packageId) : undefined;
+}
+
+function packageBrief(pkg: WorkPackage) {
+  const brief = briefs.find((b) => briefExtras.get(b.id)?.packageId === pkg.id);
+  if (!brief) return null;
+  const tracked = pkg.planItems.filter((i) => i.briefPart);
+  const sent = briefExtrasFor(brief).sentParts;
+  return {
+    id: brief.id,
+    token: brief.token,
+    form: brief.form,
+    name: brief.name,
+    partsTotal: tracked.length,
+    partsSent: tracked.filter((i) => sent[i.briefPart as string]).length,
+    partsReceived: tracked.filter((i) => i.state === "done").length,
+  };
+}
+
+function publicBrief(brief: Brief): PublicBrief {
+  const extras = briefExtrasFor(brief);
+  const pkg = briefPackage(brief);
+  const parts: Record<string, BriefPartState> = {};
+  for (const item of pkg?.planItems.filter((i) => i.briefPart) ?? []) {
+    parts[item.briefPart as string] = {
+      title: item.title,
+      sentAt: extras.sentParts[item.briefPart as string] ?? null,
+      received: item.state === "done",
+    };
+  }
+  return {
+    form: brief.form,
+    name: brief.name,
+    answers: brief.answers,
+    savedAt: brief.savedAt,
+    sentAt: brief.sentAt,
+    acceptsFiles: pkg !== undefined,
+    projectTitle: pkg?.title ?? null,
+    parts,
+    files: extras.files,
+  };
 }
 
 let vaultKey: VaultKeyRecord | null = null;
