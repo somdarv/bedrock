@@ -6,8 +6,8 @@ import { acceptedWhen, phoneWords } from "@/lib/documents/acceptance";
 import { acceptContract } from "@/lib/documents/contract-actions";
 import type { DocumentAcceptance, DocumentRecord } from "@/lib/documents/registry";
 import { DocumentProvider } from "./document-context";
-import { Heading, Note, Panel, Section } from "./doc-ui";
-import { BODY, INK, SM, TONE, XS } from "./plan-ui";
+import { Note, Panel } from "./doc-ui";
+import { BODY, INK, SM, XS } from "./plan-ui";
 
 /**
  * A contract as a page you sign. It reads like any other document, and one person types their name
@@ -15,8 +15,8 @@ import { BODY, INK, SM, TONE, XS } from "./plan-ui";
  * 2026-11-05, in the manner of the CediBites staff letters, so these carry over from there:
  *
  *  - Nothing is drawn to sign on. No underlines. It is accepted on screen.
- *  - Until accepted, it says so. Accepted, it closes with the name, the phone number and the time,
- *    on screen and in the PDF. Our stamp stays in the footer throughout.
+ *  - Until accepted, it ends at our sign-off. Accepted, it closes with the name, the phone number
+ *    and the time, on screen and in the PDF. Our stamp stays in the footer throughout.
  *  - Download stays at the top of the screen from the moment it opens, accepted or not.
  */
 
@@ -119,27 +119,9 @@ function SigningBar() {
   );
 }
 
-/** One side's name on the contract. */
-function SignedFor({
-  party,
-  tone,
-  children,
-}: {
-  party: string;
-  tone: "ours" | "yoursLight";
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn("rounded-[var(--doc-r-panel)] p-6", TONE[tone])}>
-      <p className={cn("font-bold", SM, INK)}>For {party}</p>
-      <div className="mt-3 space-y-1">{children}</div>
-    </div>
-  );
-}
-
 /**
- * The end of the contract: both sides' names. On the signing link it also holds the form, and once
- * accepted, the way to save a copy. Those two never print.
+ * The end of the contract: our sign-off, then the acceptance once there is one. On the signing link
+ * it also holds the form and the way to save a copy. Those two never print.
  */
 export function ContractSignatures({
   record,
@@ -156,35 +138,33 @@ export function ContractSignatures({
   const acceptance = signing ? signing.acceptance : (record.acceptance ?? null);
 
   return (
-    <Section className="mb-10">
-      <div id="accept" className="scroll-mt-24">
-        <div className="avoid-break">
-          <Heading className="font-bold">Signatures</Heading>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <SignedFor party="Saharabase Technologies" tone="ours">
-              <p className={cn("font-semibold", SM, INK)}>{signer.name}</p>
-              <p className={cn(XS, BODY)}>{signer.title}</p>
-              <p className={cn(XS, BODY)}>Issued {record.issueDate}</p>
-            </SignedFor>
-            <SignedFor party={party} tone="yoursLight">
-              {acceptance ? (
-                <>
-                  <p className={cn("font-semibold", SM, INK)}>{acceptance.name}</p>
-                  {acceptance.phone && (
-                    <p className={cn(XS, BODY)}>{phoneWords(acceptance.phone)}</p>
-                  )}
-                  <p className={cn(XS, BODY)}>Accepted {acceptedWhen(acceptance.at)}</p>
-                </>
-              ) : (
-                <p className={cn(XS, BODY)}>Not yet accepted</p>
-              )}
-            </SignedFor>
-          </div>
-        </div>
-        {signing && !acceptance && <AcceptForm party={party} />}
-        {signing && acceptance && <AcceptedNote />}
+    <div id="accept" className="scroll-mt-24">
+      <div className="letter-close avoid-break">
+        <p className="letter-line">Yours faithfully,</p>
+        <p className="letter-line letter-signer">
+          <strong>{signer.name}</strong>
+        </p>
+        <p className="letter-line">{signer.title}</p>
+        <p className="letter-line">For Saharabase Technologies</p>
       </div>
-    </Section>
+      {acceptance && (
+        <div className="letter-accepted avoid-break">
+          <p>
+            <strong>Acceptance:</strong> I have read, understood and accept the terms above for{" "}
+            {party}.
+          </p>
+          <p className="letter-line">
+            Signed online by: <strong>{acceptance.name}</strong>
+          </p>
+          {acceptance.phone && (
+            <p className="letter-line">Phone: {phoneWords(acceptance.phone)}</p>
+          )}
+          <p className="letter-line">Date: {acceptedWhen(acceptance.at)}</p>
+        </div>
+      )}
+      {signing && !acceptance && <AcceptForm party={party} />}
+      {signing && acceptance && <AcceptedNote />}
+    </div>
   );
 }
 
@@ -218,7 +198,7 @@ function AcceptForm({ party }: { party: string }) {
   };
 
   return (
-    <form onSubmit={submit} className="no-print mt-3">
+    <form onSubmit={submit} className="no-print mt-8">
       <Panel>
         <h4 className={cn("font-bold", SM, INK)}>Accept and sign</h4>
         <label className={cn("mt-4 flex cursor-pointer items-start gap-3", SM, BODY)}>
@@ -281,7 +261,7 @@ function AcceptedNote() {
   const { filename } = React.useContext(SigningContext)!;
 
   return (
-    <div className="no-print mt-3">
+    <div className="no-print mt-8">
       <Panel>
         <p className={cn("font-bold", SM, INK)}>Accepted. Thank you.</p>
         <p className={cn("mt-1", SM, BODY)}>We will now send your link: What we need from you.</p>

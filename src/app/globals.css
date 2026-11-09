@@ -81,6 +81,107 @@
     background: color-mix(in srgb, var(--color-foreground) 34%, transparent);
     background-clip: content-box;
   }
+  /* Word's spacing, in points: Calibri 11, lines at 1.15, 6 under a paragraph, 10 above a
+     heading and 4 under it, clauses in by 24. */
+  .letter {
+    --letter-indent: 14pt;
+    --letter-head-gap: 16px;
+    --letter-rule-gap: 12px;
+    font-family: Calibri, "Letter", sans-serif;
+    font-size: 11pt;
+    line-height: 1.404;
+    color: #000;
+  }
+  @media (min-width: 641px), print {
+    .letter {
+      --letter-indent: 24pt;
+      --letter-head-gap: 14mm;
+      --letter-rule-gap: 8mm;
+    }
+  }
+  .letter strong {
+    color: #000;
+    font-weight: 700;
+  }
+  .letter p {
+    margin-bottom: 6pt;
+  }
+  .letter p.letter-line {
+    margin-bottom: 8pt;
+  }
+  .letter-ref {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 1rem;
+    margin-top: var(--letter-head-gap);
+    margin-bottom: 8.5pt;
+  }
+  .letter-rule {
+    border: 0;
+    border-top: 1pt solid #000;
+    margin-top: var(--letter-rule-gap);
+    margin-bottom: 3.2mm;
+  }
+  .letter-title {
+    margin-top: 12pt;
+    margin-bottom: 10pt;
+    font-size: 14pt;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-wrap: balance;
+    color: #000;
+  }
+  .letter-heading {
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #000;
+  }
+  .letter-clause {
+    margin-bottom: 6pt;
+    padding-left: var(--letter-indent);
+    overflow-wrap: break-word;
+  }
+  .letter-sub {
+    margin-top: 3pt;
+    padding-left: var(--letter-indent);
+  }
+  .letter-table {
+    width: 100%;
+    margin-bottom: 8pt;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .letter-table th,
+  .letter-table td {
+    border: 0.75pt solid #000;
+    padding: 3pt 5pt;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: break-word;
+  }
+  .letter-table th {
+    font-weight: 700;
+  }
+  .letter-table th.text-right,
+  .letter-table td.text-right {
+    text-align: right;
+  }
+  .letter-close {
+    margin-top: 14pt;
+  }
+  .letter-signer {
+    margin-top: 22pt;
+  }
+  .letter-accepted {
+    margin-top: 14pt;
+  }
+
   /* Inside an ink panel (the upload tray) the same bar has to go the other way. */
   .doc-invert {
     scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
@@ -140,6 +241,25 @@
   10 dividers. */ .hairline {
     border-color: color-mix(in srgb, var(--color-foreground) 8%, transparent);
   }
+}
+
+/*
+ * A document set as a Word letter (letter-ui.tsx): Calibri where Windows has it, and this cut of
+ * Carlito, with Calibri's widths, on phones and everywhere else.
+ */
+@font-face {
+  font-family: "Letter";
+  src: url("/fonts/letter/CediLetter-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Letter";
+  src: url("/fonts/letter/CediLetter-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 /*
@@ -403,6 +523,15 @@
     break-inside: avoid;
   }
   tr {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  .letter-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* A clause with lettered lines under it is long, so it may run on to the next page. */
+  .letter-clause:has(.letter-sub) {
     page-break-inside: auto;
     break-inside: auto;
   }

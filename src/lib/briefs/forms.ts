@@ -668,7 +668,7 @@ const gsaCampaign: BriefForm = {
       key: "start",
       title: "To start",
       questions: [
-        { id: "pay1", kind: "note", text: "Your fee is GHS 7,000. You pay it once, in full, by 5 January 2027. You do not pay anything now." },
+        { id: "pay1", kind: "note", text: "Your fee is GHS 7,000. You pay it once, in full, by 15 January 2027. You do not pay anything now." },
       ],
     },
     {
