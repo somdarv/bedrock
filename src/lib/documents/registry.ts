@@ -94,6 +94,23 @@ export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 const REGISTRY: DocumentRecord[] = [
   {
+    id: "SAH-BD-20261109-PRO-HANNA-65",
+    reference: "PRO-HANNA-65",
+    category: "proposals",
+    type: "Proposal",
+    title: "The First Version of Your Business System",
+    client: "Hanna",
+    project: "Business System",
+    issueDate: "9 November 2026",
+    validUntil: "30 November 2026",
+    status: "valid",
+    approver: { ...DEFAULT_APPROVER },
+    system: GENERATING_SYSTEM,
+    serial: null,
+    preparedAt: null,
+    prepared: false,
+  },
+  {
     id: "SAH-BD-20261105-CON-GSA-64",
     reference: "CON-GSA-64",
     category: "proposals",
