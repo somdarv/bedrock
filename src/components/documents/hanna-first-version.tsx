@@ -29,32 +29,19 @@ import {
   STEP_SOFT,
   Steps,
   TONE,
-  TONE_SOFT,
   XS,
   type Step,
   type StepTone,
-  type Tone,
 } from "./plan-ui";
 
 /**
  * What we recommend Hanna builds first, and why (PRO-HANNA-65). It answers the brief she sent on
  * 27 October 2026, form "hanna-bizflow". Question ids in the comments below are from that form.
  *
- * It carries no build fee on purpose. The owner has not set one, and her budget (L2) is unset.
+ * It says nothing about who pays for the build. The owner took that section out on 9 November
+ * 2026, so the cost is settled in the agreement, outside this paper.
  * The product has no settled name either (A1), so the paper says "your system", never BizFlow.
  */
-
-/* Figures */
-
-/** The middle of the GHS 100 to 250 she chose for the smallest plan (K3). */
-const MONTHLY_PRICE = 175;
-const BUSINESSES = 50;
-const TOTAL = BUSINESSES * MONTHLY_PRICE;
-/** The top of the 5 to 8% she offered (L2), so the sum is the kindest it can be. */
-const OWNERSHIP = 8;
-const OUR_SHARE = (TOTAL * OWNERSHIP) / 100;
-
-const ghs = (n: number) => `GHS ${n.toLocaleString("en-GB")}`;
 
 /* 01 What you told us */
 
@@ -208,50 +195,9 @@ const CHANGES: { ask: string; we: string; why: string }[] = [
   },
 ];
 
-/* 05 Who pays for the build */
-
-const SUM: Step[] = [
-  { tone: "raised", sub: "Say", title: `${BUSINESSES} businesses are paying` },
-  { tone: "raised", sub: "Each pays", title: `${ghs(MONTHLY_PRICE)} a month` },
-  { tone: "date", sub: "All together", title: `${ghs(TOTAL)} a month` },
-  { tone: "clay", sub: `Our ${OWNERSHIP}%`, title: `${ghs(OUR_SHARE)} a month` },
-];
-
-const WAYS: { title: string; tone: Tone; items: string[] }[] = [
-  {
-    title: "Way 1. You pay for the build.",
-    tone: "yoursLight",
-    items: [
-      "You pay one fixed price for the six parts.",
-      "You own the product, its name and its customers.",
-      "You keep the subscriptions.",
-      "You pay for the hosting and the SMS.",
-      "You pay us a monthly fee for support.",
-      "The tools we already own stay ours. You hold a licence to use them.",
-    ],
-  },
-  {
-    title: "Way 2. We pay for the build.",
-    tone: "ours",
-    items: [
-      "We build it at our own cost.",
-      "We own the system.",
-      "You sell it to businesses.",
-      "You earn a share of every subscription.",
-      "Hosting, SMS and support come out of the subscriptions.",
-      "We write your share into an agreement.",
-    ],
-  },
-];
-
-/* 06 What we need from you */
+/* 05 What we need from you */
 
 const NEEDS: { you: string; so: string; otherwise: string }[] = [
-  {
-    you: "Choose Way 1 or Way 2.",
-    so: "We write the agreement.",
-    otherwise: "Nobody has agreed who carries the cost, so we cannot start.",
-  },
   {
     you: "Name one real business that takes bookings.",
     so: "We build around its real work.",
@@ -266,7 +212,7 @@ const NEEDS: { you: string; so: string; otherwise: string }[] = [
 
 const NEXT: Step[] = [
   { tone: "raised", sub: "1", title: "You read this" },
-  { tone: "raised", sub: "2", title: "You send us your three answers" },
+  { tone: "raised", sub: "2", title: "You send us your two answers" },
   { tone: "raised", sub: "3", title: "We send the agreement" },
   { tone: "raised", sub: "4", title: "We start building" },
 ];
@@ -422,22 +368,6 @@ function ChangeRows() {
   );
 }
 
-function WayCards() {
-  return (
-    <div className="mt-5 grid gap-2 sm:grid-cols-2">
-      {WAYS.map((way) => (
-        <div
-          key={way.title}
-          className={cn("avoid-break rounded-[var(--doc-r-panel)] p-6", TONE[way.tone])}
-        >
-          <p className={cn("font-bold", SM, INK)}>{way.title}</p>
-          <DotList items={way.items} className={cn("mt-3", TONE_SOFT[way.tone])} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function NeedRows() {
   return (
     <div className="mt-7 space-y-2">
@@ -475,10 +405,7 @@ export function HannaFirstVersion({ record }: { record: DocumentRecord }) {
           <DetailList>
             <DetailRow label="Prepared for" value="Hanna" />
             <DetailRow label="What we recommend" value="Build six of your 15 parts first" />
-            <DetailRow
-              label="What we need from you"
-              value="A way to pay for it, one real business and a name"
-            />
+            <DetailRow label="What we need from you" value="One real business and a name" />
           </DetailList>
         </div>
       </Section>
@@ -565,32 +492,8 @@ export function HannaFirstVersion({ record }: { record: DocumentRecord }) {
       {/* 05 */}
       <Part>
         <div className="avoid-break">
-          <Bridge>All of this has a cost, so we must agree who carries it.</Bridge>
-          <Head n={5}>Who pays for the build</Head>
-          <P className="mt-4">
-            You have not set a budget. You offered GHS 1,000 in instalments after launch. You also
-            offered us 5 to 8% of the ownership. Thank you for that.
-          </P>
-          <P className="mt-3">It does not cover the work. Here is the sum.</P>
-          <Steps steps={SUM} className="mt-7" />
-          <Note className="mt-3">
-            {ghs(MONTHLY_PRICE)} is the middle of the monthly price you chose.
-          </Note>
-          <P className="mt-5">
-            That {ghs(OUR_SHARE)} would also have to pay for hosting, SMS and support. You asked us
-            to do the support. And reaching {BUSINESSES} businesses takes time.
-          </P>
-          <P className="mt-3">We see two fair ways to do this. Either one works for us.</P>
-        </div>
-        <WayCards />
-        <Note className="mt-4">If you choose Way 1, we will send you the fixed price.</Note>
-      </Part>
-
-      {/* 06 */}
-      <Part>
-        <div className="avoid-break">
-          <Bridge>Three answers from you start the work.</Bridge>
-          <Head n={6}>What we need from you</Head>
+          <Bridge>Before we start, two things are still open.</Bridge>
+          <Head n={5}>What we need from you</Head>
           <P className="mt-4">
             One of your answers says no business is ready to try it. Another says one is. If there
             is one, tell us which.
