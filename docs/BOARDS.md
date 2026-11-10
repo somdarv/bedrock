@@ -83,10 +83,38 @@ As on the Claude canvas. Shortcuts in brackets.
 On the API server, as `sahara`, in `~/apps/hub-api`:
 
 ```sh
-php artisan boards:create "Laptop layouts, round 2" --for=Isaac
+php artisan boards:create "Laptop layouts, round 2" --for=Isaac --client=infralearn
 ```
 
-It prints the board's id and the link to send.
+It prints the board's id and the link to send. `--client` ties the board to a client by its id
+or a part of its name that fits one client; the admin list then shows the client's name.
+
+## Bringing a Claude canvas across
+
+`scripts/canvas-to-board.cjs` turns a Claude Design canvas into a board folder. Read the canvas's
+`project/canvas.json` and every `project/*.dc.html` with the Artifact tool, and each picture by
+its asset id (`/_blob/<id>` in the pages) one at a time, then:
+
+```sh
+node scripts/canvas-to-board.cjs <folder holding project/> <folder of the <id>.jpg pictures> <out folder>
+```
+
+Each artboard's `renderVals()` runs and its `sc-for`, `sc-if` and `{{holes}}` are written out,
+so the frame is a plain page whose blocks can be picked. An artboard named `*-today` (prod
+beside beta) becomes its beta half alone, the screenshot written into the page, set where the
+beta half stood. Titles and grey notes come across as board notes. Push the folder as below.
+
+## The inbox
+
+What clients said and drew on any board since we last looked.
+
+- **The owner:** the top of `/admin/boards`, "New from clients". Each comment opens its board on
+  that comment. "Mark these read" moves the owner's place on.
+- **An assistant:** `php artisan boards:inbox` on the API server. It prints each comment with its
+  board, frame, the block or area it is about, and the talk before it. `--json` for a script,
+  `--mark` to move the place on once read, `--since="2026-11-10 12:00"` to look again from a time.
+- Each reader keeps its own place (`board_reads`: `owner`, `agent`), so one reading never hides
+  a comment from the other.
 
 ## Writing frames
 

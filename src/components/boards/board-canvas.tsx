@@ -886,15 +886,25 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
           className="pointer-events-none absolute left-0 top-0"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transformOrigin: "0 0" }}
         >
-          {notes.map((n, i) => (
-            <div
-              key={i}
-              className="absolute whitespace-nowrap font-display text-[72px] font-semibold leading-none tracking-[-0.02em] text-foreground"
-              style={{ left: n.x, top: n.y }}
-            >
-              {n.text}
-            </div>
-          ))}
+          {notes.map((n, i) =>
+            n.kind === "sticky" ? (
+              <div
+                key={i}
+                className="absolute whitespace-pre-wrap break-words rounded-[12px] bg-[#e9e8e4] text-foreground"
+                style={{ left: n.x, top: n.y, width: n.w ?? 400, fontSize: n.size ?? 24, lineHeight: 1.4, padding: (n.size ?? 24) * 0.9 }}
+              >
+                {n.text}
+              </div>
+            ) : (
+              <div
+                key={i}
+                className="absolute whitespace-nowrap font-display text-[72px] font-semibold leading-none tracking-[-0.02em] text-foreground"
+                style={{ left: n.x, top: n.y }}
+              >
+                {n.text}
+              </div>
+            ),
+          )}
           {behind.map((m) => (
             <MarkView key={m.id} mark={m} editing={false} onEdited={NOOP} />
           ))}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyLink } from "@/components/admin/copy-link";
+import { BoardInbox } from "@/components/boards/board-inbox";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { when } from "@/lib/boards/view";
@@ -12,7 +13,10 @@ export const metadata = { title: "Boards" };
  * `boards:push`.
  */
 export default async function BoardsPage() {
-  const boards = await api.boards.list().catch(() => []);
+  const [boards, inbox] = await Promise.all([
+    api.boards.list().catch(() => []),
+    api.boards.inbox().catch(() => null),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-10">
@@ -22,6 +26,8 @@ export default async function BoardsPage() {
           Drawings a client comments on from a private link. Their comments wait here for a reply.
         </p>
       </header>
+
+      {inbox ? <BoardInbox inbox={inbox} /> : null}
 
       {boards.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
@@ -46,7 +52,7 @@ export default async function BoardsPage() {
                     {b.title}
                   </Link>
                   <div className="text-xs text-subtle">
-                    {b.forName ? `For ${b.forName}, ` : ""}
+                    {b.clientName ? `${b.clientName}, ` : b.forName ? `For ${b.forName}, ` : ""}
                     {b.framesCount} {b.framesCount === 1 ? "drawing" : "drawings"}
                   </div>
                 </TD>

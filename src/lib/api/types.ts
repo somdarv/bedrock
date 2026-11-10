@@ -1273,12 +1273,18 @@ export interface BoardPage {
   name: string;
 }
 
-/** A title drawn on the board over a row of frames, in board pixels. */
+/**
+ * Words on the board itself, in board pixels: a title over a row of frames, or a grey sticky note
+ * `w` wide in `size` pixel text, as the Claude canvas draws them.
+ */
 export interface BoardNote {
   x: number;
   y: number;
   text: string;
   page?: string | null;
+  kind?: "title" | "sticky";
+  w?: number;
+  size?: number;
 }
 
 /** One drawing: a whole web page we wrote, w by h CSS pixels, at x, y on the board. */
@@ -1377,12 +1383,41 @@ export interface AdminBoard extends PublicBoard {
   id: string;
   token: string;
   closedAt: string | null;
+  client: { id: string; name: string } | null;
+}
+
+/** What clients said and drew since the owner last marked the inbox read. */
+export interface BoardInbox {
+  seenUntil: string | null;
+  newest: string | null;
+  comments: {
+    board: { id: string; title: string; client: string | null; link: string };
+    pin: { id: string; number: number; doneAt: string | null; firstComment: boolean };
+    where: {
+      page: string | null;
+      frameKey: string | null;
+      frameTitle: string | null;
+      anchor: BoardAnchor | null;
+    };
+    author: string;
+    body: string;
+    createdAt: string;
+  }[];
+  drawings: {
+    board: { id: string; title: string; client: string | null; link: string };
+    kind: BoardMarkKind;
+    text: string | null;
+    page: string | null;
+    author: string;
+    createdAt: string;
+  }[];
 }
 
 export interface BoardSummary {
   id: string;
   title: string;
   forName: string | null;
+  clientName: string | null;
   token: string;
   framesCount: number;
   pinsOpen: number;

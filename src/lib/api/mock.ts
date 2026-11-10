@@ -2414,6 +2414,14 @@ export const mockApi: BedrockApi = {
       await delay();
       return mockBoards.map(boardSummary);
     },
+    async inbox() {
+      await delay();
+      return { seenUntil: null, newest: null, comments: [], drawings: [] };
+    },
+    async inboxSeen() {
+      await delay();
+      return { seenUntil: new Date().toISOString(), newest: null, comments: [], drawings: [] };
+    },
     async get(id) {
       await delay();
       return structuredClone(found(mockBoards.find((b) => b.id === id), "Board"));
@@ -2517,6 +2525,7 @@ const mockBoards: AdminBoard[] = [
     token: "mock-board",
     title: "Laptop layouts, round 2",
     forName: "Isaac",
+    client: null,
     closedAt: null,
     pages: [
       { id: "student", name: "Student" },
@@ -2625,6 +2634,7 @@ function boardSummary(board: AdminBoard): BoardSummary {
     id: board.id,
     title: board.title,
     forName: board.forName,
+    clientName: board.client?.name ?? null,
     token: board.token,
     framesCount: board.frames.length,
     pinsOpen: board.pins.filter((p) => !p.doneAt).length,

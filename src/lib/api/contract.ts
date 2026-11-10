@@ -2,6 +2,7 @@ import type { DocumentAcceptance, DocumentRecord } from "@/lib/documents/registr
 import type {
   AdminBoard,
   AdminSession,
+  BoardInbox,
   BoardMark,
   BoardMarkInput,
   BoardPinInput,
@@ -391,6 +392,10 @@ export interface BedrockApi {
    */
   boards: {
     list(): Promise<BoardSummary[]>;
+    /** What clients said and drew since the owner last marked it read. */
+    inbox(): Promise<BoardInbox>;
+    /** Mark the owner's inbox read up to a moment, or to now. */
+    inboxSeen(until: string | null): Promise<BoardInbox>;
     get(id: string): Promise<AdminBoard>;
     /** One frame's page, read with the admin's session. Works on a board whose link is off. */
     frame(id: string, frameId: string): Promise<{ html: string; version: number }>;

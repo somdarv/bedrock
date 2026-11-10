@@ -71,7 +71,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   KeyL: "line",
 };
 
-export function BoardView({ side, initial }: { side: BoardSide; initial: PublicBoard }) {
+export function BoardView({ side, initial, openPinId }: { side: BoardSide; initial: PublicBoard; openPinId?: string | null }) {
   const { toast } = useToast();
   const wide = useMedia("(min-width: 768px)");
   const canvas = React.useRef<CanvasHandle>(null);
@@ -493,6 +493,18 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     setDraft(null);
     if (t !== "select") setSelection(null);
   }
+
+  // A link from the inbox opens the board on one comment.
+  const opened = React.useRef(false);
+  React.useEffect(() => {
+    if (opened.current || !openPinId || wide === null) return;
+    const pin = board.pins.find((p) => p.id === openPinId);
+    if (!pin) return;
+    opened.current = true;
+    openPin(pin, true);
+    // Once, when the screen first knows its size.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPinId, wide]);
 
   /* ------------------------------------------------------------ keys */
 

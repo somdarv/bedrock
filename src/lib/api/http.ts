@@ -3,6 +3,7 @@ import type { DocumentRecord } from "@/lib/documents/registry";
 import type {
   AdminBoard,
   AdminSession,
+  BoardInbox,
   BoardMark,
   BoardSummary,
   PublicBoard,
@@ -575,6 +576,9 @@ export const httpApi: BedrockApi = {
   },
   boards: {
     list: () => request<BoardSummary[]>(`/api/admin/boards`),
+    inbox: () => request<BoardInbox>(`/api/admin/boards/inbox`),
+    inboxSeen: (until) =>
+      request<BoardInbox>(`/api/admin/boards/inbox/seen`, { method: "POST", body: JSON.stringify({ until }) }),
     get: (id) => request<AdminBoard>(`/api/admin/boards/${encodeURIComponent(id)}`),
     frame: (id, frameId) =>
       request<{ html: string; version: number }>(

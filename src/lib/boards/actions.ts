@@ -62,6 +62,17 @@ export async function setBoardClosed(id: string, closed: boolean) {
   return result;
 }
 
+/** Mark the owner's inbox read up to the newest thing it showed. */
+export async function markInboxRead(until: string | null) {
+  try {
+    await api.boards.inboxSeen(until);
+    revalidatePath("/admin/boards");
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "The inbox was not marked read. Try again." };
+  }
+}
+
 /* ------------------------------------------------------------------ drawings */
 
 export type MarkResult = { ok: true; mark: BoardMark | null } | { ok: false; error: string };

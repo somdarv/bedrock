@@ -12,8 +12,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 /** A board, our side: the same screen as the link, plus closing pins and turning the link off. */
-export default async function AdminBoardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminBoardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ pin?: string }>;
+}) {
   const { id } = await params;
+  const { pin } = await searchParams;
   const user = await requireSession();
 
   let board;
@@ -28,6 +35,7 @@ export default async function AdminBoardPage({ params }: { params: Promise<{ id:
     <BoardView
       side={{ kind: "us", id: board.id, token: board.token, userName: user.name || "SaharaBase", closedAt: board.closedAt }}
       initial={board}
+      openPinId={pin ?? null}
     />
   );
 }
