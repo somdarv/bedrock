@@ -1,6 +1,10 @@
 import type { DocumentAcceptance, DocumentRecord } from "@/lib/documents/registry";
 import type {
+  AdminBoard,
   AdminSession,
+  BoardPinInput,
+  BoardSummary,
+  PublicBoard,
   Brief,
   BriefAnswers,
   BriefPartInput,
@@ -378,6 +382,29 @@ export interface BedrockApi {
     addFile(token: string, file: File, part: string, question: string): Promise<PublicBrief>;
     /** PUBLIC: take back a file, until its part is received. */
     removeFile(token: string, fileId: string): Promise<PublicBrief>;
+  };
+  /**
+   * Boards: drawings with pins and talk, by private link (docs/BOARDS.md). A board is made and
+   * filled on the API server with `boards:create` and `boards:push`; nothing here makes one.
+   */
+  boards: {
+    list(): Promise<BoardSummary[]>;
+    get(id: string): Promise<AdminBoard>;
+    /** One frame's page, read with the admin's session. Works on a board whose link is off. */
+    frame(id: string, frameId: string): Promise<{ html: string; version: number }>;
+    pin(id: string, input: BoardPinInput): Promise<AdminBoard>;
+    reply(id: string, pinId: string, body: string): Promise<AdminBoard>;
+    setDone(id: string, pinId: string, done: boolean): Promise<AdminBoard>;
+    /** Turn the link off, or on again. */
+    setClosed(id: string, closed: boolean): Promise<AdminBoard>;
+    /** PUBLIC: the board behind a link. 404 when the link is off. */
+    open(token: string): Promise<PublicBoard>;
+    /** PUBLIC: one frame's page. */
+    openFrame(token: string, frameId: string): Promise<{ html: string; version: number }>;
+    /** PUBLIC: drop a pin with its first comment, under the name they typed. */
+    publicPin(token: string, input: BoardPinInput & { name: string }): Promise<PublicBoard>;
+    /** PUBLIC: reply under a pin. A reply on a closed pin opens it again. */
+    publicReply(token: string, pinId: string, input: { body: string; name: string }): Promise<PublicBoard>;
   };
 }
 

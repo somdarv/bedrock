@@ -50,6 +50,8 @@ export const api: BedrockApi = {
   contracts: isLive("contracts") || isLive("packages") ? httpApi.contracts : mockApi.contracts,
   // Briefs ride the packages switch too: same admin surface, same API.
   briefs: isLive("briefs") || isLive("packages") ? httpApi.briefs : mockApi.briefs,
+  // Boards ride it as well, for the same reason.
+  boards: isLive("boards") || isLive("packages") ? httpApi.boards : mockApi.boards,
 };
 
 export * from "./contract";

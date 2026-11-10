@@ -1,7 +1,10 @@
 import { ApiError, type BedrockApi, type ContractLink } from "./contract";
 import type { DocumentRecord } from "@/lib/documents/registry";
 import type {
+  AdminBoard,
   AdminSession,
+  BoardSummary,
+  PublicBoard,
   Brief,
   BriefSummary,
   BriefUploadPlan,
@@ -567,6 +570,49 @@ export const httpApi: BedrockApi = {
       request<PublicBrief>(
         `/api/b/${encodeURIComponent(token)}/files/${encodeURIComponent(fileId)}`,
         { method: "DELETE" },
+      ),
+  },
+  boards: {
+    list: () => request<BoardSummary[]>(`/api/admin/boards`),
+    get: (id) => request<AdminBoard>(`/api/admin/boards/${encodeURIComponent(id)}`),
+    frame: (id, frameId) =>
+      request<{ html: string; version: number }>(
+        `/api/admin/boards/${encodeURIComponent(id)}/frames/${encodeURIComponent(frameId)}`,
+      ),
+    pin: (id, input) =>
+      request<AdminBoard>(`/api/admin/boards/${encodeURIComponent(id)}/pins`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    reply: (id, pinId, body) =>
+      request<AdminBoard>(
+        `/api/admin/boards/${encodeURIComponent(id)}/pins/${encodeURIComponent(pinId)}/comments`,
+        { method: "POST", body: JSON.stringify({ body }) },
+      ),
+    setDone: (id, pinId, done) =>
+      request<AdminBoard>(
+        `/api/admin/boards/${encodeURIComponent(id)}/pins/${encodeURIComponent(pinId)}`,
+        { method: "PATCH", body: JSON.stringify({ done }) },
+      ),
+    setClosed: (id, closed) =>
+      request<AdminBoard>(`/api/admin/boards/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ closed }),
+      }),
+    open: (token) => request<PublicBoard>(`/api/boards/${encodeURIComponent(token)}`),
+    openFrame: (token, frameId) =>
+      request<{ html: string; version: number }>(
+        `/api/boards/${encodeURIComponent(token)}/frames/${encodeURIComponent(frameId)}`,
+      ),
+    publicPin: (token, input) =>
+      request<PublicBoard>(`/api/boards/${encodeURIComponent(token)}/pins`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    publicReply: (token, pinId, input) =>
+      request<PublicBoard>(
+        `/api/boards/${encodeURIComponent(token)}/pins/${encodeURIComponent(pinId)}/comments`,
+        { method: "POST", body: JSON.stringify(input) },
       ),
   },
 };

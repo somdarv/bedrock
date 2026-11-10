@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AssetOverviewRow, type BillTo, type Brief, type BriefFile, type BriefPartState, type BriefSummary, type PublicBrief, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AdminBoard, type BoardPinInput, type BoardSummary, type PublicBoard, type AssetOverviewRow, type BillTo, type Brief, type BriefFile, type BriefPartState, type BriefSummary, type PublicBrief, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -2409,7 +2409,174 @@ export const mockApi: BedrockApi = {
       return publicBrief(brief);
     },
   },
+  boards: {
+    async list() {
+      await delay();
+      return mockBoards.map(boardSummary);
+    },
+    async get(id) {
+      await delay();
+      return structuredClone(found(mockBoards.find((b) => b.id === id), "Board"));
+    },
+    async frame(id, frameId) {
+      await delay();
+      return mockFrame(found(mockBoards.find((b) => b.id === id), "Board"), frameId);
+    },
+    async pin(id, input) {
+      await delay();
+      const board = found(mockBoards.find((b) => b.id === id), "Board");
+      dropMockPin(board, input, "us", "SaharaBase");
+      return structuredClone(board);
+    },
+    async reply(id, pinId, body) {
+      await delay();
+      const board = found(mockBoards.find((b) => b.id === id), "Board");
+      replyMock(board, pinId, body, "us", "SaharaBase");
+      return structuredClone(board);
+    },
+    async setDone(id, pinId, done) {
+      await delay();
+      const board = found(mockBoards.find((b) => b.id === id), "Board");
+      const pin = found(board.pins.find((p) => p.id === pinId), "Pin");
+      pin.doneAt = done ? (pin.doneAt ?? new Date().toISOString()) : null;
+      pin.doneBy = done ? (pin.doneBy ?? "SaharaBase") : null;
+      return structuredClone(board);
+    },
+    async setClosed(id, closed) {
+      await delay();
+      const board = found(mockBoards.find((b) => b.id === id), "Board");
+      board.closedAt = closed ? (board.closedAt ?? new Date().toISOString()) : null;
+      return structuredClone(board);
+    },
+    async open(token) {
+      await delay();
+      return publicBoard(openMockBoard(token));
+    },
+    async openFrame(token, frameId) {
+      await delay();
+      return mockFrame(openMockBoard(token), frameId);
+    },
+    async publicPin(token, input) {
+      await delay();
+      const board = openMockBoard(token);
+      dropMockPin(board, input, "client", input.name.trim() || "The client");
+      return publicBoard(board);
+    },
+    async publicReply(token, pinId, input) {
+      await delay();
+      const board = openMockBoard(token);
+      const pin = replyMock(board, pinId, input.body, "client", input.name.trim() || "The client");
+      pin.doneAt = null;
+      pin.doneBy = null;
+      return publicBoard(board);
+    },
+  },
 };
+
+/* ------------------------------------------------------------------- boards */
+
+/** One sample board, so /board/mock-board and the admin list open without the API. */
+const mockFramePages: Record<string, string> = {
+  "home.html": mockPage("Home", "Your classes this week", "#2f6f4f"),
+  "enrol.html": mockPage("Enrol", "Pick a class", "#1c3f6e"),
+  "courses.html": mockPage("Courses", "Three courses", "#7a3d8f"),
+};
+
+function mockPage(title: string, line: string, colour: string) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font:16px system-ui;color:#12110f}header{background:${colour};color:#fff;padding:32px 40px}h1{margin:0;font-size:32px}main{padding:32px 40px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}div{background:#f1efea;border-radius:16px;height:180px}</style></head><body><header><h1>${title}</h1><p>${line}</p></header><main><div></div><div></div><div></div><div></div><div></div><div></div></main></body></html>`;
+}
+
+const mockBoards: AdminBoard[] = [
+  {
+    id: "01JBOARDMOCK000000000000000",
+    token: "mock-board",
+    title: "Laptop layouts, round 2",
+    forName: "Isaac",
+    closedAt: null,
+    pages: [
+      { id: "student", name: "Student" },
+      { id: "admin", name: "Institute admin" },
+    ],
+    notes: [{ x: 0, y: -160, text: "Home and enrolling", page: "student" }],
+    frames: [
+      { id: "01JFRAMEHOME00000000000000", key: "home.html", title: "Home", page: "student", x: 0, y: 0, w: 1280, h: 800, version: 2 },
+      { id: "01JFRAMEENROL0000000000000", key: "enrol.html", title: "Enrol", page: "student", x: 1360, y: 0, w: 1280, h: 800, version: 1 },
+      { id: "01JFRAMECOURSES00000000000", key: "courses.html", title: "Courses", page: "admin", x: 0, y: 0, w: 1280, h: 800, version: 1 },
+    ],
+    pins: [
+      {
+        id: "01JPINMOCK0000000000000001",
+        number: 1,
+        frameId: "01JFRAMEHOME00000000000000",
+        x: 620,
+        y: 90,
+        frameVersion: 1,
+        doneAt: null,
+        doneBy: null,
+        comments: [
+          { id: "c1", side: "client", author: "Isaac", body: "The banner is still too tall on my laptop.", createdAt: "2026-11-10T09:12:00Z" },
+          { id: "c2", side: "us", author: "SaharaBase", body: "Halved it in this version. Is this better?", createdAt: "2026-11-10T10:02:00Z" },
+        ],
+      },
+    ],
+  },
+];
+
+function publicBoard(board: AdminBoard): PublicBoard {
+  const { title, forName, pages, notes, frames, pins } = structuredClone(board);
+  return { title, forName, pages, notes, frames, pins };
+}
+
+function openMockBoard(token: string): AdminBoard {
+  const board = mockBoards.find((b) => b.token === token && !b.closedAt);
+  if (!board) throw new ApiError(404, "Board not found");
+  return board;
+}
+
+function mockFrame(board: AdminBoard, frameId: string) {
+  const frame = found(board.frames.find((f) => f.id === frameId), "Frame");
+  return { html: mockFramePages[frame.key] ?? "<p>No page</p>", version: frame.version };
+}
+
+function dropMockPin(board: AdminBoard, input: BoardPinInput, side: "client" | "us", author: string) {
+  const frame = board.frames.find((f) => f.id === input.frameId);
+  if (!frame) throw new ApiError(422, "That drawing is no longer on this board.");
+  board.pins.push({
+    id: `pin-${Date.now()}`,
+    number: Math.max(0, ...board.pins.map((p) => p.number)) + 1,
+    frameId: frame.id,
+    x: input.x,
+    y: input.y,
+    frameVersion: frame.version,
+    doneAt: null,
+    doneBy: null,
+    comments: [{ id: `c-${Date.now()}`, side, author, body: input.body.trim(), createdAt: new Date().toISOString() }],
+  });
+}
+
+function replyMock(board: AdminBoard, pinId: string, body: string, side: "client" | "us", author: string) {
+  const pin = found(board.pins.find((p) => p.id === pinId), "Pin");
+  pin.comments.push({ id: `c-${Date.now()}`, side, author, body: body.trim(), createdAt: new Date().toISOString() });
+  return pin;
+}
+
+function boardSummary(board: AdminBoard): BoardSummary {
+  const last = board.pins.flatMap((p) => p.comments).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return {
+    id: board.id,
+    title: board.title,
+    forName: board.forName,
+    token: board.token,
+    framesCount: board.frames.length,
+    pinsOpen: board.pins.filter((p) => !p.doneAt).length,
+    pinsDone: board.pins.filter((p) => p.doneAt).length,
+    lastCommentAt: last?.createdAt ?? null,
+    lastCommentSide: last?.side ?? null,
+    lastCommentAuthor: last?.author ?? null,
+    closedAt: board.closedAt,
+    createdAt: "2026-11-10T08:00:00Z",
+  };
+}
 
 /* ------------------------------------------------------------------- briefs */
 

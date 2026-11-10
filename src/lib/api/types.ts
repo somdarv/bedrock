@@ -1264,3 +1264,94 @@ export type BriefUploadPlan =
   | { strategy: "multipart"; id: string; partSize: number; partCount: number; direct: boolean }
   | { strategy: "form" }
   | { strategy: "done"; brief: PublicBrief };
+
+/* ------------------------------------------------------------------- boards */
+
+/** A tab across the top of a board. Frames name the page they sit on. */
+export interface BoardPage {
+  id: string;
+  name: string;
+}
+
+/** A title drawn on the board over a row of frames, in board pixels. */
+export interface BoardNote {
+  x: number;
+  y: number;
+  text: string;
+  page?: string | null;
+}
+
+/** One drawing: a whole web page we wrote, w by h CSS pixels, at x, y on the board. */
+export interface BoardFrame {
+  id: string;
+  key: string;
+  title: string;
+  page: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  version: number;
+}
+
+/** A remark under a pin. "client" came from the link, "us" from the admin. */
+export interface BoardComment {
+  id: string;
+  side: "client" | "us";
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+/** A spot on a frame, in the frame's own pixels, and the talk about it. */
+export interface BoardPin {
+  id: string;
+  number: number;
+  frameId: string;
+  x: number;
+  y: number;
+  /** The frame's version when the pin was dropped. Lower than the frame's now: it was redrawn since. */
+  frameVersion: number;
+  doneAt: string | null;
+  doneBy: string | null;
+  comments: BoardComment[];
+}
+
+/** A board as its private link sees it. Never carries the row id or the token. */
+export interface PublicBoard {
+  title: string;
+  forName: string | null;
+  pages: BoardPage[];
+  notes: BoardNote[];
+  frames: BoardFrame[];
+  pins: BoardPin[];
+}
+
+/** Our side of a board. */
+export interface AdminBoard extends PublicBoard {
+  id: string;
+  token: string;
+  closedAt: string | null;
+}
+
+export interface BoardSummary {
+  id: string;
+  title: string;
+  forName: string | null;
+  token: string;
+  framesCount: number;
+  pinsOpen: number;
+  pinsDone: number;
+  lastCommentAt: string | null;
+  lastCommentSide: "client" | "us" | null;
+  lastCommentAuthor: string | null;
+  closedAt: string | null;
+  createdAt: string;
+}
+
+export interface BoardPinInput {
+  frameId: string;
+  x: number;
+  y: number;
+  body: string;
+}

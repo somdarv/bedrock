@@ -72,6 +72,12 @@ const BriefsIcon = ({ className }: IconProps) => (
     <path d="M8.5 11l1.5 1.5 2.5-3M14 11h2M8.5 16.5h7" />
   </svg>
 );
+const BoardsIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
+    <rect x="3" y="4" width="18" height="14" rx="2" />
+    <path d="M14.5 9.5a2 2 0 1 0-3.4 1.4L12.5 13l1.4-2.1a2 2 0 0 0 .6-1.4zM8 21h8" />
+  </svg>
+);
 const DocumentsIcon = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={s(className)} aria-hidden>
     <path d="M6 2.5h7l5 5V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V3a.5.5 0 0 1 .5-.5Z" />
@@ -120,6 +126,7 @@ const NAV: Item[] = [
   { kind: "link", href: "/admin", label: "Dashboard", Icon: DashboardIcon },
   { kind: "link", href: "/admin/clients", label: "Clients", Icon: ClientsIcon },
   { kind: "link", href: "/admin/briefs", label: "Briefs", Icon: BriefsIcon },
+  { kind: "link", href: "/admin/boards", label: "Boards", Icon: BoardsIcon },
   { kind: "link", href: "/admin/packages", label: "Work Packages", Icon: PackagesIcon, badge: "attention" },
   { kind: "link", href: "/admin/files", label: "Files", Icon: FilesIcon },
   { kind: "link", href: "/admin/invoices", label: "Invoices", Icon: InvoicesIcon },
