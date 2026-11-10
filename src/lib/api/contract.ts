@@ -2,6 +2,8 @@ import type { DocumentAcceptance, DocumentRecord } from "@/lib/documents/registr
 import type {
   AdminBoard,
   AdminSession,
+  BoardMark,
+  BoardMarkInput,
   BoardPinInput,
   BoardSummary,
   PublicBoard,
@@ -405,6 +407,13 @@ export interface BedrockApi {
     publicPin(token: string, input: BoardPinInput & { name: string }): Promise<PublicBoard>;
     /** PUBLIC: reply under a pin. A reply on a closed pin opens it again. */
     publicReply(token: string, pinId: string, input: { body: string; name: string }): Promise<PublicBoard>;
+    /** Make or change a drawing, by the id the browser gave it. */
+    saveMark(id: string, markId: string, input: BoardMarkInput): Promise<BoardMark>;
+    removeMark(id: string, markId: string): Promise<void>;
+    restoreMark(id: string, markId: string): Promise<BoardMark>;
+    publicSaveMark(token: string, markId: string, input: BoardMarkInput & { name: string }): Promise<BoardMark>;
+    publicRemoveMark(token: string, markId: string): Promise<void>;
+    publicRestoreMark(token: string, markId: string): Promise<BoardMark>;
   };
 }
 

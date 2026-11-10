@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { api, ApiError, type AdminBoard, type BoardPinInput, type PublicBoard } from "@/lib/api";
+import { api, ApiError, type AdminBoard, type BoardMark, type BoardMarkInput, type BoardPinInput, type PublicBoard } from "@/lib/api";
 
 /**
  * Boards (docs/BOARDS.md). The link's side writes under the name the person typed; ours under
@@ -60,4 +60,43 @@ export async function setBoardClosed(id: string, closed: boolean) {
   const result = await run<AdminBoard>("The link did not change. Try again.", () => api.boards.setClosed(id, closed));
   revalidatePath("/admin/boards");
   return result;
+}
+
+/* ------------------------------------------------------------------ drawings */
+
+export type MarkResult = { ok: true; mark: BoardMark | null } | { ok: false; error: string };
+
+async function runMark(fallback: string, call: () => Promise<BoardMark | void>): Promise<MarkResult> {
+  try {
+    return { ok: true, mark: (await call()) ?? null };
+  } catch (e) {
+    return { ok: false, error: e instanceof ApiError && e.message && e.status < 500 ? e.message : fallback };
+  }
+}
+
+const NOT_SAVED = "That drawing did not save. Check your internet.";
+
+/** Save a drawing from the link, under the name typed there, or from our side. */
+export async function saveMark(
+  side: { kind: "client"; token: string; name: string } | { kind: "us"; id: string },
+  markId: string,
+  input: BoardMarkInput,
+) {
+  return runMark(NOT_SAVED, () =>
+    side.kind === "us"
+      ? api.boards.saveMark(side.id, markId, input)
+      : api.boards.publicSaveMark(side.token, markId, { ...input, name: side.name }),
+  );
+}
+
+export async function removeMark(side: { kind: "client"; token: string } | { kind: "us"; id: string }, markId: string) {
+  return runMark("That drawing was not removed. Check your internet.", () =>
+    side.kind === "us" ? api.boards.removeMark(side.id, markId) : api.boards.publicRemoveMark(side.token, markId),
+  );
+}
+
+export async function restoreMark(side: { kind: "client"; token: string } | { kind: "us"; id: string }, markId: string) {
+  return runMark("That drawing did not come back. Check your internet.", () =>
+    side.kind === "us" ? api.boards.restoreMark(side.id, markId) : api.boards.publicRestoreMark(side.token, markId),
+  );
 }

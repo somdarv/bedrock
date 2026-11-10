@@ -1,5 +1,5 @@
 import { ApiError, type BedrockApi } from "./contract";
-import { balance, discountOn, effectiveTotal, type ActivityEntry, type AdminBoard, type BoardPinInput, type BoardSummary, type PublicBoard, type AssetOverviewRow, type BillTo, type Brief, type BriefFile, type BriefPartState, type BriefSummary, type PublicBrief, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
+import { balance, discountOn, effectiveTotal, type ActivityEntry, type AdminBoard, type BoardMark, type BoardMarkInput, type BoardPinInput, type BoardSummary, type PublicBoard, type AssetOverviewRow, type BillTo, type Brief, type BriefFile, type BriefPartState, type BriefSummary, type PublicBrief, type Client, type ClientAsset, type Deliverable, type DeliverableFolder, type DeliverableType, type PlanComment, type PlanItem, type FileManifest, type FileSelection, type FileShare, type FileShareInput, type Discountable, type HostingServer, type InfraCharge, type Invoice, type InvoiceItem, type LineItem, type Milestone, type Payment, type ReminderRule, type SavingsState, type SetAside, type SetAsideStatus, type VaultEntryRecord, type VaultKeyRecord, type WorkPackage } from "./types";
 import { nextTransitions, statusMeta } from "@/lib/status";
 import { formatCedis } from "@/lib/utils";
 import { extensionOf, pathTo, typeFromName, withDescendants } from "@/lib/files/tree";
@@ -2470,6 +2470,31 @@ export const mockApi: BedrockApi = {
       pin.doneBy = null;
       return publicBoard(board);
     },
+    async saveMark(id, markId, input) {
+      await delay();
+      return saveMockMark(found(mockBoards.find((b) => b.id === id), "Board"), markId, input, "us", "SaharaBase");
+    },
+    async removeMark(id, markId) {
+      await delay();
+      removeMockMark(found(mockBoards.find((b) => b.id === id), "Board"), markId);
+    },
+    async restoreMark(id, markId) {
+      await delay();
+      return restoreMockMark(found(mockBoards.find((b) => b.id === id), "Board"), markId);
+    },
+    async publicSaveMark(token, markId, input) {
+      await delay();
+      const { name, ...rest } = input;
+      return saveMockMark(openMockBoard(token), markId, rest, "client", name.trim() || "The client");
+    },
+    async publicRemoveMark(token, markId) {
+      await delay();
+      removeMockMark(openMockBoard(token), markId);
+    },
+    async publicRestoreMark(token, markId) {
+      await delay();
+      return restoreMockMark(openMockBoard(token), markId);
+    },
   },
 };
 
@@ -2508,6 +2533,8 @@ const mockBoards: AdminBoard[] = [
         id: "01JPINMOCK0000000000000001",
         number: 1,
         frameId: "01JFRAMEHOME00000000000000",
+        page: "student",
+        anchor: null,
         x: 620,
         y: 90,
         frameVersion: 1,
@@ -2519,12 +2546,42 @@ const mockBoards: AdminBoard[] = [
         ],
       },
     ],
+    marks: [],
   },
 ];
 
 function publicBoard(board: AdminBoard): PublicBoard {
-  const { title, forName, pages, notes, frames, pins } = structuredClone(board);
-  return { title, forName, pages, notes, frames, pins };
+  const { title, forName, pages, notes, frames, pins, marks } = structuredClone(board);
+  return { title, forName, pages, notes, frames, pins, marks };
+}
+
+function saveMockMark(board: AdminBoard, markId: string, input: BoardMarkInput, side: "client" | "us", author: string): BoardMark {
+  const existing = board.marks.find((m) => m.id === markId);
+  const mark: BoardMark = {
+    ...input,
+    id: markId,
+    author: existing?.author ?? author,
+    side: existing?.side ?? side,
+    updatedAt: new Date().toISOString(),
+  };
+  board.marks = [...board.marks.filter((m) => m.id !== markId), mark];
+  removedMockMarks.delete(markId);
+  return structuredClone(mark);
+}
+
+const removedMockMarks = new Map<string, BoardMark>();
+
+function removeMockMark(board: AdminBoard, markId: string) {
+  const mark = board.marks.find((m) => m.id === markId);
+  if (mark) removedMockMarks.set(markId, mark);
+  board.marks = board.marks.filter((m) => m.id !== markId);
+}
+
+function restoreMockMark(board: AdminBoard, markId: string): BoardMark {
+  const mark = found(removedMockMarks.get(markId), "Drawing");
+  board.marks.push(mark);
+  removedMockMarks.delete(markId);
+  return structuredClone(mark);
 }
 
 function openMockBoard(token: string): AdminBoard {
@@ -2539,15 +2596,17 @@ function mockFrame(board: AdminBoard, frameId: string) {
 }
 
 function dropMockPin(board: AdminBoard, input: BoardPinInput, side: "client" | "us", author: string) {
-  const frame = board.frames.find((f) => f.id === input.frameId);
-  if (!frame) throw new ApiError(422, "That drawing is no longer on this board.");
+  const frame = input.frameId ? board.frames.find((f) => f.id === input.frameId) : null;
+  if (input.frameId && !frame) throw new ApiError(422, "That drawing is no longer on this board.");
   board.pins.push({
     id: `pin-${Date.now()}`,
     number: Math.max(0, ...board.pins.map((p) => p.number)) + 1,
-    frameId: frame.id,
+    frameId: frame?.id ?? null,
+    page: frame?.page ?? input.page,
+    anchor: input.anchor,
     x: input.x,
     y: input.y,
-    frameVersion: frame.version,
+    frameVersion: frame?.version ?? 1,
     doneAt: null,
     doneBy: null,
     comments: [{ id: `c-${Date.now()}`, side, author, body: input.body.trim(), createdAt: new Date().toISOString() }],

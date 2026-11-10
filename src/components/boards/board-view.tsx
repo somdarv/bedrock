@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import type { BoardFrame, BoardPin, PublicBoard } from "@/lib/api";
+import type { BoardAnchor, BoardFrame, BoardMark, BoardPin, PublicBoard } from "@/lib/api";
 import { BrandLogo } from "@/components/brand-mark";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -10,32 +10,63 @@ import {
   dropPublicPin,
   loadAdminBoard,
   loadPublicBoard,
+  removeMark,
   replyAdmin,
   replyPublic,
+  restoreMark,
+  saveMark,
   setBoardClosed,
   setPinDone,
   type BoardResult,
+  type MarkResult,
 } from "@/lib/boards/actions";
+import { boxOf, moveBy, toInput, type Rect } from "@/lib/boards/marks";
 import { clamp, draftKey, framesOn, NAME_KEY, pageOf, pinOrder, store } from "@/lib/boards/view";
 import { cn, publicBaseUrl } from "@/lib/utils";
-import { BoardCanvas, Caret, type CanvasHandle, type Spot, type ToScreen, type Tool } from "./board-canvas";
+import {
+  BoardCanvas,
+  Caret,
+  type CanvasHandle,
+  type DrawStyle,
+  type PinPlace,
+  type Selection,
+  type Spot,
+  type ToScreen,
+  type Tool,
+} from "./board-canvas";
 import { AllComments, Avatar, NewCommentCard, ThreadCard, type NameField } from "./board-panel";
+import { Menu, PageMenu, SelectionBar, Toolbar, useOutside } from "./board-toolbar";
 
 /**
- * A board (docs/BOARDS.md), laid out as the Claude design canvas is: a thin top bar, a floating
- * toolbar with the pages, the frames on a grey canvas, comment mode from the top bar, a thread
- * floating beside its pin and every comment in the All comments panel. On a phone the thread
- * and the panel come up as sheets. The same screen serves the private link and our admin; only
- * we resolve a comment or turn the link off.
+ * A board (docs/BOARDS.md), laid out and worked as the Claude design canvas is: a thin top bar,
+ * a floating toolbar with the pages and the drawing tools, the designs on a grey canvas, comment
+ * mode from the top bar, a bar over whatever is selected, a thread floating beside its pin and
+ * every comment in the All comments panel. On a phone the tools sit along the bottom and the
+ * thread and the panel come up as sheets. The same screen serves the private link and our admin;
+ * only we resolve a comment or turn the link off.
  */
 export type BoardSide =
   | { kind: "client"; token: string }
   | { kind: "us"; id: string; token: string; userName: string; closedAt: string | null };
 
-/** How often an open board asks for new comments, so both sides see each other's replies. */
-const POLL_MS = 20_000;
+/** How often an open board asks for new comments and drawings. */
+const POLL_MS = 15_000;
 const PANEL_W = 320;
 const POP_W = 320;
+
+type Step = { before: BoardMark | null; after: BoardMark | null };
+
+const TOOL_KEYS: Record<string, Tool> = {
+  KeyV: "select",
+  KeyH: "hand",
+  KeyT: "text",
+  KeyA: "frame",
+  KeyN: "note",
+  KeyP: "pencil",
+  KeyR: "rect",
+  KeyO: "oval",
+  KeyL: "line",
+};
 
 export function BoardView({ side, initial }: { side: BoardSide; initial: PublicBoard }) {
   const { toast } = useToast();
@@ -43,10 +74,13 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   const canvas = React.useRef<CanvasHandle>(null);
 
   const [board, setBoard] = React.useState(initial);
+  const [marks, setMarks] = React.useState<BoardMark[]>(initial.marks ?? []);
   const [closedAt, setClosedAt] = React.useState(side.kind === "us" ? side.closedAt : null);
   const [page, setPage] = React.useState<string | null>(initial.pages[0]?.id ?? null);
-  const [tool, setTool] = React.useState<"select" | "hand">("select");
-  const [commenting, setCommenting] = React.useState(false);
+  const [tool, setTool] = React.useState<Tool>("select");
+  const [style, setStyle] = React.useState<DrawStyle>({ ink: "#e03131", noteFill: "#ffec99", strokePx: 3 });
+  const [selection, setSelection] = React.useState<Selection>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<Spot | null>(null);
   const [selected, setSelected] = React.useState<string | null>(null);
   const [allOpen, setAllOpen] = React.useState(false);
@@ -75,25 +109,170 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     () => board.notes.filter((n) => board.pages.length === 0 || (n.page ?? board.pages[0].id) === page),
     [board, page],
   );
-  const onPage = new Set(frames.map((f) => f.id));
-  const shownPins = board.pins.filter(
-    (p) => onPage.has(p.frameId) && (!p.doneAt || showResolved || p.id === selected),
-  );
-  const selectedPin = board.pins.find((p) => p.id === selected) ?? null;
-  const openCount = pinOrder(board.pins).open.length;
-  const frameOf = (frameId: string) => board.frames.find((f) => f.id === frameId);
+  const firstPage = board.pages[0]?.id ?? null;
+  const pageMarks = React.useMemo(() => marks.filter((m) => (m.page ?? firstPage) === page), [marks, page, firstPage]);
+  const frameOf = (id: string | null) => (id ? board.frames.find((f) => f.id === id) : undefined);
   const canResolve = side.kind === "us";
-  const activeTool: Tool = commenting ? "comment" : tool;
+  const openCount = pinOrder(board.pins).open.length;
+
+  const sideKind = side.kind;
+  const sideId = side.kind === "us" ? side.id : side.token;
+  const src = React.useCallback(
+    (f: BoardFrame) =>
+      sideKind === "us" ? `/admin/boards/${sideId}/frames/${f.id}?v=${f.version}` : `/board/${sideId}/frames/${f.id}?v=${f.version}`,
+    [sideKind, sideId],
+  );
+
+  /* ------------------------------------------------------------ saving drawings */
+
+  const sideRef = React.useRef(side);
+  sideRef.current = side;
+  const nameRef = React.useRef(typedName);
+  nameRef.current = typedName;
+  const who = () => {
+    const s = sideRef.current;
+    return s.kind === "us" ? ({ kind: "us", id: s.id } as const) : ({ kind: "client", token: s.token } as const);
+  };
+  const whoNamed = () => {
+    const s = sideRef.current;
+    return s.kind === "us"
+      ? ({ kind: "us", id: s.id } as const)
+      : ({ kind: "client", token: s.token, name: nameRef.current || "The client" } as const);
+  };
+
+  // Saves for one drawing run one after another, so a move never lands before the drawing exists.
+  const chains = React.useRef(new Map<string, Promise<unknown>>());
+  const pending = React.useRef(new Map<string, number>());
+  const persist = React.useCallback(
+    (id: string, run: () => Promise<MarkResult>) => {
+      pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
+      const next = (chains.current.get(id) ?? Promise.resolve())
+        .then(run)
+        .then((r) => {
+          if (!r.ok) toast(r.error, "danger");
+        })
+        .catch(() => toast("That drawing did not save. Check your internet.", "danger"))
+        .finally(() => {
+          const left = (pending.current.get(id) ?? 1) - 1;
+          if (left <= 0) pending.current.delete(id);
+          else pending.current.set(id, left);
+        });
+      chains.current.set(id, next);
+    },
+    [toast],
+  );
+
+  const remoteSave = (m: BoardMark) => persist(m.id, () => saveMark(whoNamed(), m.id, toInput(m)));
+  const remoteRemove = (id: string) => persist(id, () => removeMark(who(), id));
+  const remoteRestore = (m: BoardMark) =>
+    persist(m.id, async () => {
+      const back = await restoreMark(who(), m.id);
+      return back.ok ? saveMark(whoNamed(), m.id, toInput(m)) : back;
+    });
+
+  const undoStack = React.useRef<Step[]>([]);
+  const redoStack = React.useRef<Step[]>([]);
+  const [, bump] = React.useState(0);
+
+  const place = (before: BoardMark | null, after: BoardMark | null) =>
+    setMarks((ms) => {
+      const id = after?.id ?? before?.id;
+      const rest = ms.filter((m) => m.id !== id);
+      return after ? [...rest, after] : rest;
+    });
+
+  /** Make, change or remove a drawing, here at once and on the server behind it. */
+  const change = (before: BoardMark | null, after: BoardMark | null, record = true) => {
+    place(before, after);
+    if (after) remoteSave(after);
+    else if (before) remoteRemove(before.id);
+    if (record) {
+      undoStack.current.push({ before, after });
+      if (undoStack.current.length > 200) undoStack.current.shift();
+      redoStack.current = [];
+      bump((n) => n + 1);
+    }
+  };
+
+  const undo = () => {
+    const step = undoStack.current.pop();
+    if (!step) return;
+    place(step.after, step.before);
+    if (step.before && !step.after) remoteRestore(step.before);
+    else if (step.before) remoteSave(step.before);
+    else if (step.after) remoteRemove(step.after.id);
+    redoStack.current.push(step);
+    setSelection(null);
+    bump((n) => n + 1);
+  };
+
+  const redo = () => {
+    const step = redoStack.current.pop();
+    if (!step) return;
+    place(step.before, step.after);
+    if (step.after && !step.before) remoteRestore(step.after);
+    else if (step.after) remoteSave(step.after);
+    else if (step.before) remoteRemove(step.before.id);
+    undoStack.current.push(step);
+    setSelection(null);
+    bump((n) => n + 1);
+  };
+
+  // Text and notes are kept here until their words are in; an empty one is never saved.
+  const fresh = React.useRef(new Set<string>());
+
+  const onCreate = (mark: BoardMark, edit: boolean) => {
+    if (edit) {
+      fresh.current.add(mark.id);
+      place(null, mark);
+      setEditingId(mark.id);
+    } else {
+      change(null, mark);
+    }
+    setSelection({ kind: "mark", id: mark.id });
+    if (tool !== "pencil" && tool !== "pen") setTool("select");
+  };
+
+  const onEdited = (mark: BoardMark, text: string, height: number) => {
+    setEditingId(null);
+    const words = text.replace(/\s+$/, "");
+    const h = mark.kind === "text" ? Math.max(mark.h, height) : mark.h;
+    if (fresh.current.has(mark.id)) {
+      fresh.current.delete(mark.id);
+      if (!words.trim()) {
+        place(mark, null);
+        setSelection(null);
+        return;
+      }
+      change(null, { ...mark, text: words, h });
+      return;
+    }
+    if (!words.trim() && mark.kind === "text") {
+      change(mark, null);
+      setSelection(null);
+      return;
+    }
+    if (words !== mark.text || h !== mark.h) change(mark, { ...mark, text: words, h });
+  };
 
   /* ------------------------------------------------------------ keeping up */
 
-  const kind = side.kind;
-  const key = side.kind === "us" ? side.id : side.token;
+  const editingRef = React.useRef(editingId);
+  editingRef.current = editingId;
   React.useEffect(() => {
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
-      const r = kind === "us" ? await loadAdminBoard(key) : await loadPublicBoard(key);
-      if (r.ok) setBoard(r.board);
+      const r = sideKind === "us" ? await loadAdminBoard(sideId) : await loadPublicBoard(sideId);
+      if (!r.ok) return;
+      setBoard(r.board);
+      // Their drawings come in; ours still saving, and the one being typed in, stay as they are here.
+      setMarks((local) => {
+        const keep = new Set<string>([...pending.current.keys(), ...fresh.current]);
+        if (editingRef.current) keep.add(editingRef.current);
+        const merged = (r.board.marks ?? []).filter((m) => !keep.has(m.id));
+        for (const m of local) if (keep.has(m.id)) merged.push(m);
+        return merged;
+      });
     };
     const timer = window.setInterval(tick, POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && tick();
@@ -102,30 +281,9 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [kind, key]);
+  }, [sideKind, sideId]);
 
-  // The canvas's keys: C comments, V select, H hand, Shift 1 fit, Shift 0 100%, Escape backs out.
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === "Escape") {
-        if (draft) setDraft(null);
-        else if (selected) setSelected(null);
-        else if (commenting) setCommenting(false);
-        else if (allOpen) setAllOpen(false);
-      } else if (e.code === "Digit1" && e.shiftKey) canvas.current?.fit();
-      else if (e.code === "Digit0" && e.shiftKey) canvas.current?.actual();
-      else if (e.key === "c" || e.key === "C") toggleCommenting();
-      else if (e.key === "v" || e.key === "V") pickTool("select");
-      else if (e.key === "h" || e.key === "H") pickTool("hand");
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  /* ------------------------------------------------------------ actions */
+  /* ------------------------------------------------------------ comments */
 
   const take = (r: BoardResult<PublicBoard>): r is { ok: true; board: PublicBoard } => {
     if (!r.ok) {
@@ -136,24 +294,63 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     return true;
   };
 
-  function toggleCommenting() {
-    setCommenting((v) => !v);
-    setDraft(null);
+  /** Where a pin sits on the board. One on a drawing follows the drawing. */
+  const placeOf = (pin: { frameId: string | null; anchor: BoardAnchor | null; x: number; y: number }) => {
+    if (pin.anchor?.kind === "mark") {
+      const markId = pin.anchor.markId;
+      const m = marks.find((x) => x.id === markId);
+      if (m) {
+        const b = boxOf(m);
+        return { x: b.x + b.w, y: b.y };
+      }
+    }
+    if (pin.frameId) {
+      const f = frameOf(pin.frameId);
+      return f ? { x: f.x + pin.x, y: f.y + pin.y } : null;
+    }
+    return { x: pin.x, y: pin.y };
+  };
+
+  /** The box a comment is about, to outline while it is open. */
+  const anchorBox = (frameId: string | null, anchor: BoardAnchor | null): Rect | null => {
+    if (!anchor) return null;
+    if (anchor.kind === "mark") {
+      const m = marks.find((x) => x.id === anchor.markId);
+      return m ? boxOf(m) : null;
+    }
+    const f = frameOf(frameId);
+    if (!f) return null;
+    return anchor.kind === "frame" ? f : { x: f.x + anchor.rect.x, y: f.y + anchor.rect.y, w: anchor.rect.w, h: anchor.rect.h };
+  };
+
+  const isOnPage = (pin: BoardPin) => {
+    if (pin.frameId) {
+      const f = frameOf(pin.frameId);
+      return Boolean(f && pageOf(board, f) === page);
+    }
+    return (pin.page ?? firstPage) === page;
+  };
+
+  const pins: PinPlace[] = [];
+  for (const pin of board.pins) {
+    if (!isOnPage(pin) || (pin.doneAt && !showResolved && pin.id !== selected)) continue;
+    const at = placeOf(pin);
+    if (at) pins.push({ pin, x: at.x, y: at.y });
   }
 
-  function pickTool(t: "select" | "hand") {
-    setTool(t);
-    setCommenting(false);
-    setDraft(null);
-  }
+  const selectedPin = board.pins.find((p) => p.id === selected) ?? null;
+  const highlight = draft ? anchorBox(draft.frameId, draft.anchor) : selectedPin ? anchorBox(selectedPin.frameId, selectedPin.anchor) : null;
 
   const goTo = (pin: BoardPin) => {
-    const frame = frameOf(pin.frameId);
-    if (!frame) return;
-    const target = pageOf(board, frame);
+    const f = frameOf(pin.frameId);
+    const target = f ? pageOf(board, f) : (pin.page ?? firstPage);
     if (target !== page) setPage(target);
-    // After the page has changed and fitted itself.
-    requestAnimationFrame(() => canvas.current?.fitFrame(frame));
+    const box = anchorBox(pin.frameId, pin.anchor) ?? (f ? (f as Rect) : null);
+    const at = placeOf(pin);
+    requestAnimationFrame(() => {
+      if (box && box.w > 0) canvas.current?.fitRect(box);
+      else if (at) canvas.current?.fitRect({ x: at.x - 400, y: at.y - 300, w: 800, h: 600 });
+    });
   };
 
   const openPin = (pin: BoardPin, move: boolean) => {
@@ -165,10 +362,8 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   const sendNew = async (body: string, author: string) => {
     if (!draft) return false;
     setBusy(true);
-    const r =
-      side.kind === "us"
-        ? await dropAdminPin(side.id, { ...draft, body })
-        : await dropPublicPin(side.token, { ...draft, body, name: author });
+    const input = { frameId: draft.frameId, page: draft.page, anchor: draft.anchor, x: draft.x, y: draft.y, body };
+    const r = side.kind === "us" ? await dropAdminPin(side.id, input) : await dropPublicPin(side.token, { ...input, name: author });
     setBusy(false);
     if (!take(r)) return false;
     const newest = r.board.pins.reduce((a, b) => (b.number > a.number ? b : a));
@@ -181,9 +376,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     if (!selected) return false;
     setBusy(true);
     const r =
-      side.kind === "us"
-        ? await replyAdmin(side.id, selected, body)
-        : await replyPublic(side.token, selected, { body, name: author });
+      side.kind === "us" ? await replyAdmin(side.id, selected, body) : await replyPublic(side.token, selected, { body, name: author });
     setBusy(false);
     return take(r);
   };
@@ -208,6 +401,144 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     }
   };
 
+  /** A comment on whatever is selected: a drawing, a block of a design, or a whole design. */
+  const commentOnSelection = () => {
+    if (!selection) return;
+    if (selection.kind === "mark") {
+      const m = marks.find((x) => x.id === selection.id);
+      if (!m) return;
+      const b = boxOf(m);
+      setDraft({ frameId: null, page: m.page ?? firstPage, x: b.x + b.w, y: b.y, anchor: { kind: "mark", markId: m.id } });
+    } else {
+      const f = frameOf(selection.frameId);
+      if (!f) return;
+      if (selection.kind === "frame") {
+        setDraft({ frameId: f.id, page: f.page, x: f.w, y: 0, anchor: { kind: "frame" } });
+      } else {
+        const r = selection.rect;
+        setDraft({
+          frameId: f.id,
+          page: f.page,
+          x: clamp(r.x + r.w, 0, f.w),
+          y: clamp(r.y, 0, f.h),
+          anchor: { kind: "element", rect: r, path: selection.path, label: selection.label },
+        });
+      }
+    }
+    setSelected(null);
+    // The comment takes over from the selection, as on the Claude canvas.
+    setSelection(null);
+  };
+
+  const selectionBox = (): Rect | null => {
+    if (!selection) return null;
+    if (selection.kind === "mark") {
+      const m = marks.find((x) => x.id === selection.id);
+      return m ? boxOf(m) : null;
+    }
+    const f = frameOf(selection.frameId);
+    if (!f) return null;
+    return selection.kind === "frame" ? f : { x: f.x + selection.rect.x, y: f.y + selection.rect.y, w: selection.rect.w, h: selection.rect.h };
+  };
+
+  const zoomToSelection = () => {
+    const b = selectionBox();
+    if (b) canvas.current?.fitRect(b);
+  };
+
+  const removeSelected = () => {
+    if (selection?.kind !== "mark") return;
+    const m = marks.find((x) => x.id === selection.id);
+    if (m) change(m, null);
+    setSelection(null);
+  };
+
+  function pickTool(t: Tool) {
+    setTool(t);
+    setDraft(null);
+    if (t !== "select") setSelection(null);
+  }
+
+  /* ------------------------------------------------------------ keys */
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const mod = e.ctrlKey || e.metaKey;
+
+      if (mod && e.code === "KeyZ") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (mod && e.code === "KeyY") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+      if (mod && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        canvas.current?.zoomBy(1.25);
+        return;
+      }
+      if (mod && e.key === "-") {
+        e.preventDefault();
+        canvas.current?.zoomBy(0.8);
+        return;
+      }
+      if (mod || e.altKey) return;
+
+      if (e.key === "Escape") {
+        if (draft) setDraft(null);
+        else if (selected) setSelected(null);
+        else if (selection?.kind === "element" && selection.depth > 0) setSelection({ ...selection, depth: selection.depth - 1 });
+        else if (selection) setSelection(null);
+        else if (tool !== "select") setTool("select");
+        else if (allOpen) setAllOpen(false);
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selection?.kind === "mark") {
+        e.preventDefault();
+        removeSelected();
+        return;
+      }
+      if (e.key === "Enter" && selection?.kind === "mark") {
+        const m = marks.find((x) => x.id === selection.id);
+        if (m && (m.kind === "text" || m.kind === "note")) {
+          e.preventDefault();
+          setEditingId(m.id);
+        }
+        return;
+      }
+      if (e.shiftKey && e.code === "Digit1") return void canvas.current?.fit();
+      if (e.shiftKey && e.code === "Digit2") return void zoomToSelection();
+      if (e.shiftKey && e.code === "Digit0") return void canvas.current?.zoomTo(1);
+      if (e.key.startsWith("Arrow") && selection?.kind === "mark") {
+        const m = marks.find((x) => x.id === selection.id);
+        if (!m) return;
+        e.preventDefault();
+        const step = (e.shiftKey ? 10 : 1) / (canvas.current?.zoom() ?? 1);
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        change(m, moveBy(m, dx, dy));
+        return;
+      }
+      if (e.code === "KeyC" && !e.shiftKey) {
+        if (selection) commentOnSelection();
+        else pickTool(tool === "comment" ? "select" : "comment");
+        return;
+      }
+      if (e.shiftKey && e.code === "KeyP") return void pickTool("pen");
+      if (e.shiftKey && e.code === "KeyL") return void pickTool("arrow");
+      const next = TOOL_KEYS[e.code];
+      if (next && !e.shiftKey) pickTool(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   /* ------------------------------------------------------------ what floats */
 
   const thread = selectedPin ? (
@@ -226,13 +557,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   ) : null;
 
   const composer = draft ? (
-    <NewCommentCard
-      draftKey={draftKey(side.token, null)}
-      name={name}
-      busy={busy}
-      onSend={sendNew}
-      onCancel={() => setDraft(null)}
-    />
+    <NewCommentCard draftKey={draftKey(side.token, null)} name={name} busy={busy} onSend={sendNew} onCancel={() => setDraft(null)} />
   ) : null;
 
   const all = (
@@ -251,15 +576,13 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     />
   );
 
-  // On a laptop the thread or the new comment floats beside its spot, out of the panel's way.
+  // On a laptop the thread or the new comment floats beside its pin, out of the panel's way.
   const overlay = (toScreen: ToScreen, size: { w: number; h: number }) => {
     if (!wide) return null;
-    const spot = draft ?? (selectedPin ? { frameId: selectedPin.frameId, x: selectedPin.x, y: selectedPin.y } : null);
+    const at = draft ? placeOf({ frameId: draft.frameId, anchor: null, x: draft.x, y: draft.y }) : selectedPin ? placeOf(selectedPin) : null;
     const body = draft ? composer : thread;
-    if (!spot || !body) return null;
-    const frame = frameOf(spot.frameId);
-    if (!frame) return null;
-    const p = toScreen(frame.x + spot.x, frame.y + spot.y);
+    if (!at || !body) return null;
+    const p = toScreen(at.x, at.y);
     const right = size.w - (allOpen ? PANEL_W + 12 : 0);
     let left = p.x + 30;
     if (left + POP_W > right - 12) left = p.x - POP_W - 14;
@@ -268,17 +591,51 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     return (
       <div
         data-float
-        className="absolute z-20 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
+        className="absolute z-30 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
         style={{ left, top, width: POP_W, maxHeight: size.h - top - 12 }}
-        onClick={(e) => e.stopPropagation()}
       >
         {body}
       </div>
     );
   };
 
-  const empty = board.frames.length === 0;
+  const selectedMark = selection?.kind === "mark" ? (marks.find((m) => m.id === selection.id) ?? null) : null;
+  const selectionBar = (rect: Rect, zoom: number) => (
+    <SelectionBar
+      rect={rect}
+      mark={selectedMark}
+      zoom={zoom}
+      label={
+        selection?.kind === "element" ? selection.label : selection?.kind === "frame" ? (frameOf(selection.frameId)?.title ?? null) : null
+      }
+      onComment={commentOnSelection}
+      onZoom={zoomToSelection}
+      onStyle={(patch) => {
+        if (!selectedMark) return;
+        change(selectedMark, { ...selectedMark, ...patch });
+        const colour = patch.color;
+        if (colour) setStyle((s) => (selectedMark.kind === "note" ? { ...s, noteFill: colour } : { ...s, ink: colour }));
+      }}
+      onRemove={removeSelected}
+    />
+  );
+
+  const empty = board.frames.length === 0 && marks.length === 0;
   const phoneSheet = !wide ? (draft ? "new" : selectedPin ? "thread" : allOpen ? "all" : null) : null;
+
+  const pageMenu =
+    board.pages.length > 0 ? (
+      <PageMenu
+        pages={board.pages}
+        page={page}
+        onPage={(id) => {
+          setPage(id);
+          setDraft(null);
+          setSelected(null);
+          setSelection(null);
+        }}
+      />
+    ) : null;
 
   /* ------------------------------------------------------------ the screen */
 
@@ -311,17 +668,15 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
         )}
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {name.value ? <Avatar name={name.value} side={side.kind === "us" ? "us" : "client"} /> : null}
-          {!empty ? (
-            <CommentMenu
-              active={commenting}
-              openCount={openCount}
-              onToggle={toggleCommenting}
-              onShowAll={() => {
-                setAllOpen(true);
-                setDraft(null);
-              }}
-            />
-          ) : null}
+          <CommentMenu
+            active={tool === "comment"}
+            openCount={openCount}
+            onToggle={() => pickTool(tool === "comment" ? "select" : "comment")}
+            onShowAll={() => {
+              setAllOpen(true);
+              setDraft(null);
+            }}
+          />
         </div>
       </header>
 
@@ -332,78 +687,79 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       ) : null}
 
       <div className="relative min-h-0 flex-1">
+        <BoardCanvas
+          ref={canvas}
+          frames={frames}
+          marks={pageMarks}
+          notes={notes}
+          page={page}
+          fitKey={page ?? ""}
+          tool={tool}
+          style={style}
+          selection={selection}
+          onSelect={(s) => {
+            setSelection(s);
+            if (s) setSelected(null);
+          }}
+          editingId={editingId}
+          onEdit={setEditingId}
+          onEdited={onEdited}
+          onCreate={onCreate}
+          onCommit={(before, after) => change(before, after)}
+          pins={pins}
+          selectedPinId={selected}
+          highlight={highlight}
+          draft={draft}
+          onSelectPin={(id) => {
+            const pin = board.pins.find((p) => p.id === id);
+            if (pin) openPin(pin, false);
+            setSelection(null);
+          }}
+          onComment={(spot) => {
+            setSelected(null);
+            setDraft(spot);
+          }}
+          onBackground={() => {
+            setDraft(null);
+            setSelected(null);
+          }}
+          insetRight={wide && allOpen ? PANEL_W + 12 : 0}
+          src={src}
+          author={{ name: name.value || "The client", side: side.kind === "us" ? "us" : "client" }}
+          zoomMenu={{
+            canUndo: undoStack.current.length > 0,
+            canRedo: redoStack.current.length > 0,
+            onUndo: undo,
+            onRedo: redo,
+            zoomToSelection,
+          }}
+          overlay={overlay}
+          selectionBar={tool === "select" ? selectionBar : undefined}
+        />
+
         {empty ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center">
             <div>
               <p className="font-display text-lg font-semibold">Nothing is on this board yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">The drawings appear here when we add them.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Draw on it, or wait for the designs we add.</p>
             </div>
-          </div>
-        ) : (
-          <BoardCanvas
-            ref={canvas}
-            frames={frames}
-            notes={notes}
-            fitKey={page ?? ""}
-            tool={activeTool}
-            pins={shownPins}
-            selectedId={selected}
-            draft={draft}
-            insetRight={wide && allOpen ? PANEL_W + 12 : 0}
-            onSpot={(spot) => {
-              setSelected(null);
-              setDraft(spot);
-            }}
-            onSelectPin={(id) => {
-              const pin = board.pins.find((p) => p.id === id);
-              if (pin) openPin(pin, false);
-            }}
-            onBackground={() => {
-              setDraft(null);
-              setSelected(null);
-            }}
-            src={(f: BoardFrame) =>
-              side.kind === "us"
-                ? `/admin/boards/${side.id}/frames/${f.id}?v=${f.version}`
-                : `/board/${side.token}/frames/${f.id}?v=${f.version}`
-            }
-            overlay={overlay}
-          />
-        )}
-
-        {!empty && (board.pages.length > 0 || wide) ? (
-          <div
-            data-float
-            className="absolute left-3 top-3 z-10 flex h-10 items-center gap-0.5 rounded-xl border border-black/10 bg-surface px-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-          >
-            {board.pages.length > 0 ? (
-              <PageMenu
-                pages={board.pages}
-                page={page}
-                onPage={(id) => {
-                  setPage(id);
-                  setDraft(null);
-                  setSelected(null);
-                }}
-              />
-            ) : null}
-            {wide ? (
-              <>
-                {board.pages.length > 0 ? <span className="mx-1 h-5 w-px bg-border" aria-hidden /> : null}
-                <ToolButton label="Select (V)" active={activeTool === "select"} onClick={() => pickTool("select")}>
-                  <path d="M6 4l12 7-5.5 1.5L10 18z" fill="currentColor" stroke="none" />
-                </ToolButton>
-                <ToolButton label="Hand (H)" active={activeTool === "hand"} onClick={() => pickTool("hand")}>
-                  <path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 10V5a1.5 1.5 0 0 1 3 0v5M14 10V6.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-.5a5 5 0 0 1-4-2L4 14.5a1.5 1.5 0 0 1 2.3-2L8 14" />
-                </ToolButton>
-              </>
-            ) : null}
           </div>
         ) : null}
 
-        {!wide && commenting && !draft ? (
+        <Toolbar tool={tool} onTool={pickTool} compact={!wide} pageMenu={pageMenu} />
+
+        {!wide && pageMenu ? (
+          <div
+            data-float
+            className="absolute left-3 top-3 z-10 flex h-11 items-center rounded-xl border border-black/10 bg-surface px-1 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+          >
+            {pageMenu}
+          </div>
+        ) : null}
+
+        {!wide && tool === "comment" && !draft ? (
           <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-white">
-            Tap a spot on a drawing
+            Tap a spot to comment
           </div>
         ) : null}
 
@@ -443,7 +799,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   );
 }
 
-/* ------------------------------------------------------------------ the bars */
+/* ------------------------------------------------------------------ the top bar */
 
 function CommentMenu({
   active,
@@ -464,21 +820,15 @@ function CommentMenu({
         type="button"
         onClick={onToggle}
         aria-pressed={active}
-        aria-label={active ? "Stop commenting (C)" : "Comment (C)"}
-        title={active ? "Stop commenting (C)" : "Comment (C)"}
+        aria-label={active ? "Stop commenting C" : "Comment C"}
+        title={active ? "Stop commenting C" : "Comment C"}
         className={cn(
           "flex h-8 w-8 items-center justify-center rounded-md",
           active ? "bg-[#e5eefc] text-[#2f6fdf]" : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
       >
         <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden>
-          <path
-            d="M4 20V12a8 8 0 1 1 8 8z"
-            fill={active ? "currentColor" : "none"}
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinejoin="round"
-          />
+          <path d="M4 20V12a8 8 0 1 1 8 8z" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
         </svg>
       </button>
       <button
@@ -492,7 +842,7 @@ function CommentMenu({
         <Caret />
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 top-10 z-50 w-56 rounded-xl border border-black/10 bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+        <Menu className="right-0 top-10 w-56">
           <button
             type="button"
             role="menuitem"
@@ -503,62 +853,9 @@ function CommentMenu({
             className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm hover:bg-muted"
           >
             Show all comments
-            <span className="tabular-nums text-xs text-subtle">{openCount} open</span>
+            <span className="text-xs tabular-nums text-subtle">{openCount} open</span>
           </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function PageMenu({
-  pages,
-  page,
-  onPage,
-}: {
-  pages: { id: string; name: string }[];
-  page: string | null;
-  onPage: (id: string) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const wrap = useOutside<HTMLDivElement>(open, () => setOpen(false));
-  const current = pages.find((p) => p.id === page) ?? pages[0];
-  return (
-    <div ref={wrap} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex h-8 max-w-[14rem] items-center gap-1.5 rounded-lg px-2 text-[15px] hover:bg-muted"
-      >
-        <span className="text-xs tabular-nums text-subtle">{pages.length}</span>
-        <span className="min-w-0 truncate">{current?.name}</span>
-        <Caret />
-      </button>
-      {open ? (
-        <div role="menu" className="absolute left-0 top-10 z-50 w-60 rounded-xl border border-black/10 bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-          {pages.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={p.id === current?.id}
-              onClick={() => {
-                onPage(p.id);
-                setOpen(false);
-              }}
-              className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-[15px] hover:bg-muted"
-            >
-              <span className="truncate">{p.name}</span>
-              {p.id === current?.id ? (
-                <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#2f6fdf]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M5 12.5l4.5 4.5L19 7.5" />
-                </svg>
-              ) : null}
-            </button>
-          ))}
-        </div>
+        </Menu>
       ) : null}
     </div>
   );
@@ -602,7 +899,7 @@ function TitleMenu({
         <Caret />
       </button>
       {open ? (
-        <div role="menu" className="absolute left-0 top-10 z-50 w-60 rounded-xl border border-black/10 bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+        <Menu className="left-0 top-10 w-60">
           <button type="button" role="menuitem" onClick={copy} className="flex h-9 w-full items-center rounded-md px-3 text-left text-sm hover:bg-muted">
             {copied ? "Link copied" : "Copy the link"}
           </button>
@@ -618,56 +915,10 @@ function TitleMenu({
           >
             {closed ? "Turn the link on" : "Turn the link off"}
           </button>
-        </div>
+        </Menu>
       ) : null}
     </div>
   );
-}
-
-function ToolButton({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-lg",
-        active ? "bg-[#e5eefc] text-[#2f6fdf]" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        {children}
-      </svg>
-    </button>
-  );
-}
-
-/* ------------------------------------------------------------------ hooks */
-
-/** Close a menu when a press lands outside it. */
-function useOutside<T extends HTMLElement>(active: boolean, close: () => void) {
-  const ref = React.useRef<T>(null);
-  React.useEffect(() => {
-    if (!active) return;
-    const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) close();
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [active, close]);
-  return ref;
 }
 
 /** A media query's answer, or null until the browser has said. */
@@ -682,4 +933,3 @@ function useMedia(query: string): boolean | null {
   }, [query]);
   return match;
 }
-

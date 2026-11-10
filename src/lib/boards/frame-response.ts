@@ -1,14 +1,18 @@
 /**
  * A frame's page, as the hub serves it to the board (docs/BOARDS.md). We wrote the page, but it
- * is still shown as if a stranger had: the board puts it in a frame with `sandbox` set and no
- * permissions, and this header says the same to a browser that opens the address on its own.
- * No script runs, nothing can be sent anywhere, and only the hub may frame it.
+ * is still shown as if a stranger had: the board puts it in a frame with `sandbox` set and only
+ * `allow-same-origin`, and this header says the same to a browser that opens the address on its
+ * own. No script runs, nothing can be sent anywhere, and only the hub may frame it.
+ *
+ * `allow-same-origin` lets the board read the page's layout to find the block under the pointer
+ * (lib/boards/inspect.ts). It is safe only because scripts stay off: never add `allow-scripts`
+ * beside it, or a page could reach the hub as the person viewing it.
  *
  * Pictures may come from anywhere over https or be written into the page. Styles and fonts may
  * come from Google Fonts. Everything else is refused.
  */
 const FRAME_POLICY = [
-  "sandbox",
+  "sandbox allow-same-origin",
   "default-src 'none'",
   "img-src data: blob: https:",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",

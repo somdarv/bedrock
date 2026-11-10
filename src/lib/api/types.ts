@@ -1303,11 +1303,25 @@ export interface BoardComment {
   createdAt: string;
 }
 
-/** A spot on a frame, in the frame's own pixels, and the talk about it. */
+/**
+ * What a comment is about when it is more than a spot: one block inside a frame (its box in the
+ * frame's pixels, its path and a few of its words), a whole frame, or one drawing.
+ */
+export type BoardAnchor =
+  | { kind: "element"; rect: { x: number; y: number; w: number; h: number }; path: string; label: string }
+  | { kind: "frame" }
+  | { kind: "mark"; markId: string };
+
+/**
+ * A spot and the talk about it. On a frame, x and y are the frame's own pixels; on the canvas
+ * (no frame) they are board pixels on `page`.
+ */
 export interface BoardPin {
   id: string;
   number: number;
-  frameId: string;
+  frameId: string | null;
+  page: string | null;
+  anchor: BoardAnchor | null;
   x: number;
   y: number;
   /** The frame's version when the pin was dropped. Lower than the frame's now: it was redrawn since. */
@@ -1325,7 +1339,36 @@ export interface PublicBoard {
   notes: BoardNote[];
   frames: BoardFrame[];
   pins: BoardPin[];
+  marks: BoardMark[];
 }
+
+export type BoardMarkKind = "text" | "note" | "frame" | "pencil" | "pen" | "rect" | "oval" | "arrow" | "line";
+
+/**
+ * Something drawn on a board. Its box is x, y, w, h in board pixels; a line's shape is `points`
+ * ([x0, y0, x1, y1, ...]) from x, y. The browser makes the id.
+ */
+export interface BoardMark {
+  id: string;
+  page: string | null;
+  kind: BoardMarkKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  points: number[] | null;
+  color: string;
+  stroke: number | null;
+  fontSize: number | null;
+  text: string | null;
+  z: number;
+  author: string;
+  side: "client" | "us";
+  updatedAt: string | null;
+}
+
+/** What is sent to save a drawing. Who made it is the server's to say. */
+export type BoardMarkInput = Omit<BoardMark, "id" | "author" | "side" | "updatedAt">;
 
 /** Our side of a board. */
 export interface AdminBoard extends PublicBoard {
@@ -1350,7 +1393,9 @@ export interface BoardSummary {
 }
 
 export interface BoardPinInput {
-  frameId: string;
+  frameId: string | null;
+  page: string | null;
+  anchor: BoardAnchor | null;
   x: number;
   y: number;
   body: string;

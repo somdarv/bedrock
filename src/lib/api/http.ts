@@ -3,6 +3,7 @@ import type { DocumentRecord } from "@/lib/documents/registry";
 import type {
   AdminBoard,
   AdminSession,
+  BoardMark,
   BoardSummary,
   PublicBoard,
   Brief,
@@ -613,6 +614,36 @@ export const httpApi: BedrockApi = {
       request<PublicBoard>(
         `/api/boards/${encodeURIComponent(token)}/pins/${encodeURIComponent(pinId)}/comments`,
         { method: "POST", body: JSON.stringify(input) },
+      ),
+    saveMark: (id, markId, input) =>
+      request<BoardMark>(`/api/admin/boards/${encodeURIComponent(id)}/marks/${encodeURIComponent(markId)}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    removeMark: async (id, markId) => {
+      await request<unknown>(`/api/admin/boards/${encodeURIComponent(id)}/marks/${encodeURIComponent(markId)}`, {
+        method: "DELETE",
+      });
+    },
+    restoreMark: (id, markId) =>
+      request<BoardMark>(
+        `/api/admin/boards/${encodeURIComponent(id)}/marks/${encodeURIComponent(markId)}/restore`,
+        { method: "POST" },
+      ),
+    publicSaveMark: (token, markId, input) =>
+      request<BoardMark>(`/api/boards/${encodeURIComponent(token)}/marks/${encodeURIComponent(markId)}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    publicRemoveMark: async (token, markId) => {
+      await request<unknown>(`/api/boards/${encodeURIComponent(token)}/marks/${encodeURIComponent(markId)}`, {
+        method: "DELETE",
+      });
+    },
+    publicRestoreMark: (token, markId) =>
+      request<BoardMark>(
+        `/api/boards/${encodeURIComponent(token)}/marks/${encodeURIComponent(markId)}/restore`,
+        { method: "POST" },
       ),
   },
 };

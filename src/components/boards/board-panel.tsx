@@ -169,12 +169,20 @@ function CommentCard({
         <ResolveTick done={Boolean(pin.doneAt)} enabled={canResolve} onChange={onResolve} />
       </div>
       <p className="mt-2 line-clamp-4 whitespace-pre-wrap break-words text-[15px] leading-snug">{first.body}</p>
-      <p className="mt-2 text-xs text-muted-foreground">
-        {frame?.title ?? "A removed drawing"}
+      <p className="mt-2 truncate text-xs text-muted-foreground">
+        {where(pin, frame)}
         {replies > 0 ? ` · ${replies} ${replies === 1 ? "reply" : "replies"}` : ""}
       </p>
     </div>
   );
+}
+
+/** Where a comment sits, in a few words: the design and the block, or the canvas. */
+function where(pin: BoardPin, frame: BoardFrame | undefined) {
+  const on = pin.frameId ? (frame?.title ?? "A removed design") : "On the canvas";
+  if (pin.anchor?.kind === "element" && pin.anchor.label) return `${on}, "${pin.anchor.label.slice(0, 40)}"`;
+  if (pin.anchor?.kind === "mark") return `${on}, on a drawing`;
+  return on;
 }
 
 /** A tick in a circle: filled when resolved. Only our side can press it. */
@@ -259,7 +267,8 @@ export function ThreadCard({
             <p className="mt-1.5 whitespace-pre-wrap break-words text-[15px] leading-relaxed">{c.body}</p>
           </div>
         ))}
-        {redrawn ? <p className="mt-3 text-xs text-warning">Left on an earlier version of this drawing.</p> : null}
+        <p className="mt-3 text-xs text-muted-foreground">{where(pin, frame)}</p>
+        {redrawn ? <p className="mt-1 text-xs text-warning">Left on an earlier version of this design.</p> : null}
         {pin.doneAt ? (
           <p className="mt-3 text-xs text-muted-foreground">Resolved by {pin.doneBy ?? "SaharaBase"}.</p>
         ) : null}
