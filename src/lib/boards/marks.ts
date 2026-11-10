@@ -239,6 +239,77 @@ export function markName(m: BoardMark): string {
     arrow: "Arrow",
     line: "Line",
   };
-  const words = m.text?.trim().replace(/\s+/g, " ").slice(0, 40);
+  const words = plainText(m.text).trim().replace(/\s+/g, " ").slice(0, 40);
   return words ? `${names[m.kind]}: ${words}` : names[m.kind];
+}
+
+/* ------------------------------------------------------------------ several at once */
+
+/** The box round several drawings. */
+export function unionBox(ms: BoardMark[]): Rect | null {
+  if (ms.length === 0) return null;
+  let x = Infinity;
+  let y = Infinity;
+  let r = -Infinity;
+  let b = -Infinity;
+  for (const m of ms) {
+    const o = boxOf(m);
+    x = Math.min(x, o.x);
+    y = Math.min(y, o.y);
+    r = Math.max(r, o.x + o.w);
+    b = Math.max(b, o.y + o.h);
+  }
+  return { x, y, w: r - x, h: b - y };
+}
+
+export function overlaps(a: Rect, b: Rect) {
+  return a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h;
+}
+
+/** A box from two corners, either way round. */
+export function between(ax: number, ay: number, bx: number, by: number): Rect {
+  return { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) };
+}
+
+/* ------------------------------------------------------------------ words */
+
+/**
+ * Words in text and notes keep their bold as **two stars** either side, so a drawing stays
+ * plain text on the server and in `boards:comments`. These read and write that.
+ */
+export type Run = { text: string; bold: boolean };
+
+export function runs(text: string): Run[] {
+  const out: Run[] = [];
+  for (const part of text.split(/(\*\*[\s\S]+?\*\*)/g)) {
+    if (!part) continue;
+    const bold = part.length > 4 && part.startsWith("**") && part.endsWith("**");
+    out.push({ text: bold ? part.slice(2, -2) : part, bold });
+  }
+  return out;
+}
+
+export function fromRuns(rs: Run[]): string {
+  return rs
+    .map((r) => (r.bold && r.text.trim() ? `**${r.text}**` : r.text))
+    .join("")
+    .replace(/\*\*\*\*/g, "");
+}
+
+export const plainText = (text: string | null) => (text ?? "").replace(/\*\*/g, "");
+
+/** Bold all of it, or none of it when all of it is bold already. */
+export function toggleBoldAll(text: string): string {
+  const rs = runs(text).filter((r) => r.text);
+  const allBold = rs.length > 0 && rs.every((r) => r.bold || !r.text.trim());
+  const plain = rs.map((r) => r.text).join("");
+  return allBold ? plain : fromRuns([{ text: plain, bold: true }]);
+}
+
+/** Text sizes a drawing steps through, in board pixels at 100%. */
+export const TEXT_SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 120, 160, 200, 280, 400];
+
+export function stepSize(size: number, dir: 1 | -1): number {
+  if (dir > 0) return TEXT_SIZES.find((s) => s > size + 0.5) ?? Math.round(size * 1.25);
+  return [...TEXT_SIZES].reverse().find((s) => s < size - 0.5) ?? Math.max(4, Math.round(size / 1.25));
 }

@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import type { BoardMark } from "@/lib/api";
-import { absPoints, arrowHead, smoothPath } from "@/lib/boards/marks";
+import { absPoints, arrowHead, fromRuns, runs, smoothPath, type Run } from "@/lib/boards/marks";
 
 /**
  * How each drawing looks, in board pixels inside the canvas's moving layer (docs/BOARDS.md).
- * Text and notes are edited in place: the words become a text box of the same size and face.
+ * Text and notes are edited in place, in a box that shows bold as bold: select words and press
+ * Ctrl B, or the B on the bar above. Their words are kept with **two stars** round what is bold.
  */
 export const MarkView = React.memo(function MarkView({
   mark,
@@ -15,8 +16,8 @@ export const MarkView = React.memo(function MarkView({
 }: {
   mark: BoardMark;
   editing: boolean;
-  /** Called once when editing ends, with the words and the height they now take. */
-  onEdited: (text: string, height: number) => void;
+  /** Called once when editing ends, with the words, the height they take and the text size. */
+  onEdited: (text: string, height: number, fontSize: number) => void;
 }) {
   const m = mark;
   const stroke = m.stroke ?? 2;
@@ -50,7 +51,7 @@ export const MarkView = React.memo(function MarkView({
       <EditText mark={m} style={box} onDone={onEdited} />
     ) : (
       <div className="absolute overflow-hidden whitespace-pre-wrap break-words" style={box}>
-        {m.text || (note ? "" : " ")}
+        <RichText text={m.text ?? ""} />
       </div>
     );
   }
@@ -80,6 +81,23 @@ export const MarkView = React.memo(function MarkView({
   );
 });
 
+/** Words with their bold. React escapes every word, so nothing typed can become markup. */
+export function RichText({ text }: { text: string }) {
+  return (
+    <>
+      {runs(text).map((r, i) =>
+        r.bold ? (
+          <strong key={i} className="font-bold">
+            {r.text}
+          </strong>
+        ) : (
+          <React.Fragment key={i}>{r.text}</React.Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
 function Arrow({
   tail,
   tip,
@@ -98,7 +116,15 @@ function Arrow({
   );
 }
 
-/** Words being typed into a text or a note. Leaving the box, or Escape, ends it. */
+/** The event the format bar sends to the box being typed in. */
+export type FormatEvent = CustomEvent<{ size: number }>;
+export const FORMAT_EVENT = "board-format";
+
+/**
+ * Words being typed into a text or a note. Leaving the box, Escape or Ctrl Enter ends it. The
+ * box is filled once from the words and read back once at the end; React does not own what is
+ * inside it while it is open.
+ */
 function EditText({
   mark,
   style,
@@ -106,50 +132,115 @@ function EditText({
 }: {
   mark: BoardMark;
   style: React.CSSProperties;
-  onDone: (text: string, height: number) => void;
+  onDone: (text: string, height: number, fontSize: number) => void;
 }) {
-  const [text, setText] = React.useState(mark.text ?? "");
-  const area = React.useRef<HTMLTextAreaElement>(null);
+  const box = React.useRef<HTMLDivElement>(null);
+  const [size, setSize] = React.useState(mark.fontSize ?? 20);
+  const sizeRef = React.useRef(size);
+  sizeRef.current = size;
   const done = React.useRef(false);
 
-  React.useLayoutEffect(() => {
-    const el = area.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, mark.kind === "note" ? mark.h : 0)}px`;
-  }, [text, mark.kind, mark.h]);
+  const finish = React.useCallback(() => {
+    const el = box.current;
+    if (done.current || !el) return;
+    done.current = true;
+    onDone(toMarkdown(el).replace(/\s+$/, ""), el.scrollHeight, sizeRef.current);
+  }, [onDone]);
 
-  React.useEffect(() => {
-    const el = area.current;
+  React.useLayoutEffect(() => {
+    const el = box.current;
     if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    el.replaceChildren(...toNodes(mark.text ?? ""));
+    // Focus without letting the browser scroll the canvas to show the box.
+    el.focus({ preventScroll: true });
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    const onFormat = (e: Event) => setSize((e as FormatEvent).detail.size);
+    el.addEventListener(FORMAT_EVENT, onFormat);
+    // Editing ends on blur alone. The canvas blurs the box before it acts on any press, so the
+    // words are read back before the box goes.
+    return () => el.removeEventListener(FORMAT_EVENT, onFormat);
+    // Filled once, when editing starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const finish = () => {
-    if (done.current) return;
-    done.current = true;
-    onDone(text, area.current?.scrollHeight ?? mark.h);
-  };
-
   return (
-    <textarea
-      ref={area}
+    <div
+      ref={box}
       data-float
-      value={text}
-      onChange={(e) => setText(e.target.value)}
+      data-editing
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-multiline
+      aria-label={mark.kind === "note" ? "Note" : "Text"}
       onBlur={finish}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
           e.preventDefault();
-          finish();
+          box.current?.blur();
         }
       }}
+      onPaste={(e) => {
+        // Pasted words come in plain, never as someone else's markup.
+        e.preventDefault();
+        document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+      }}
       onPointerDown={(e) => e.stopPropagation()}
-      aria-label={mark.kind === "note" ? "Note" : "Text"}
-      className="pointer-events-auto absolute resize-none overflow-hidden border-0 outline-none"
-      style={{ ...style, height: undefined, font: "inherit", fontSize: style.fontSize, lineHeight: style.lineHeight }}
+      className="pointer-events-auto absolute cursor-text whitespace-pre-wrap break-words outline-none"
+      style={{ ...style, height: undefined, fontSize: size, padding: mark.kind === "note" ? size * 0.8 : 0 }}
     />
   );
+}
+
+/** The words as nodes for the box: bold in <b>, lines split by <br>. Never parsed as markup. */
+function toNodes(text: string): Node[] {
+  const out: Node[] = [];
+  for (const r of runs(text)) {
+    r.text.split("\n").forEach((part, i) => {
+      if (i > 0) out.push(document.createElement("br"));
+      if (!part) return;
+      const t = document.createTextNode(part);
+      if (r.bold) {
+        const b = document.createElement("b");
+        b.appendChild(t);
+        out.push(b);
+      } else out.push(t);
+    });
+  }
+  return out;
+}
+
+/** The box read back as words with **two stars** round what is bold. */
+function toMarkdown(root: HTMLElement): string {
+  const rs: Run[] = [];
+  const push = (text: string, bold: boolean) => {
+    const last = rs[rs.length - 1];
+    if (last && last.bold === bold) last.text += text;
+    else rs.push({ text, bold });
+  };
+  const ends = () => rs.map((r) => r.text).join("");
+  const walk = (node: Node, bold: boolean) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent) push(node.textContent, bold);
+      return;
+    }
+    if (!(node instanceof HTMLElement)) return;
+    if (node.tagName === "BR") {
+      push("\n", false);
+      return;
+    }
+    const block = node.tagName === "DIV" || node.tagName === "P";
+    if (block && ends() && !ends().endsWith("\n")) push("\n", false);
+    const weight = node.style.fontWeight;
+    const b = bold || node.tagName === "B" || node.tagName === "STRONG" || weight === "bold" || Number(weight) >= 600;
+    node.childNodes.forEach((c) => walk(c, b));
+  };
+  root.childNodes.forEach((c) => walk(c, false));
+  return fromRuns(rs);
 }

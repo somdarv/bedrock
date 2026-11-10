@@ -182,6 +182,7 @@ function where(pin: BoardPin, frame: BoardFrame | undefined) {
   const on = pin.frameId ? (frame?.title ?? "A removed design") : "On the canvas";
   if (pin.anchor?.kind === "element" && pin.anchor.label) return `${on}, "${pin.anchor.label.slice(0, 40)}"`;
   if (pin.anchor?.kind === "mark") return `${on}, on a drawing`;
+  if (pin.anchor?.kind === "area") return `${on}, on an area`;
   return on;
 }
 
@@ -239,16 +240,17 @@ export function ThreadCard({
   onResolve: (done: boolean) => void;
   onClose: () => void;
 }) {
-  const end = React.useRef<HTMLDivElement>(null);
+  const list = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    // Braces matter: scrollIntoView returns a promise in new browsers, and an effect may only return a cleanup.
-    end.current?.scrollIntoView({ block: "end" });
+    // Scroll the thread itself to its last word. scrollIntoView would scroll the canvas too.
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [pin.comments.length]);
   const redrawn = frame && pin.frameVersion < frame.version;
 
   return (
     <div className="flex max-h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
+      <div ref={list} className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
         {pin.comments.map((c, i) => (
           <div key={c.id} className={cn(i > 0 && "mt-4")}>
             <div className="flex items-center gap-2">
@@ -272,7 +274,7 @@ export function ThreadCard({
         {pin.doneAt ? (
           <p className="mt-3 text-xs text-muted-foreground">Resolved by {pin.doneBy ?? "SaharaBase"}.</p>
         ) : null}
-        <div ref={end} className="h-3" />
+        <div className="h-3" />
       </div>
       <div className="shrink-0 border-t border-border p-3">
         <Composer

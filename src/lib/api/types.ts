@@ -1310,7 +1310,9 @@ export interface BoardComment {
 export type BoardAnchor =
   | { kind: "element"; rect: { x: number; y: number; w: number; h: number }; path: string; label: string }
   | { kind: "frame" }
-  | { kind: "mark"; markId: string };
+  | { kind: "mark"; markId: string }
+  /** An area dragged out with the comment tool: on a frame in its pixels, else on the board. */
+  | { kind: "area"; rect: { x: number; y: number; w: number; h: number } };
 
 /**
  * A spot and the talk about it. On a frame, x and y are the frame's own pixels; on the canvas

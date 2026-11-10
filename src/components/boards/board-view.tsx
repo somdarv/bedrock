@@ -20,7 +20,7 @@ import {
   type BoardResult,
   type MarkResult,
 } from "@/lib/boards/actions";
-import { boxOf, moveBy, toInput, type Rect } from "@/lib/boards/marks";
+import { boxOf, moveBy, toInput, unionBox, type Rect } from "@/lib/boards/marks";
 import { clamp, draftKey, framesOn, NAME_KEY, pageOf, pinOrder, store } from "@/lib/boards/view";
 import { cn, publicBaseUrl } from "@/lib/utils";
 import {
@@ -29,13 +29,15 @@ import {
   type CanvasHandle,
   type DrawStyle,
   type PinPlace,
+  selectedIds,
   type Selection,
   type Spot,
   type ToScreen,
   type Tool,
 } from "./board-canvas";
+import { FORMAT_EVENT } from "./board-marks";
 import { AllComments, Avatar, NewCommentCard, ThreadCard, type NameField } from "./board-panel";
-import { Menu, PageMenu, SelectionBar, Toolbar, useOutside } from "./board-toolbar";
+import { EditBar, Menu, PageMenu, SelectionBar, Toolbar, useOutside, type Restyle } from "./board-toolbar";
 
 /**
  * A board (docs/BOARDS.md), laid out and worked as the Claude design canvas is: a thin top bar,
@@ -54,7 +56,8 @@ const POLL_MS = 15_000;
 const PANEL_W = 320;
 const POP_W = 320;
 
-type Step = { before: BoardMark | null; after: BoardMark | null };
+/** One undo step: every drawing it changed, as it was and as it became. */
+type Step = { before: BoardMark | null; after: BoardMark | null }[];
 
 const TOOL_KEYS: Record<string, Tool> = {
   KeyV: "select",
@@ -181,26 +184,31 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       return after ? [...rest, after] : rest;
     });
 
-  /** Make, change or remove a drawing, here at once and on the server behind it. */
-  const change = (before: BoardMark | null, after: BoardMark | null, record = true) => {
-    place(before, after);
-    if (after) remoteSave(after);
-    else if (before) remoteRemove(before.id);
-    if (record) {
-      undoStack.current.push({ before, after });
+  /** Make, change or remove drawings, here at once and on the server behind it, as one undo step. */
+  const changeMany = (step: Step, record = true) => {
+    for (const { before, after } of step) {
+      place(before, after);
+      if (after) remoteSave(after);
+      else if (before) remoteRemove(before.id);
+    }
+    if (record && step.length) {
+      undoStack.current.push(step);
       if (undoStack.current.length > 200) undoStack.current.shift();
       redoStack.current = [];
       bump((n) => n + 1);
     }
   };
+  const change = (before: BoardMark | null, after: BoardMark | null) => changeMany([{ before, after }]);
 
   const undo = () => {
     const step = undoStack.current.pop();
     if (!step) return;
-    place(step.after, step.before);
-    if (step.before && !step.after) remoteRestore(step.before);
-    else if (step.before) remoteSave(step.before);
-    else if (step.after) remoteRemove(step.after.id);
+    for (const { before, after } of step) {
+      place(after, before);
+      if (before && !after) remoteRestore(before);
+      else if (before) remoteSave(before);
+      else if (after) remoteRemove(after.id);
+    }
     redoStack.current.push(step);
     setSelection(null);
     bump((n) => n + 1);
@@ -209,10 +217,12 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   const redo = () => {
     const step = redoStack.current.pop();
     if (!step) return;
-    place(step.before, step.after);
-    if (step.after && !step.before) remoteRestore(step.after);
-    else if (step.after) remoteSave(step.after);
-    else if (step.before) remoteRemove(step.before.id);
+    for (const { before, after } of step) {
+      place(before, after);
+      if (after && !before) remoteRestore(after);
+      else if (after) remoteSave(after);
+      else if (before) remoteRemove(before.id);
+    }
     undoStack.current.push(step);
     setSelection(null);
     bump((n) => n + 1);
@@ -221,11 +231,18 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
   // Text and notes are kept here until their words are in; an empty one is never saved.
   const fresh = React.useRef(new Set<string>());
 
+  // The text size while words are typed, shown on the bar above them.
+  const [editSize, setEditSize] = React.useState(20);
+  const startEditing = (m: BoardMark) => {
+    setEditSize(m.fontSize ?? 20);
+    setEditingId(m.id);
+  };
+
   const onCreate = (mark: BoardMark, edit: boolean) => {
     if (edit) {
       fresh.current.add(mark.id);
       place(null, mark);
-      setEditingId(mark.id);
+      startEditing(mark);
     } else {
       change(null, mark);
     }
@@ -233,10 +250,11 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     if (tool !== "pencil" && tool !== "pen") setTool("select");
   };
 
-  const onEdited = (mark: BoardMark, text: string, height: number) => {
+  const onEdited = (mark: BoardMark, text: string, height: number, fontSize: number) => {
     setEditingId(null);
     const words = text.replace(/\s+$/, "");
-    const h = mark.kind === "text" ? Math.max(mark.h, height) : mark.h;
+    const h = mark.kind === "text" ? height : mark.h;
+    const sized = { ...mark, fontSize };
     if (fresh.current.has(mark.id)) {
       fresh.current.delete(mark.id);
       if (!words.trim()) {
@@ -244,7 +262,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
         setSelection(null);
         return;
       }
-      change(null, { ...mark, text: words, h });
+      change(null, { ...sized, text: words, h });
       return;
     }
     if (!words.trim() && mark.kind === "text") {
@@ -252,7 +270,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       setSelection(null);
       return;
     }
-    if (words !== mark.text || h !== mark.h) change(mark, { ...mark, text: words, h });
+    if (words !== mark.text || h !== mark.h || fontSize !== mark.fontSize) change(mark, { ...sized, text: words, h });
   };
 
   /* ------------------------------------------------------------ keeping up */
@@ -318,6 +336,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       const m = marks.find((x) => x.id === anchor.markId);
       return m ? boxOf(m) : null;
     }
+    if (anchor.kind === "area" && !frameId) return anchor.rect;
     const f = frameOf(frameId);
     if (!f) return null;
     return anchor.kind === "frame" ? f : { x: f.x + anchor.rect.x, y: f.y + anchor.rect.y, w: anchor.rect.w, h: anchor.rect.h };
@@ -409,6 +428,14 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
       if (!m) return;
       const b = boxOf(m);
       setDraft({ frameId: null, page: m.page ?? firstPage, x: b.x + b.w, y: b.y, anchor: { kind: "mark", markId: m.id } });
+    } else if (selection.kind === "marks") {
+      // Several drawings: the comment is on the area round them all.
+      const b = unionBox(marks.filter((m) => selection.ids.includes(m.id)));
+      if (!b) return;
+      setDraft({ frameId: null, page, x: b.x + b.w, y: b.y, anchor: { kind: "area", rect: b } });
+    } else if (selection.kind === "area") {
+      const r = selection.rect;
+      setDraft({ frameId: selection.frameId, page, x: r.x + r.w, y: r.y, anchor: { kind: "area", rect: r } });
     } else {
       const f = frameOf(selection.frameId);
       if (!f) return;
@@ -432,10 +459,10 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
 
   const selectionBox = (): Rect | null => {
     if (!selection) return null;
-    if (selection.kind === "mark") {
-      const m = marks.find((x) => x.id === selection.id);
-      return m ? boxOf(m) : null;
+    if (selection.kind === "mark" || selection.kind === "marks") {
+      return unionBox(marks.filter((m) => selectedIds(selection).includes(m.id)));
     }
+    if (selection.kind === "area") return anchorBox(selection.frameId, { kind: "area", rect: selection.rect });
     const f = frameOf(selection.frameId);
     if (!f) return null;
     return selection.kind === "frame" ? f : { x: f.x + selection.rect.x, y: f.y + selection.rect.y, w: selection.rect.w, h: selection.rect.h };
@@ -446,11 +473,19 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     if (b) canvas.current?.fitRect(b);
   };
 
+  const chosen = marks.filter((m) => selectedIds(selection).includes(m.id));
+
   const removeSelected = () => {
-    if (selection?.kind !== "mark") return;
-    const m = marks.find((x) => x.id === selection.id);
-    if (m) change(m, null);
+    if (!chosen.length) return;
+    changeMany(chosen.map((m) => ({ before: m, after: null })));
     setSelection(null);
+  };
+
+  const restyle = (fn: Restyle) => {
+    if (!chosen.length) return;
+    changeMany(chosen.map((m) => ({ before: m, after: { ...m, ...fn(m) } })));
+    const colour = fn(chosen[0]).color;
+    if (colour) setStyle((st) => (chosen[0].kind === "note" ? { ...st, noteFill: colour } : { ...st, ink: colour }));
   };
 
   function pickTool(t: Tool) {
@@ -499,7 +534,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
         else if (allOpen) setAllOpen(false);
         return;
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selection?.kind === "mark") {
+      if ((e.key === "Delete" || e.key === "Backspace") && chosen.length) {
         e.preventDefault();
         removeSelected();
         return;
@@ -508,21 +543,19 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
         const m = marks.find((x) => x.id === selection.id);
         if (m && (m.kind === "text" || m.kind === "note")) {
           e.preventDefault();
-          setEditingId(m.id);
+          startEditing(m);
         }
         return;
       }
       if (e.shiftKey && e.code === "Digit1") return void canvas.current?.fit();
       if (e.shiftKey && e.code === "Digit2") return void zoomToSelection();
       if (e.shiftKey && e.code === "Digit0") return void canvas.current?.zoomTo(1);
-      if (e.key.startsWith("Arrow") && selection?.kind === "mark") {
-        const m = marks.find((x) => x.id === selection.id);
-        if (!m) return;
+      if (e.key.startsWith("Arrow") && chosen.length) {
         e.preventDefault();
         const step = (e.shiftKey ? 10 : 1) / (canvas.current?.zoom() ?? 1);
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        change(m, moveBy(m, dx, dy));
+        changeMany(chosen.map((m) => ({ before: m, after: moveBy(m, dx, dy) })));
         return;
       }
       if (e.code === "KeyC" && !e.shiftKey) {
@@ -599,24 +632,29 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
     );
   };
 
-  const selectedMark = selection?.kind === "mark" ? (marks.find((m) => m.id === selection.id) ?? null) : null;
   const selectionBar = (rect: Rect, zoom: number) => (
     <SelectionBar
       rect={rect}
-      mark={selectedMark}
+      marks={chosen}
       zoom={zoom}
       label={
         selection?.kind === "element" ? selection.label : selection?.kind === "frame" ? (frameOf(selection.frameId)?.title ?? null) : null
       }
       onComment={commentOnSelection}
       onZoom={zoomToSelection}
-      onStyle={(patch) => {
-        if (!selectedMark) return;
-        change(selectedMark, { ...selectedMark, ...patch });
-        const colour = patch.color;
-        if (colour) setStyle((s) => (selectedMark.kind === "note" ? { ...s, noteFill: colour } : { ...s, ink: colour }));
-      }}
+      onStyle={restyle}
       onRemove={removeSelected}
+    />
+  );
+
+  const editBar = (rect: Rect) => (
+    <EditBar
+      rect={rect}
+      size={editSize}
+      onSize={(next) => {
+        setEditSize(next);
+        document.querySelector("[data-editing]")?.dispatchEvent(new CustomEvent(FORMAT_EVENT, { detail: { size: next } }));
+      }}
     />
   );
 
@@ -702,10 +740,14 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
             if (s) setSelected(null);
           }}
           editingId={editingId}
-          onEdit={setEditingId}
+          onEdit={(id) => {
+            const m = id ? marks.find((x) => x.id === id) : null;
+            if (m) startEditing(m);
+            else setEditingId(null);
+          }}
           onEdited={onEdited}
           onCreate={onCreate}
-          onCommit={(before, after) => change(before, after)}
+          onCommit={(before, after) => changeMany(before.map((b, i) => ({ before: b, after: after[i] })))}
           pins={pins}
           selectedPinId={selected}
           highlight={highlight}
@@ -735,6 +777,7 @@ export function BoardView({ side, initial }: { side: BoardSide; initial: PublicB
           }}
           overlay={overlay}
           selectionBar={tool === "select" ? selectionBar : undefined}
+          editBar={editBar}
         />
 
         {empty ? (

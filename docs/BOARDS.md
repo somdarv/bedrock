@@ -50,24 +50,31 @@ studio.
 
 As on the Claude canvas. Shortcuts in brackets.
 
-- **Move and zoom.** Drag the ground, two fingers on a trackpad, the hand (H), Space and drag, or
-  the middle button. Pinch or Ctrl and the wheel zooms, as do Ctrl + and Ctrl -. The zoom menu
-  has Fit artboards (Shift 1), Zoom to selection (Shift 2), 25% to 200% (100% is Shift 0), Undo
-  and Redo.
+- **Move and zoom.** Space and drag, the wheel button and drag, the hand (H), or two fingers on a
+  trackpad. A plain drag never moves the canvas: it selects. Pinch or Ctrl and the wheel zooms, as
+  do Ctrl + and Ctrl -. The zoom menu has Fit artboards (Shift 1), Zoom to selection (Shift 2),
+  25% to 200% (100% is Shift 0), Undo and Redo.
 - **Select (V).** A click on a design picks the outermost block under the pointer; a double click
-  goes one level in; Escape goes back out. A click on a drawing picks it: drag to move, handles to
-  resize, arrows to nudge (Shift for 10), Delete to remove, Enter to edit text. A bar over the
-  selection has its colour and line width, Comment (C), Zoom to selection and Remove.
+  goes one level in; Escape goes back out. A click on a drawing picks it; Shift and a click adds
+  or takes away one. A drag draws a box: it picks every drawing it touches, or, with none under
+  it, the area of the design (or the canvas) it covers, ready for a comment. Dragging what is
+  selected moves it all; handles resize one drawing; arrows nudge (Shift for 10); Delete removes;
+  Enter edits text. A bar over the selection has the colour and line width, the size and bold for
+  text and notes, Comment (C), Zoom to selection and Remove.
+- **Text and notes.** Double click to type. Select words and press Ctrl B, or B on the bar above,
+  to bold them; A- and A+ set the size of the whole text. Bold is kept as **two stars** round the
+  words, so the server and `boards:comments` see plain text.
 - **Draw.** Text (T), Artboard (A, a white frame with a name), Note (N), Pencil (P), Pen (Shift P:
   click the points, Enter or a double click ends it), Rectangle (R), Oval (O), Arrow (Shift L),
   Line (L). Shift keeps shapes square and lines to 45 degrees. A drag sets the size; a click makes
-  a standard one. Ctrl Z undoes, Ctrl Shift Z redoes.
+  a standard one. Ctrl Z undoes, Ctrl Shift Z redoes; moving several drawings is one step.
 - **Comment.** The bubble at the top right, or C, turns comment mode on. The design and the block
-  under the pointer get an amber outline; a click drops the comment there. A click on a drawing
-  puts the comment on it; a click on empty canvas leaves it on the canvas. With something
-  selected, C comments on the selection. The block or drawing is outlined while its thread is open.
-- **On a phone** the tools sit along the bottom, one finger moves the canvas with the select tool
-  and draws with a drawing tool, and two fingers always pinch and move.
+  under the pointer get an amber outline. A click drops the comment on that block, on a drawing,
+  or on the empty canvas; a drag puts it on the area dragged out. With something selected, C
+  comments on the selection. What a comment is about is outlined while its thread is open.
+- **On a phone** the tools sit along the bottom. With the select tool one finger moves the canvas,
+  since a phone has no Space or wheel button; with a drawing tool it draws, and in comment mode a
+  drag marks an area. Two fingers always pinch and move.
 - **What a phone keeps.** The typed name and any comment not yet sent stay in that device's
   storage. A private window forgets them.
 

@@ -4,6 +4,7 @@ import * as React from "react";
 import type { BoardAnchor, BoardFrame, BoardMark, BoardMarkKind, BoardNote, BoardPin } from "@/lib/api";
 import { blockAt } from "@/lib/boards/inspect";
 import {
+  between,
   boxOf,
   fromPoints,
   handlePoint,
@@ -11,8 +12,10 @@ import {
   markAt,
   moveBy,
   newMarkId,
+  overlaps,
   resize,
   thin,
+  unionBox,
   type Handle,
   type Rect,
 } from "@/lib/boards/marks";
@@ -22,12 +25,17 @@ import { MarkView } from "./board-marks";
 import { PinBubble } from "./board-panel";
 
 /**
- * The canvas, as the Claude design canvas works (docs/BOARDS.md): the designs and what people
- * drew on a grey ground, moved with a drag, two fingers, the hand or Space, and zoomed with a
- * pinch, Ctrl and the wheel, or the zoom menu. The select tool picks a drawing or a block inside
- * a design (a double click goes one level in); the drawing tools make text, frames, notes,
- * pencil and pen lines, rectangles, ovals, arrows and lines; comment mode drops a comment on
- * whatever is under the pointer. A phone uses the same canvas.
+ * The canvas, as the Claude design canvas works (docs/BOARDS.md).
+ *
+ * - Moving round it: Space and drag, the wheel button, the hand, or two fingers on a trackpad.
+ *   Pinch, or Ctrl and the wheel, zooms. A plain drag never moves the canvas, except a finger on
+ *   a phone, which has no Space or wheel button.
+ * - Select: a click picks a drawing or the outermost block of a design (a double click goes one
+ *   level in); a drag draws a box that picks every drawing it touches, or the area of the design
+ *   under it; Shift and a click adds or takes away a drawing. Dragging what is selected moves it.
+ * - Comment: a click drops the comment on what is under it; a drag puts it on the area dragged.
+ * - The drawing tools make text, frames, notes, pencil and pen lines, rectangles, ovals, arrows
+ *   and lines.
  */
 
 export type Tool =
@@ -46,6 +54,7 @@ export type Tool =
 
 export type Selection =
   | { kind: "mark"; id: string }
+  | { kind: "marks"; ids: string[] }
   | { kind: "frame"; frameId: string }
   | {
       kind: "element";
@@ -57,7 +66,11 @@ export type Selection =
       /** Where it was picked, on the frame, so a double click can go one level in from there. */
       at: { x: number; y: number };
     }
+  /** An area dragged out: on a design in its pixels, or on the board. */
+  | { kind: "area"; frameId: string | null; rect: Rect }
   | null;
+
+export const selectedIds = (s: Selection): string[] => (s?.kind === "mark" ? [s.id] : s?.kind === "marks" ? s.ids : []);
 
 /** Where a new comment goes and what it is about. */
 export type Spot = { frameId: string | null; page: string | null; x: number; y: number; anchor: BoardAnchor | null };
@@ -98,12 +111,13 @@ interface Props {
   onSelect: (s: Selection) => void;
   editingId: string | null;
   onEdit: (id: string | null) => void;
-  onEdited: (mark: BoardMark, text: string, height: number) => void;
+  onEdited: (mark: BoardMark, text: string, height: number, fontSize: number) => void;
   onCreate: (mark: BoardMark, edit: boolean) => void;
-  onCommit: (before: BoardMark, after: BoardMark) => void;
+  /** Drawings moved or resized: as they were, and as they are now, in the same order. */
+  onCommit: (before: BoardMark[], after: BoardMark[]) => void;
   pins: PinPlace[];
   selectedPinId: string | null;
-  /** A box to show while a comment is open: the block or drawing it is about. Board pixels. */
+  /** A box to show while a comment is open: the block, area or drawing it is about. Board pixels. */
   highlight: Rect | null;
   draft: Spot | null;
   onSelectPin: (id: string) => void;
@@ -115,6 +129,8 @@ interface Props {
   zoomMenu: ZoomMenuActions;
   overlay?: (toScreen: ToScreen, size: { w: number; h: number }, zoom: number) => React.ReactNode;
   selectionBar?: (rect: Rect, zoom: number) => React.ReactNode;
+  /** The bar over a text or note while its words are being typed. */
+  editBar?: (rect: Rect, mark: BoardMark, zoom: number) => React.ReactNode;
 }
 
 const MIN_Z = 0.02;
@@ -130,7 +146,8 @@ const COMMENT_CURSOR =
 type Gesture =
   | { kind: "pan"; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | { kind: "pinch"; dist: number; z: number; mx: number; my: number; vx: number; vy: number }
-  | { kind: "move"; from: BoardMark; bx: number; by: number; moved: boolean }
+  | { kind: "band"; mode: "select" | "comment"; sx: number; sy: number; bx: number; by: number; moved: boolean }
+  | { kind: "move"; from: BoardMark[]; bx: number; by: number; moved: boolean; click: BoardMark }
   | { kind: "resize"; from: BoardMark; handle: Handle }
   | { kind: "box"; mark: BoardMark; bx: number; by: number }
   | { kind: "line"; mark: BoardMark; bx: number; by: number }
@@ -150,9 +167,9 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     selection,
     onSelect,
     editingId,
-    onEdit,
     onEdited,
     onCreate,
+    onEdit,
     onCommit,
     pins,
     selectedPinId,
@@ -167,6 +184,7 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     zoomMenu,
     overlay,
     selectionBar,
+    editBar,
   } = props;
 
   const box = React.useRef<HTMLDivElement>(null);
@@ -175,13 +193,14 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
   const viewRef = React.useRef(view);
   viewRef.current = view;
 
-  // The drawing being made, moved or resized, shown before it is saved.
-  const [live, setLive] = React.useState<BoardMark | null>(null);
-  const liveRef = React.useRef<BoardMark | null>(null);
-  const show = (m: BoardMark | null) => {
-    liveRef.current = m;
-    setLive(m);
+  // Drawings being made, moved or resized, shown before they are saved.
+  const [live, setLive] = React.useState<BoardMark[]>([]);
+  const liveRef = React.useRef<BoardMark[]>([]);
+  const show = (ms: BoardMark[]) => {
+    liveRef.current = ms;
+    setLive(ms);
   };
+  const [band, setBand] = React.useState<Rect | null>(null);
   const [hover, setHover] = React.useState<Hover>(null);
   const [pen, setPen] = React.useState<{ pts: [number, number][]; at: [number, number] | null } | null>(null);
   const [space, setSpace] = React.useState(false);
@@ -217,19 +236,15 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
 
   const pageBounds = React.useCallback((): Rect => {
     if (frames.length === 0 && marks.length === 0) return bounds(frames, notes);
-    let x = Infinity;
-    let y = Infinity;
-    let right = -Infinity;
-    let bottom = -Infinity;
-    const take = (r: Rect) => {
-      x = Math.min(x, r.x);
-      y = Math.min(y, r.y);
-      right = Math.max(right, r.x + r.w);
-      bottom = Math.max(bottom, r.y + r.h);
-    };
-    if (frames.length) take(bounds(frames, notes));
-    for (const m of marks) take(boxOf(m));
-    return { x, y, w: right - x, h: bottom - y };
+    const parts: Rect[] = [];
+    if (frames.length) parts.push(bounds(frames, notes));
+    const drawn = unionBox(marks);
+    if (drawn) parts.push(drawn);
+    const x = Math.min(...parts.map((p) => p.x));
+    const y = Math.min(...parts.map((p) => p.y));
+    const r = Math.max(...parts.map((p) => p.x + p.w));
+    const b = Math.max(...parts.map((p) => p.y + p.h));
+    return { x, y, w: r - x, h: b - y };
   }, [frames, notes, marks]);
 
   const fit = React.useCallback(() => fitBox(pageBounds(), 88, 1), [fitBox, pageBounds]);
@@ -310,11 +325,14 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     const up = (e: KeyboardEvent) => {
       if (e.code === "Space") setSpace(false);
     };
+    const lost = () => setSpace(false);
     window.addEventListener("keydown", down, true);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", lost);
     return () => {
       window.removeEventListener("keydown", down, true);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", lost);
     };
   });
 
@@ -326,7 +344,11 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
 
   /* ---------------------------------------------------------------- what is where */
 
-  const shown = React.useMemo(() => (live ? [...marks.filter((m) => m.id !== live.id), live] : marks), [marks, live]);
+  const shown = React.useMemo(() => {
+    if (live.length === 0) return marks;
+    const ids = new Set(live.map((m) => m.id));
+    return [...marks.filter((m) => !ids.has(m.id)), ...live];
+  }, [marks, live]);
   const ordered = React.useMemo(() => [...shown].sort((a, b) => a.z - b.z || a.id.localeCompare(b.id)), [shown]);
   const behind = ordered.filter((m) => m.kind === "frame");
   const above = ordered.filter((m) => m.kind !== "frame");
@@ -356,12 +378,14 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     return hit && !(hit.kind === "frame" && frameAt(x, y)) ? hit : null;
   };
 
-  const selectedMark = selection?.kind === "mark" ? (shown.find((m) => m.id === selection.id) ?? null) : null;
+  const chosen = selectedIds(selection);
+  const chosenMarks = shown.filter((m) => chosen.includes(m.id));
+  const single = chosenMarks.length === 1 ? chosenMarks[0] : null;
 
   const handleAt = (sx: number, sy: number): Handle | null => {
-    if (!selectedMark || editingId) return null;
-    for (const h of handlesOf(selectedMark)) {
-      const [hx, hy] = handlePoint(selectedMark, h);
+    if (!single || editingId) return null;
+    for (const h of handlesOf(single)) {
+      const [hx, hy] = handlePoint(single, h);
       const p = toScreen(hx, hy);
       if (Math.abs(p.x - sx) <= 10 && Math.abs(p.y - sy) <= 10) return h;
     }
@@ -376,6 +400,17 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     return found
       ? { kind: "element", frameId: f.id, ...found.block, depth: found.depth, at: { x: fx, y: fy } }
       : { kind: "frame", frameId: f.id };
+  };
+
+  /** An area dragged out: kept to the design it started on, in that design's pixels. */
+  const areaOf = (r: Rect, startX: number, startY: number): { frameId: string | null; rect: Rect } => {
+    const f = frameAt(startX, startY);
+    if (!f) return { frameId: null, rect: r };
+    const x = clamp(r.x, f.x, f.x + f.w);
+    const y = clamp(r.y, f.y, f.y + f.h);
+    const right = clamp(r.x + r.w, f.x, f.x + f.w);
+    const bottom = clamp(r.y + r.h, f.y, f.y + f.h);
+    return { frameId: f.id, rect: { x: round2(x - f.x), y: round2(y - f.y), w: round2(right - x), h: round2(bottom - y) } };
   };
 
   const newMark = (kind: BoardMarkKind, x: number, y: number): BoardMark => {
@@ -410,13 +445,16 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as Element).closest("[data-float]")) return;
     if (e.pointerType === "mouse" && e.button === 2) return;
+    // Words being typed are read back first, before this press does anything else.
+    if (editingId) (document.activeElement as HTMLElement | null)?.blur?.();
     box.current?.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, local(e));
     const v = viewRef.current;
 
     if (pointers.current.size === 2) {
       // A second finger: whatever the first was doing becomes a pinch.
-      show(null);
+      show([]);
+      setBand(null);
       const [a, b] = [...pointers.current.values()];
       begin({
         kind: "pinch",
@@ -434,38 +472,49 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     const s = local(e);
     const p = toBoard(s.x, s.y);
     const pan: Gesture = { kind: "pan", sx: s.x, sy: s.y, vx: v.x, vy: v.y, moved: false };
+    const touch = e.pointerType === "touch";
 
     if (e.pointerType === "mouse" && e.button === 1) {
       e.preventDefault();
       begin({ ...pan, moved: true });
       return;
     }
-    if (editingId) onEdit(null);
 
     switch (activeTool) {
       case "hand":
-      case "comment":
         begin(pan);
+        return;
+      case "comment":
+        begin({ kind: "band", mode: "comment", sx: s.x, sy: s.y, bx: p.x, by: p.y, moved: false });
         return;
       case "select": {
         const handle = handleAt(s.x, s.y);
-        if (handle && selectedMark) {
-          begin({ kind: "resize", from: selectedMark, handle });
+        if (handle && single) {
+          begin({ kind: "resize", from: single, handle });
           return;
         }
         const hit = takeMark(p.x, p.y);
         if (hit) {
-          onSelect({ kind: "mark", id: hit.id });
-          begin({ kind: "move", from: hit, bx: p.x, by: p.y, moved: false });
+          if (e.shiftKey) {
+            // Shift and a click adds a drawing to what is selected, or takes it away.
+            const next = chosen.includes(hit.id) ? chosen.filter((id) => id !== hit.id) : [...chosen, hit.id];
+            onSelect(next.length === 0 ? null : next.length === 1 ? { kind: "mark", id: next[0] } : { kind: "marks", ids: next });
+            begin(null);
+            return;
+          }
+          const group = chosen.includes(hit.id) ? chosenMarks : [hit];
+          if (!chosen.includes(hit.id)) onSelect({ kind: "mark", id: hit.id });
+          begin({ kind: "move", from: group, bx: p.x, by: p.y, moved: false, click: hit });
           return;
         }
-        begin(pan);
+        // A finger moves the canvas; a mouse or a pen draws a box to select with.
+        begin(touch ? pan : { kind: "band", mode: "select", sx: s.x, sy: s.y, bx: p.x, by: p.y, moved: false });
         return;
       }
       case "pencil": {
         const mark = newMark("pencil", p.x, p.y);
         begin({ kind: "draw", mark, pts: [[p.x, p.y]] });
-        show({ ...mark, points: [0, 0] });
+        show([{ ...mark, points: [0, 0] }]);
         return;
       }
       case "pen":
@@ -513,16 +562,22 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
         setView((v) => ({ ...v, x: g.vx + dx, y: g.vy + dy }));
         return;
       }
+      case "band": {
+        if (!g.moved && Math.hypot(s.x - g.sx, s.y - g.sy) < 5) return;
+        g.moved = true;
+        setBand(between(g.sx, g.sy, s.x, s.y));
+        return;
+      }
       case "move": {
         const dx = p.x - g.bx;
         const dy = p.y - g.by;
         if (!g.moved && Math.hypot(dx, dy) * viewRef.current.z < 4) return;
         g.moved = true;
-        show(moveBy(g.from, dx, dy));
+        show(g.from.map((m) => moveBy(m, dx, dy)));
         return;
       }
       case "resize":
-        show(resize(g.from, g.handle, p.x, p.y, e.shiftKey));
+        show([resize(g.from, g.handle, p.x, p.y, e.shiftKey)]);
         return;
       case "box": {
         let w = p.x - g.bx;
@@ -532,13 +587,15 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
           w = Math.sign(w || 1) * side;
           h = Math.sign(h || 1) * side;
         }
-        show({
-          ...g.mark,
-          x: round2(Math.min(g.bx, g.bx + w)),
-          y: round2(Math.min(g.by, g.by + h)),
-          w: round2(Math.abs(w)),
-          h: round2(g.mark.kind === "text" ? 30 / viewRef.current.z : Math.abs(h)),
-        });
+        show([
+          {
+            ...g.mark,
+            x: round2(Math.min(g.bx, g.bx + w)),
+            y: round2(Math.min(g.by, g.by + h)),
+            w: round2(Math.abs(w)),
+            h: round2(g.mark.kind === "text" ? 30 / viewRef.current.z : Math.abs(h)),
+          },
+        ]);
         return;
       }
       case "line": {
@@ -551,12 +608,12 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
           ex = g.bx + Math.cos(ang) * len;
           ey = g.by + Math.sin(ang) * len;
         }
-        show({ ...g.mark, ...fromPoints([[g.bx, g.by], [ex, ey]]) });
+        show([{ ...g.mark, ...fromPoints([[g.bx, g.by], [ex, ey]]) }]);
         return;
       }
       case "draw":
         g.pts.push([p.x, p.y]);
-        show({ ...g.mark, ...fromPoints(g.pts) });
+        show([{ ...g.mark, ...fromPoints(g.pts) }]);
         return;
     }
   };
@@ -578,40 +635,74 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     }
     if (pointers.current.size > 0 || !had || !g) return;
     begin(null);
+    setBand(null);
 
     const now = performance.now();
     const double = now - lastTap.current.t < 320 && Math.hypot(s.x - lastTap.current.x, s.y - lastTap.current.y) < 8;
     const p = toBoard(s.x, s.y);
     const z = viewRef.current.z;
     const made = liveRef.current;
-    show(null);
+    show([]);
+
+    const tapped = () => {
+      lastTap.current = { t: double ? 0 : now, x: s.x, y: s.y };
+    };
 
     switch (g.kind) {
       case "pan":
         if (g.moved) return;
-        lastTap.current = { t: double ? 0 : now, x: s.x, y: s.y };
+        tapped();
         click(p.x, p.y, double);
         return;
-      case "move":
-        if (g.moved && made) {
-          onCommit(g.from, made);
+      case "band": {
+        if (!g.moved) {
+          tapped();
+          click(p.x, p.y, double);
           return;
         }
-        lastTap.current = { t: double ? 0 : now, x: s.x, y: s.y };
-        if (double && (g.from.kind === "text" || g.from.kind === "note")) onEdit(g.from.id);
+        const r = between(g.bx, g.by, p.x, p.y);
+        const area = areaOf(r, g.bx, g.by);
+        if (g.mode === "comment") {
+          const { frameId, rect } = area;
+          onComment({ frameId, page, x: rect.x + rect.w, y: rect.y, anchor: { kind: "area", rect } });
+          return;
+        }
+        // A drawn frame is taken only when the box holds all of it, so a box inside one picks what is in it.
+        const hits = shown.filter((m) => {
+          const b = boxOf(m);
+          if (m.kind !== "frame") return overlaps(b, r);
+          return b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h;
+        });
+        if (hits.length === 1) onSelect({ kind: "mark", id: hits[0].id });
+        else if (hits.length > 1) onSelect({ kind: "marks", ids: hits.map((m) => m.id) });
+        else onSelect({ kind: "area", ...area });
+        return;
+      }
+      case "move":
+        if (g.moved && made.length) {
+          const byId = new Map(made.map((m) => [m.id, m]));
+          onCommit(g.from, g.from.map((m) => byId.get(m.id) ?? m));
+          return;
+        }
+        tapped();
+        if (double && (g.click.kind === "text" || g.click.kind === "note")) onEdit(g.click.id);
+        else if (!double && chosen.length > 1) onSelect({ kind: "mark", id: g.click.id });
         return;
       case "resize":
-        if (made) onCommit(g.from, made);
+        if (made[0]) onCommit([g.from], [made[0]]);
         return;
       case "box": {
-        const mark = made && made.id === g.mark.id && made.w * z >= 6 ? made : defaultBox(g.mark, z);
+        const drawn = made[0];
+        const mark = drawn && drawn.id === g.mark.id && drawn.w * z >= 6 ? drawn : defaultBox(g.mark, z);
         onCreate(mark, mark.kind === "text" || mark.kind === "note");
         return;
       }
-      case "line":
-        if (made && made.id === g.mark.id && Math.hypot(made.w, made.h) * z >= 6) onCreate(made, false);
+      case "line": {
+        const drawn = made[0];
+        if (drawn && drawn.id === g.mark.id && Math.hypot(drawn.w, drawn.h) * z >= 6) onCreate(drawn, false);
         else onCreate({ ...g.mark, ...fromPoints([[g.bx, g.by], [g.bx + 160 / z, g.by]]) }, false);
         return;
+      }
       case "draw": {
         const pts = thin(g.pts, 1.5 / z);
         if (pts.length === 1) pts.push([pts[0][0] + 0.5 / z, pts[0][1] + 0.5 / z]);
@@ -727,22 +818,28 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
     const a = toScreen(r.x, r.y);
     return { x: a.x, y: a.y, w: r.w * view.z, h: r.h * view.z };
   };
+  const onFrame = (frameId: string | null, r: Rect): Rect | null => {
+    if (!frameId) return r;
+    const f = frames.find((x) => x.id === frameId);
+    return f ? { x: f.x + r.x, y: f.y + r.y, w: r.w, h: r.h } : null;
+  };
 
   let selRect: Rect | null = null;
-  if (selectedMark) selRect = screenRect(boxOf(selectedMark));
-  else if (selection?.kind === "frame" || selection?.kind === "element") {
+  if (chosenMarks.length) {
+    const u = unionBox(chosenMarks);
+    if (u) selRect = screenRect(u);
+  } else if (selection?.kind === "frame") {
     const f = frames.find((x) => x.id === selection.frameId);
-    if (f) {
-      selRect = screenRect(
-        selection.kind === "frame" ? f : { x: f.x + selection.rect.x, y: f.y + selection.rect.y, w: selection.rect.w, h: selection.rect.h },
-      );
-    }
+    if (f) selRect = screenRect(f);
+  } else if (selection?.kind === "element" || selection?.kind === "area") {
+    const r = onFrame(selection.kind === "element" ? selection.frameId : selection.frameId, selection.rect);
+    if (r) selRect = screenRect(r);
   }
 
   const hoverRects: { r: Rect; tone: "select" | "comment" }[] = [];
-  if (hover && !busy) {
+  if (hover && !busy && !band) {
     const tone = activeTool === "comment" ? "comment" : "select";
-    if (hover.kind === "mark" && !(selection?.kind === "mark" && selection.id === hover.id)) {
+    if (hover.kind === "mark" && !chosen.includes(hover.id)) {
       const m = shown.find((x) => x.id === hover.id);
       if (m) hoverRects.push({ r: screenRect(boxOf(m)), tone });
     } else if (hover.kind === "frame") {
@@ -761,6 +858,7 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
   })();
 
   const highlightRect = highlight ? screenRect(highlight) : null;
+  const editing = editingId ? shown.find((m) => m.id === editingId) : undefined;
 
   const cursor =
     activeTool === "comment" ? COMMENT_CURSOR : activeTool === "hand" ? undefined : activeTool === "select" ? "default" : "crosshair";
@@ -771,10 +869,11 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
   ];
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-[#ebebea]">
+    // overflow-clip, not hidden: the browser must never scroll the canvas to show something.
+    <div className="absolute inset-0 overflow-clip bg-[#ebebea]">
       <div
         ref={box}
-        className={cn("absolute inset-0 touch-none select-none outline-none", activeTool === "hand" && "cursor-grab active:cursor-grabbing")}
+        className={cn("absolute inset-0 overflow-clip touch-none select-none outline-none", activeTool === "hand" && "cursor-grab active:cursor-grabbing")}
         style={cursor ? { cursor } : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -805,7 +904,7 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
               key={m.id}
               mark={m}
               editing={m.id === editingId}
-              onEdited={m.id === editingId ? (text, height) => onEdited(m, text, height) : NOOP}
+              onEdited={m.id === editingId ? (text, height, fontSize) => onEdited(m, text, height, fontSize) : NOOP}
             />
           ))}
           {pen ? (
@@ -866,15 +965,42 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
           />
         ) : null}
 
+        {band ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute border",
+              gesture.current?.kind === "band" && gesture.current.mode === "comment"
+                ? "border-[#c2741c] bg-[#c2741c]/[0.08]"
+                : "border-[#2f6fdf] bg-[#2f6fdf]/[0.08]",
+            )}
+            style={{ left: band.x, top: band.y, width: band.w, height: band.h }}
+          />
+        ) : null}
+
         {selRect && !editingId ? (
           <>
+            {chosenMarks.length > 1
+              ? chosenMarks.map((m) => {
+                  const r = screenRect(boxOf(m));
+                  return (
+                    <div
+                      key={m.id}
+                      className="pointer-events-none absolute outline outline-1 outline-[#2f6fdf]/60"
+                      style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+                    />
+                  );
+                })
+              : null}
             <div
-              className="pointer-events-none absolute outline outline-[1.5px] outline-[#2f6fdf]"
+              className={cn(
+                "pointer-events-none absolute outline outline-[1.5px] outline-[#2f6fdf]",
+                selection?.kind === "area" && "bg-[#2f6fdf]/[0.05] outline-dashed",
+              )}
               style={{ left: selRect.x, top: selRect.y, width: selRect.w, height: selRect.h }}
             />
-            {selectedMark
-              ? handlesOf(selectedMark).map((h) => {
-                  const [hx, hy] = handlePoint(selectedMark, h);
+            {single
+              ? handlesOf(single).map((h) => {
+                  const [hx, hy] = handlePoint(single, h);
                   const p = toScreen(hx, hy);
                   return (
                     <span
@@ -891,6 +1017,8 @@ export const BoardCanvas = React.forwardRef<CanvasHandle, Props>(function BoardC
             {selectionBar && !busy ? selectionBar(selRect, view.z) : null}
           </>
         ) : null}
+
+        {editing && editBar ? editBar(screenRect(boxOf(editing)), editing, view.z) : null}
 
         {pins.map(({ pin, x, y }) => {
           const p = toScreen(x, y);

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { BoardMark } from "@/lib/api";
-import { INKS, NOTE_FILLS, isLine, type Rect } from "@/lib/boards/marks";
+import { INKS, NOTE_FILLS, isLine, runs, stepSize, toggleBoldAll, type Rect } from "@/lib/boards/marks";
 import { cn } from "@/lib/utils";
 import { Caret, type Tool } from "./board-canvas";
 
@@ -190,13 +190,17 @@ export function ToolButton({
 
 /* ------------------------------------------------------------------ over a selection */
 
+/** What a change from the bar does to each drawing selected. */
+export type Restyle = (m: BoardMark) => Partial<BoardMark>;
+
 /**
- * The bar over what is selected. A drawing gets its colour, its line width, a comment and
- * removal; a block of a design gets a comment and a zoom, as on the Claude canvas.
+ * The bar over what is selected, as on the Claude canvas. Drawings get their colour, their line
+ * width, and for text and notes the size and bold; a block or an area of a design gets a comment
+ * and a zoom.
  */
 export function SelectionBar({
   rect,
-  mark,
+  marks,
   zoom,
   label,
   onComment,
@@ -205,22 +209,27 @@ export function SelectionBar({
   onRemove,
 }: {
   rect: Rect;
-  mark: BoardMark | null;
+  /** The drawings selected. None when a block or an area of a design is. */
+  marks: BoardMark[];
   /** The canvas's zoom, so a line width is chosen as it looks on screen. */
   zoom: number;
-  /** What a block of a design says, shown so it is clear what a comment will be about. */
+  /** What a block of a design says, so it is clear what a comment will be about. */
   label: string | null;
   onComment: () => void;
   onZoom: () => void;
-  onStyle: (patch: Partial<BoardMark>) => void;
+  onStyle: (restyle: Restyle) => void;
   onRemove: () => void;
 }) {
   const [palette, setPalette] = React.useState(false);
   const wrap = useOutside<HTMLDivElement>(palette, () => setPalette(false));
   const top = rect.y - 52 < 8 ? rect.y + rect.h + 10 : rect.y - 52;
   const left = rect.x + rect.w / 2;
-  const fills = mark?.kind === "note";
-  const lines = mark ? isLine(mark.kind) || mark.kind === "rect" || mark.kind === "oval" : false;
+  const any = marks.length > 0;
+  const notes = any && marks.every((m) => m.kind === "note");
+  // Notes take pale fills and the rest take inks, so a mix of the two gets no colour button.
+  const coloured = any && marks.every((m) => m.kind !== "frame") && (notes || marks.every((m) => m.kind !== "note"));
+  const lines = any && marks.every((m) => isLine(m.kind) || m.kind === "rect" || m.kind === "oval");
+  const words = any && marks.every((m) => m.kind === "text" || m.kind === "note");
 
   return (
     <div
@@ -230,7 +239,7 @@ export function SelectionBar({
       style={{ left, top }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {mark && mark.kind !== "frame" ? (
+      {coloured ? (
         <button
           type="button"
           aria-label="Colour"
@@ -239,8 +248,16 @@ export function SelectionBar({
           onClick={() => setPalette((v) => !v)}
           className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
         >
-          <span className="h-4 w-4 rounded-full border border-black/15" style={{ background: mark.color }} />
+          <span className="h-4 w-4 rounded-full border border-black/15" style={{ background: marks[0].color }} />
         </button>
+      ) : null}
+      {words ? (
+        <TextControls
+          size={marks[0].fontSize ?? 20}
+          bold={marks.every((m) => isAllBold(m.text ?? ""))}
+          onSize={(dir) => onStyle((m) => ({ fontSize: stepSize(m.fontSize ?? 20, dir) }))}
+          onBold={() => onStyle((m) => ({ text: toggleBoldAll(m.text ?? "") }))}
+        />
       ) : null}
       {label ? <span className="max-w-[12rem] truncate px-2 text-xs text-muted-foreground">{label}</span> : null}
       <ToolButton label="Comment C" onClick={onComment}>
@@ -249,22 +266,22 @@ export function SelectionBar({
       <ToolButton label="Zoom to selection Shift 2" onClick={onZoom}>
         <ToolIcon name="zoom" />
       </ToolButton>
-      {mark ? (
+      {any ? (
         <ToolButton label="Remove Delete" onClick={onRemove}>
           <ToolIcon name="trash" />
         </ToolButton>
       ) : null}
 
-      {palette && mark ? (
+      {palette && coloured ? (
         <Menu className="left-0 top-12 w-auto p-2">
           <div className="flex gap-1.5">
-            {(fills ? NOTE_FILLS : INKS).map((c) => (
+            {(notes ? NOTE_FILLS : INKS).map((c) => (
               <button
                 key={c}
                 type="button"
                 aria-label={`Colour ${c}`}
-                onClick={() => onStyle({ color: c })}
-                className={cn("h-7 w-7 rounded-full border border-black/15", mark.color === c && "ring-2 ring-[#2f6fdf] ring-offset-1")}
+                onClick={() => onStyle(() => ({ color: c }))}
+                className={cn("h-7 w-7 rounded-full border border-black/15", marks[0].color === c && "ring-2 ring-[#2f6fdf] ring-offset-1")}
                 style={{ background: c }}
               />
             ))}
@@ -276,7 +293,7 @@ export function SelectionBar({
                   key={px}
                   type="button"
                   aria-label={px === 2 ? "Thin line" : px === 4 ? "Medium line" : "Thick line"}
-                  onClick={() => onStyle({ stroke: Math.round((px / zoom) * 100) / 100 })}
+                  onClick={() => onStyle(() => ({ stroke: Math.round((px / zoom) * 100) / 100 }))}
                   className="flex h-8 flex-1 items-center justify-center rounded-md hover:bg-muted"
                 >
                   <span className="w-6 rounded-full bg-foreground" style={{ height: px }} />
@@ -288,6 +305,96 @@ export function SelectionBar({
       ) : null}
     </div>
   );
+}
+
+/** Smaller, the size, bigger, and bold. Shared by the selection bar and the bar while typing. */
+function TextControls({
+  size,
+  bold,
+  onSize,
+  onBold,
+  divider = true,
+}: {
+  size: number;
+  bold: boolean;
+  onSize: (dir: 1 | -1) => void;
+  onBold: () => void;
+  divider?: boolean;
+}) {
+  // A press here must not take the caret out of the words being typed.
+  const keep = (e: React.MouseEvent) => e.preventDefault();
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Smaller text"
+        title="Smaller text"
+        onMouseDown={keep}
+        onClick={() => onSize(-1)}
+        className="flex h-8 w-7 items-center justify-center rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        A<span className="text-[10px]">-</span>
+      </button>
+      <span className="min-w-[2.25rem] text-center text-sm tabular-nums" aria-label="Text size">
+        {Math.round(size)}
+      </span>
+      <button
+        type="button"
+        aria-label="Bigger text"
+        title="Bigger text"
+        onMouseDown={keep}
+        onClick={() => onSize(1)}
+        className="flex h-8 w-7 items-center justify-center rounded-lg text-base text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        A<span className="text-[11px]">+</span>
+      </button>
+      <button
+        type="button"
+        aria-label="Bold Ctrl B"
+        title="Bold Ctrl B"
+        aria-pressed={bold}
+        onMouseDown={keep}
+        onClick={onBold}
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-lg text-[15px] font-bold",
+          bold ? "bg-[#e5eefc] text-[#2f6fdf]" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+      >
+        B
+      </button>
+      {divider ? <span className="mx-1 h-5 w-px bg-border" aria-hidden /> : null}
+    </>
+  );
+}
+
+/**
+ * The bar over a text or note while its words are being typed: the size for the whole of it, and
+ * bold for the words selected, or for what is typed next when nothing is.
+ */
+export function EditBar({ rect, size, onSize }: { rect: Rect; size: number; onSize: (size: number) => void }) {
+  const top = rect.y - 52 < 8 ? rect.y + rect.h + 10 : rect.y - 52;
+  return (
+    <div
+      data-float
+      className="absolute z-20 flex h-10 -translate-x-1/2 items-center gap-0.5 rounded-xl border border-black/10 bg-surface px-1 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
+      style={{ left: rect.x + rect.w / 2, top }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <TextControls
+        size={size}
+        bold={false}
+        onSize={(dir) => onSize(stepSize(size, dir))}
+        onBold={() => document.execCommand("bold")}
+        divider={false}
+      />
+    </div>
+  );
+}
+
+/** True when every word of the text is bold. */
+function isAllBold(text: string) {
+  const rs = runs(text).filter((r) => r.text.trim());
+  return rs.length > 0 && rs.every((r) => r.bold);
 }
 
 /* ------------------------------------------------------------------ pages */
